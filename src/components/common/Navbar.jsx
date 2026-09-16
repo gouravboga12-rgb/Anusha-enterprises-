@@ -1,9 +1,9 @@
 import React from 'react';
-import { Menu, Search, PlusCircle, Receipt, MapPin, Calendar, Database, Cloud } from 'lucide-react';
+import { Menu, Search, PlusCircle, Receipt, MapPin, Calendar, Database, Cloud, LogOut } from 'lucide-react';
 import { AiVoiceWidget } from './AiVoiceWidget';
 import { formatDate, getTodayDateString } from '../../utils/formatters';
 
-export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveConnected, isLoading }) => {
+export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveConnected, isLoading, currentUser, onLogout }) => {
   const todayStr = formatDate(getTodayDateString());
 
   return (
@@ -128,6 +128,22 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
             <Receipt size={15} color="#0284c7" />
             <span className="btn-text">Payment</span>
           </button>
+          {currentUser && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={onLogout}
+              style={{
+                background: '#fef2f2',
+                color: '#b91c1c',
+                border: '1px solid #fecaca',
+                padding: '4px 8px'
+              }}
+              title={`Logged in as ${currentUser.name || currentUser.email}. Click to Logout`}
+            >
+              <LogOut size={14} />
+              <span className="btn-text">Logout</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

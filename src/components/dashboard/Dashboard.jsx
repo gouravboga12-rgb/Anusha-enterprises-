@@ -202,15 +202,6 @@ export const Dashboard = ({
 
       {/* Quick Actions Strip */}
       <div className="quick-actions">
-        <button className="btn btn-primary" onClick={onOpenNewSale}>
-          <PlusCircle size={16} /> New Customer Sale
-        </button>
-        <button className="btn btn-secondary" onClick={onOpenNewPurchase}>
-          <ShoppingBag size={16} color="#0284c7" /> New Supplier Purchase
-        </button>
-        <button className="btn btn-secondary" onClick={onOpenPayment}>
-          <CreditCard size={16} color="#10b981" /> Record Installment Payment
-        </button>
         <button className="btn btn-secondary" onClick={onOpenAdjustment}>
           <Sliders size={16} color="#7c3aed" /> Manual Stock Adjustment
         </button>

@@ -28,13 +28,69 @@ import { ManualAdjustmentModal } from './components/inventory/ManualAdjustmentMo
 import { RevenueProfitReport } from './components/reports/RevenueProfitReport';
 import { BottomNav } from './components/common/BottomNav';
 import { Footer } from './components/common/Footer';
+import { LoginPage } from './components/auth/LoginPage';
 
 import { dataService } from './api/dataService';
 
 export const App = () => {
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('anusha_crm_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [, setTick] = useState(0); // For re-rendering when dataService changes
+
+  // Synchronize route URL with login state
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      if (window.location.pathname !== '/control-login') {
+        window.history.replaceState(null, '', '/control-login');
+        setCurrentPath('/control-login');
+      }
+    } else {
+      if (window.location.pathname === '/control-login') {
+        window.history.replaceState(null, '', '/');
+        setCurrentPath('/');
+      }
+    }
+  }, [currentUser]);
+
+  const handleLoginSuccess = (userObj) => {
+    try {
+      localStorage.setItem('anusha_crm_auth_user', JSON.stringify(userObj));
+    } catch (e) {
+      console.warn('LocalStorage save error:', e);
+    }
+    setCurrentUser(userObj);
+    window.history.pushState(null, '', '/');
+    setCurrentPath('/');
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('anusha_crm_auth_user');
+    } catch (e) {
+      console.warn('LocalStorage remove error:', e);
+    }
+    setCurrentUser(null);
+    window.history.pushState(null, '', '/control-login');
+    setCurrentPath('/control-login');
+  };
 
   // Selection states
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
@@ -121,6 +177,10 @@ export const App = () => {
     setIsEditPurchaseOpen(true);
   };
 
+  if (!currentUser) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="app-container">
       {/* Responsive Sidebar Drawer */}
@@ -133,6 +193,8 @@ export const App = () => {
         }}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
@@ -143,6 +205,8 @@ export const App = () => {
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onOpenNewSale={() => openNewSale()}
           onOpenPayment={() => openPayment()}
+          currentUser={currentUser}
+          onLogout={handleLogout}
         />
 
         {!dataService.isLiveConnected && (

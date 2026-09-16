@@ -13,11 +13,12 @@ import {
   TrendingUp,
   RotateCcw,
   Sliders,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import { dataService } from '../../api/dataService';
 
-export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose }) => {
+export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, onLogout }) => {
   const products = dataService.getProducts();
   const lowStockCount = products.filter((p) => p.current_stock <= (p.min_stock_alert || 20)).length;
 
@@ -106,17 +107,64 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose }) => {
           })}
         </div>
 
-        <div style={{ padding: '16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
-          <button
-            className="btn btn-secondary btn-sm"
-            style={{ width: '100%', fontSize: '12px', justifyContent: 'flex-start', color: '#64748b' }}
-            onClick={handleResetData}
-            title="Restore original sample records"
-          >
-            <RotateCcw size={14} />
-            <span>Reset Sample Records</span>
-          </button>
-          <p style={{ fontSize: '10px', color: '#94a3b8', marginTop: '8px', textAlign: 'center' }}>
+        <div style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+          {currentUser && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '12px',
+              padding: '8px 10px',
+              background: '#ffffff',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  flexShrink: 0
+                }}>
+                  {currentUser.name ? currentUser.name[0] : 'S'}
+                </div>
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    {currentUser.name || 'Shiva'}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    {currentUser.email || currentUser.phone}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={onLogout}
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#b91c1c',
+                  borderRadius: '6px',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+                title="Logout"
+              >
+                <LogOut size={13} />
+              </button>
+            </div>
+          )}
+          <p style={{ fontSize: '10.5px', color: '#94a3b8', margin: 0, textAlign: 'center' }}>
             Nandipet, Nizamabad • Est. 2014
           </p>
         </div>
