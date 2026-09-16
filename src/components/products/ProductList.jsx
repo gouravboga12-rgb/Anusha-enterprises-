@@ -13,9 +13,9 @@ export const ProductList = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
 
-  const handleDeleteProduct = (prod) => {
+  const handleDeleteProduct = async (prod) => {
     if (window.confirm(`Are you sure you want to delete product "${prod.name}" (${prod.sku})?\n\nCurrent physical stock: ${prod.current_stock} ${prod.unit}.\nThis action cannot be undone.`)) {
-      dataService.deleteProduct(prod.id);
+      await dataService.deleteProduct(prod.id);
     }
   };
 
@@ -25,6 +25,8 @@ export const ProductList = ({
   };
 
   const filteredProducts = products.filter((p) => {
+    if (p.is_active === false) return false;
+
     const matches =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));

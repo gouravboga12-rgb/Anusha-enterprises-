@@ -326,11 +326,26 @@ class DataService {
     return saved;
   }
 
-  deleteProduct(id) {
+  async deleteProduct(id) {
     this.products = this.products.filter((p) => p.id !== id);
     this.notify();
 
-    supabase.from('products').delete().eq('id', id).then().catch((e) => console.warn('Live deleteProduct error:', e));
+    if (!isSupabaseConfigured) return;
+
+    try {
+      // Attempt clean deletion from Supabase
+      const { error: delErr } = await supabase.from('products').delete().eq('id', id);
+
+      // If foreign key constraint prevents deletion (product was used in past sales/purchases):
+      if (delErr && delErr.code === '23503') {
+        console.warn('Product has historical transactions; soft-deleting by setting is_active = false');
+        await supabase.from('products').update({ is_active: false }).eq('id', id);
+      } else if (delErr) {
+        console.warn('Live deleteProduct error:', delErr);
+      }
+    } catch (e) {
+      console.warn('Live deleteProduct exception:', e);
+    }
   }
 
   toggleProductActive(id) {
