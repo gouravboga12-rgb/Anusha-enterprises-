@@ -1077,15 +1077,24 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .ai-widget {
-    padding: 5px 10px !important;
+    padding: 5px 9px !important;
     gap: 5px !important;
-    border-radius: 9999px !important;
+    border-radius: 8px !important;
     display: inline-flex !important;
     align-items: center !important;
-    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
-    color: #ffffff !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #475569 !important;
     flex-shrink: 0 !important;
-    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.4) !important;
+    box-shadow: none !important;
+  }
+
+  .ai-widget .soundwave {
+    display: none !important;
+  }
+
+  .ai-widget svg {
+    color: #64748b !important;
   }
 
   .ai-widget-label-desktop {
@@ -1095,9 +1104,9 @@ h1, h2, h3, h4, h5, h6 {
   .ai-widget-label-mobile {
     display: inline !important;
     font-size: 11.5px !important;
-    font-weight: 700 !important;
+    font-weight: 600 !important;
     letter-spacing: -0.01em !important;
-    color: #ffffff !important;
+    color: #475569 !important;
   }
 
   /* Modal on mobile - clean bottom sheet */
