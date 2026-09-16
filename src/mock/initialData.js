@@ -3,59 +3,59 @@
 export const initialProducts = [
   {
     id: 'prod-1',
-    sku: 'IBB-001',
-    name: 'Ideal Boost Box',
+    sku: 'MIN-IB-01',
+    name: 'Ideal Boost',
     current_stock: 120,
-    unit: 'boxes',
+    unit: 'units',
     purchase_price: 450,
     selling_price: 650,
     min_stock_alert: 20,
     is_active: true,
-    image_url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=300&auto=format&fit=crop&q=80',
-    description: 'High performance boost power box with surge protection'
+    image_url: '/products/ideal_boost.jpg',
+    description: 'High-density cast pentolite booster for quarry rock blasting and opencast mining'
   },
   {
     id: 'prod-2',
-    sku: 'IP90-002',
-    name: 'Ideal Power 90',
+    sku: 'MIN-IP90-02',
+    name: 'Ideal Power90',
     current_stock: 85,
-    unit: 'units',
+    unit: 'boxes',
     purchase_price: 820,
     selling_price: 1150,
     min_stock_alert: 15,
     is_active: true,
-    image_url: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&auto=format&fit=crop&q=80',
-    description: '90W regulated power module for commercial & industrial setups'
+    image_url: '/products/ideal_power90.jpg',
+    description: 'Cap-sensitive packaged emulsion explosive cartridges for rock fragmentation and quarrying'
   },
   {
     id: 'prod-3',
-    sku: 'IC-003',
-    name: 'Ideal Core',
+    sku: 'MIN-IC-03',
+    name: 'Ideal Cord',
     current_stock: 45,
-    unit: 'units',
+    unit: 'reels',
     purchase_price: 1250,
     selling_price: 1750,
     min_stock_alert: 10,
     is_active: true,
-    image_url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=300&auto=format&fit=crop&q=80',
-    description: 'Centralized core processing and distribution module'
+    image_url: '/products/ideal_cord.jpg',
+    description: 'High-velocity flexible detonating cord reel (10g/m) with PETN core for mining blasts'
   },
   {
     id: 'prod-4',
-    sku: 'SEP-004',
-    name: 'Solar Eco Prime',
+    sku: 'MIN-SEP-04',
+    name: 'Solar EcoPrime',
     current_stock: 35,
-    unit: 'units',
+    unit: 'boxes',
     purchase_price: 2100,
     selling_price: 2900,
     min_stock_alert: 10,
     is_active: true,
-    image_url: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=300&auto=format&fit=crop&q=80',
-    description: 'Eco-friendly hybrid solar controller with high efficiency'
+    image_url: '/products/solar_ecoprime.png',
+    description: 'High-strength bulk/packaged emulsion booster explosive from Solar Industries India Ltd'
   },
   {
     id: 'prod-5',
-    sku: 'STB-005',
+    sku: 'MIN-STB-05',
     name: 'Salvo Thunderbolt',
     current_stock: 90,
     unit: 'boxes',
@@ -63,21 +63,21 @@ export const initialProducts = [
     selling_price: 890,
     min_stock_alert: 25,
     is_active: true,
-    image_url: 'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=300&auto=format&fit=crop&q=80',
-    description: 'Heavy-duty surge and thunder lightning arrestor unit'
+    image_url: '/products/salvo_thunderbolt.png',
+    description: 'High-velocity quarrying booster explosive cartridge from Salvo Explosives & Chemicals'
   },
   {
     id: 'prod-6',
-    sku: '3D-006',
-    name: '3D',
+    sku: 'MIN-SRI-06',
+    name: 'Sridet',
     current_stock: 160,
-    unit: 'boxes',
-    purchase_price: 310,
-    selling_price: 460,
+    unit: 'pieces',
+    purchase_price: 85,
+    selling_price: 125,
     min_stock_alert: 30,
     is_active: true,
-    image_url: 'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=300&auto=format&fit=crop&q=80',
-    description: 'Multi-directional terminal junction box'
+    image_url: '/products/sridet.jpg',
+    description: 'Non-electric shock tube delay detonator system by Ideal Detonators Pvt Ltd for precision blast timing'
   }
 ];
 
