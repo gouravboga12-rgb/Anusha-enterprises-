@@ -15,7 +15,12 @@ export const ProductList = ({
 
   const handleDeleteProduct = async (prod) => {
     if (window.confirm(`Are you sure you want to delete product "${prod.name}" (${prod.sku})?\n\nCurrent physical stock: ${prod.current_stock} ${prod.unit}.\nThis action cannot be undone.`)) {
-      await dataService.deleteProduct(prod.id);
+      try {
+        await dataService.deleteProduct(prod.id);
+      } catch (err) {
+        console.error('Delete product error:', err);
+        alert('Could not delete product: ' + (err.message || 'Unknown error'));
+      }
     }
   };
 

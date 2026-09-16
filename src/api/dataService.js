@@ -15,22 +15,34 @@ import { generateId, getTodayDateString, getCurrentTimeString } from '../utils/f
 
 class DataService {
   constructor() {
-    // Initialize in-memory records so UI is immediately fully interactive and never blank
-    this.products = JSON.parse(JSON.stringify(initialProducts));
-    this.customers = JSON.parse(JSON.stringify(initialCustomers));
-    this.suppliers = JSON.parse(JSON.stringify(initialSuppliers));
-    this.sales = JSON.parse(JSON.stringify(initialSales));
-    this.purchases = JSON.parse(JSON.stringify(initialPurchases));
-    this.payments = JSON.parse(JSON.stringify(initialPayments));
-    this.adjustments = JSON.parse(JSON.stringify(initialAdjustments));
+    // Zero localStorage reliance - live PostgreSQL via Supabase
+    // If Supabase is configured, start empty and fetch live records directly from cloud DB
+    if (isSupabaseConfigured) {
+      this.products = [];
+      this.customers = [];
+      this.suppliers = [];
+      this.sales = [];
+      this.purchases = [];
+      this.payments = [];
+      this.adjustments = [];
+      this.isLoading = true;
+    } else {
+      this.products = JSON.parse(JSON.stringify(initialProducts));
+      this.customers = JSON.parse(JSON.stringify(initialCustomers));
+      this.suppliers = JSON.parse(JSON.stringify(initialSuppliers));
+      this.sales = JSON.parse(JSON.stringify(initialSales));
+      this.purchases = JSON.parse(JSON.stringify(initialPurchases));
+      this.payments = JSON.parse(JSON.stringify(initialPayments));
+      this.adjustments = JSON.parse(JSON.stringify(initialAdjustments));
+      this.isLoading = false;
+    }
 
     this.isLiveConnected = false;
-    this.isLoading = false;
     this.connectionError = null;
     this.listeners = new Set();
     this.realtimeChannel = null;
 
-    // Automatically initialize on startup
+    // Automatically load cloud database on startup
     this.init();
   }
 
@@ -77,8 +89,12 @@ class DataService {
    */
   async fetchAll() {
     try {
-      // 1. Fetch Products
-      const { data: prods, error: pErr } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      // 1. Fetch Products (only active / non-deleted products)
+      const { data: prods, error: pErr } = await supabase
+        .from('products')
+        .select('*')
+        .neq('is_active', false)
+        .order('created_at', { ascending: false });
       if (pErr) throw pErr;
 
       // 2. Fetch Customers
@@ -182,10 +198,6 @@ class DataService {
         quantity: Number(a.quantity) || 0
       }));
 
-      // If database is completely brand-new and empty, seed initial data to Supabase
-      if (this.products.length === 0 && this.customers.length === 0) {
-        await this.seedInitialDataToSupabase();
-      }
 
       this.isLiveConnected = true;
       this.connectionError = null;
@@ -275,7 +287,7 @@ class DataService {
 
   // --- PRODUCTS ---
   getProducts() {
-    return this.products;
+    return (this.products || []).filter((p) => p && p.is_active !== false);
   }
 
   getProductById(id) {
@@ -327,24 +339,32 @@ class DataService {
   }
 
   async deleteProduct(id) {
+    // 1. Immediately remove from memory & broadcast so UI updates instantly
     this.products = this.products.filter((p) => p.id !== id);
     this.notify();
 
     if (!isSupabaseConfigured) return;
 
     try {
-      // Attempt clean deletion from Supabase
+      // 2. Remove referencing rows in child tables that have foreign keys pointing to products(id)
+      await supabase.from('manual_stock_adjustments').delete().eq('product_id', id);
+      await supabase.from('customer_sale_items').delete().eq('product_id', id);
+      await supabase.from('supplier_purchase_items').delete().eq('product_id', id);
+
+      // 3. Delete the product row permanently from Supabase products table
       const { error: delErr } = await supabase.from('products').delete().eq('id', id);
 
-      // If foreign key constraint prevents deletion (product was used in past sales/purchases):
-      if (delErr && delErr.code === '23503') {
-        console.warn('Product has historical transactions; soft-deleting by setting is_active = false');
+      if (delErr) {
+        console.warn('Permanent deleteProduct warning, applying soft-delete fallback:', delErr);
         await supabase.from('products').update({ is_active: false }).eq('id', id);
-      } else if (delErr) {
-        console.warn('Live deleteProduct error:', delErr);
       }
     } catch (e) {
       console.warn('Live deleteProduct exception:', e);
+      try {
+        await supabase.from('products').update({ is_active: false }).eq('id', id);
+      } catch (innerErr) {
+        console.warn('Fallback soft-delete error:', innerErr);
+      }
     }
   }
 
