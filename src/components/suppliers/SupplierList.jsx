@@ -139,7 +139,11 @@ export const SupplierList = ({
                                 border: '1px solid #a7f3d0',
                                 fontWeight: 700
                               }}
-                              onClick={() => onOpenPayment && onOpenPayment(supp.id, 'supplier')}
+                              onClick={() => {
+                                const pendingPurchases = dataService.getPurchases().filter((p) => p.supplier_id === supp.id && p.pending_amount > 0);
+                                const firstPurchaseId = pendingPurchases.length > 0 ? pendingPurchases[0].id : '';
+                                onOpenPayment && onOpenPayment(supp.id, 'supplier', firstPurchaseId);
+                              }}
                               title="Pay / Update Outstanding Supplier Balance"
                             >
                               <Receipt size={13} /> Pay
@@ -269,7 +273,11 @@ export const SupplierList = ({
                     <button
                       className="btn btn-sm"
                       style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}
-                      onClick={() => onOpenPayment && onOpenPayment(supp.id, 'supplier')}
+                      onClick={() => {
+                        const pendingPurchases = dataService.getPurchases().filter((p) => p.supplier_id === supp.id && p.pending_amount > 0);
+                        const firstPurchaseId = pendingPurchases.length > 0 ? pendingPurchases[0].id : '';
+                        onOpenPayment && onOpenPayment(supp.id, 'supplier', firstPurchaseId);
+                      }}
                     >
                       <Receipt size={14} /> Pay ({formatCurrency(ledger.pendingBalance)})
                     </button>

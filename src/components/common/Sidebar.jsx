@@ -44,13 +44,23 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose }) => {
         />
       )}
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-        <div className="brand-header">
-          <div className="brand-logo-badge">
-            AE
-          </div>
+        <div className="brand-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px' }}>
+          <img
+            src="/logo.png"
+            alt="Anusha Enterprises"
+            style={{
+              height: '42px',
+              width: '42px',
+              objectFit: 'contain',
+              borderRadius: '8px',
+              background: '#ffffff',
+              padding: '2px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+            }}
+          />
           <div className="brand-details">
-            <h2>Anusha Enterprises</h2>
-            <p>Digital Business Ledger</p>
+            <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>Anusha Enterprises</h2>
+            <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Digital Business Ledger</p>
           </div>
           {isOpen && (
             <button

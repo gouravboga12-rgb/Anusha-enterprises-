@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { formatCurrency, formatDate, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
+import { Receipt, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, DollarSign, Calendar, Clock } from 'lucide-react';
 
 export const RecordPaymentModal = ({
   isOpen,
@@ -27,11 +28,23 @@ export const RecordPaymentModal = ({
   const sales = dataService.getSales();
   const purchases = dataService.getPurchases();
 
+  // Reset and auto-link on open
   useEffect(() => {
     if (isOpen) {
       const type = initialPartyType || 'customer';
       const pId = initialPartyId || '';
-      const dId = initialDocId || '';
+      let dId = initialDocId || '';
+
+      // Auto-target pending bill if not specified
+      if (!dId && pId) {
+        if (type === 'customer') {
+          const pending = sales.filter((s) => s.customer_id === pId && s.pending_amount > 0);
+          if (pending.length > 0) dId = pending[0].id;
+        } else {
+          const pending = purchases.filter((p) => p.supplier_id === pId && p.pending_amount > 0);
+          if (pending.length > 0) dId = pending[0].id;
+        }
+      }
 
       setPartyType(type);
       setPartyId(pId);
@@ -57,6 +70,29 @@ export const RecordPaymentModal = ({
     }
   }, [isOpen, initialPartyId, initialPartyType, initialDocId]);
 
+  // When partyId changes in dropdown, auto-select their first pending bill
+  const handlePartyChange = (newPartyId) => {
+    setPartyId(newPartyId);
+    setError('');
+
+    if (newPartyId) {
+      const pendingBills = partyType === 'customer'
+        ? sales.filter((s) => s.customer_id === newPartyId && s.pending_amount > 0)
+        : purchases.filter((p) => p.supplier_id === newPartyId && p.pending_amount > 0);
+
+      if (pendingBills.length > 0) {
+        setDocId(pendingBills[0].id);
+        setAmount(String(pendingBills[0].pending_amount));
+      } else {
+        setDocId('');
+        setAmount('');
+      }
+    } else {
+      setDocId('');
+      setAmount('');
+    }
+  };
+
   // Filter bills for selected party
   const partySales = sales.filter((s) => s.customer_id === partyId && s.pending_amount > 0);
   const partyPurchases = purchases.filter((p) => p.supplier_id === partyId && p.pending_amount > 0);
@@ -69,18 +105,31 @@ export const RecordPaymentModal = ({
     : null;
   const partyPendingTotal = partyLedger ? partyLedger.pendingBalance : 0;
 
+  // Selected party object
+  const selectedParty = partyType === 'customer'
+    ? customers.find((c) => c.id === partyId)
+    : suppliers.find((s) => s.id === partyId);
+
+  // Live calculation numbers
+  const numAmount = Number(amount) || 0;
+  const targetBillTotal = selectedSale ? selectedSale.total_amount : (selectedPurchase ? selectedPurchase.total_amount : 0);
+  const targetPreviousPaid = selectedSale ? selectedSale.paid_amount : (selectedPurchase ? selectedPurchase.paid_amount : 0);
+  const targetPendingBefore = selectedSale ? selectedSale.pending_amount : (selectedPurchase ? selectedPurchase.pending_amount : partyPendingTotal);
+  
+  const projectedPaid = targetPreviousPaid + numAmount;
+  const projectedRemaining = Math.max(0, targetPendingBefore - numAmount);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
 
-    const numAmount = Number(amount);
-    if (!numAmount || numAmount <= 0) {
-      setError('Please enter a valid payment amount greater than 0');
+    if (!partyId) {
+      setError(`Please select a ${partyType === 'customer' ? 'Customer' : 'Supplier'}`);
       return;
     }
 
-    if (!partyId) {
-      setError(`Please select a ${partyType}`);
+    if (!numAmount || numAmount <= 0) {
+      setError('Please enter a valid payment amount greater than 0');
       return;
     }
 
@@ -94,7 +143,7 @@ export const RecordPaymentModal = ({
           reference_no: referenceNo,
           date,
           time,
-          notes
+          notes: notes || (selectedSale ? `Installment payment for ${selectedSale.invoice_no}` : 'Account payment')
         });
         if (onPaymentRecorded) onPaymentRecorded(pay);
       } else {
@@ -106,7 +155,7 @@ export const RecordPaymentModal = ({
           reference_no: referenceNo,
           date,
           time,
-          notes
+          notes: notes || (selectedPurchase ? `Payout installment for ${selectedPurchase.purchase_no}` : 'Account payout')
         });
         if (onPaymentRecorded) onPaymentRecorded(pay);
       }
@@ -123,22 +172,23 @@ export const RecordPaymentModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Record Payment / Installment Entry"
-      maxWidth="650px"
+      title={partyType === 'customer' ? 'Collect Customer Payment / Installment' : 'Record Supplier Payout / Installment'}
+      maxWidth="680px"
     >
       <form onSubmit={handleSubmit}>
         {error && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
-            {error}
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={16} />
+            <span>{error}</span>
           </div>
         )}
 
-        {/* Party Type Toggle */}
+        {/* Mode Toggle (Customer Collection vs Supplier Payout) */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
           <button
             type="button"
             className={`btn btn-sm ${partyType === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flex: 1 }}
+            style={{ flex: 1, padding: '8px' }}
             onClick={() => {
               setPartyType('customer');
               setPartyId('');
@@ -146,12 +196,12 @@ export const RecordPaymentModal = ({
               setAmount('');
             }}
           >
-            Customer Payment Received (Inward)
+            Customer Payment (Money Inward)
           </button>
           <button
             type="button"
             className={`btn btn-sm ${partyType === 'supplier' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flex: 1 }}
+            style={{ flex: 1, padding: '8px' }}
             onClick={() => {
               setPartyType('supplier');
               setPartyId('');
@@ -159,205 +209,322 @@ export const RecordPaymentModal = ({
               setAmount('');
             }}
           >
-            Supplier Payment Made (Outward)
+            Supplier Payout (Money Outward)
           </button>
         </div>
 
-        {/* Party Selector */}
-        <div className="form-group">
-          <label className="form-label">
+        {/* Party Selector with Total Balance Indicator */}
+        <div className="form-group" style={{ marginBottom: '16px' }}>
+          <label className="form-label" style={{ fontWeight: 700 }}>
             {partyType === 'customer' ? 'Select Customer *' : 'Select Supplier *'}
           </label>
           <select
             className="form-select"
             required
             value={partyId}
-            onChange={(e) => {
-              setPartyId(e.target.value);
-              setDocId('');
-              setAmount('');
-            }}
+            onChange={(e) => handlePartyChange(e.target.value)}
+            style={{ fontSize: '14px', padding: '10px 12px' }}
           >
             <option value="">-- Choose Party --</option>
             {partyType === 'customer'
-              ? customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.customer_id}) - {c.area || 'Nandipet'}
-                  </option>
-                ))
-              : suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}
-                  </option>
-                ))}
+              ? customers.map((c) => {
+                  const l = dataService.getCustomerLedger(c.id);
+                  const dueTag = l.pendingBalance > 0 ? ` [DUE: ${formatCurrency(l.pendingBalance)}]` : ' [Settled]';
+                  return (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.customer_id}) - {c.area || 'Nandipet'}{dueTag}
+                    </option>
+                  );
+                })
+              : suppliers.map((s) => {
+                  const l = dataService.getSupplierLedger(s.id);
+                  const dueTag = l.pendingBalance > 0 ? ` [PAYABLE: ${formatCurrency(l.pendingBalance)}]` : ' [Settled]';
+                  return (
+                    <option key={s.id} value={s.id}>
+                      {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}{dueTag}
+                    </option>
+                  );
+                })}
           </select>
 
           {partyId && (
-            <div style={{ marginTop: '6px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{
+              marginTop: '8px',
+              padding: '8px 12px',
+              background: '#f8fafc',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '12px'
+            }}>
               <span style={{ color: '#64748b' }}>
-                {partyType === 'customer' ? 'Total Customer Pending Balance:' : 'Total Payable to Supplier:'}
+                {partyType === 'customer' ? 'Total Customer Pending Balance:' : 'Total Outstanding to Supplier:'}
               </span>
-              <span style={{ fontWeight: 800, color: partyPendingTotal > 0 ? (partyType === 'customer' ? '#e11d48' : '#d97706') : '#10b981', background: '#f8fafc', padding: '2px 8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+              <strong style={{
+                fontSize: '14px',
+                color: partyPendingTotal > 0 ? (partyType === 'customer' ? '#e11d48' : '#d97706') : '#10b981'
+              }}>
                 {formatCurrency(partyPendingTotal)}
-              </span>
+              </strong>
             </div>
           )}
         </div>
 
-        {/* Invoice / Bill Link */}
-        {partyId && (
-          <div className="form-group">
-            <label className="form-label">
-              Select Bill / Invoice to Clear
+        {/* Bill Selection - Visual Cards if pending bills exist */}
+        {partyId && (partySales.length > 0 || partyPurchases.length > 0) && (
+          <div style={{ marginBottom: '16px' }}>
+            <label className="form-label" style={{ fontWeight: 700, marginBottom: '6px' }}>
+              Select Bill / Invoice to Clear:
             </label>
-            <select
-              className="form-select"
-              value={docId}
-              onChange={(e) => {
-                setDocId(e.target.value);
-                const item = partyType === 'customer'
-                  ? partySales.find((s) => s.id === e.target.value)
-                  : partyPurchases.find((p) => p.id === e.target.value);
-                if (item) {
-                  setAmount(String(item.pending_amount));
-                } else {
-                  setAmount('');
-                }
-              }}
-            >
-              <option value="">-- General Account Payment (All Outstanding Bills) --</option>
+            <div style={{ display: 'grid', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
               {partyType === 'customer'
                 ? partySales.map((s) => {
-                    const productSummary = s.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
+                    const isSelected = docId === s.id;
+                    const itemsStr = s.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
                     return (
-                      <option key={s.id} value={s.id}>
-                        {s.invoice_no} ({formatDate(s.date)}) - Items: {productSummary} - Due: {formatCurrency(s.pending_amount)}
-                      </option>
+                      <div
+                        key={s.id}
+                        onClick={() => {
+                          setDocId(s.id);
+                          setAmount(String(s.pending_amount));
+                        }}
+                        style={{
+                          border: `2px solid ${isSelected ? '#0284c7' : '#e2e8f0'}`,
+                          background: isSelected ? '#f0f9ff' : '#ffffff',
+                          borderRadius: '8px',
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <strong style={{ color: '#0f172a', fontSize: '13px' }}>{s.invoice_no}</strong>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>({formatDate(s.date)})</span>
+                            <span className="badge badge-partial">{s.payment_status}</span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', maxWidth: '380px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {itemsStr}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>Pending Due</div>
+                          <div style={{ fontSize: '14px', fontWeight: 800, color: '#e11d48' }}>
+                            {formatCurrency(s.pending_amount)}
+                          </div>
+                        </div>
+                      </div>
                     );
                   })
                 : partyPurchases.map((p) => {
-                    const productSummary = p.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
+                    const isSelected = docId === p.id;
+                    const itemsStr = p.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
                     return (
-                      <option key={p.id} value={p.id}>
-                        {p.purchase_no} ({formatDate(p.date)}) - Items: {productSummary} - Due: {formatCurrency(p.pending_amount)}
-                      </option>
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          setDocId(p.id);
+                          setAmount(String(p.pending_amount));
+                        }}
+                        style={{
+                          border: `2px solid ${isSelected ? '#0284c7' : '#e2e8f0'}`,
+                          background: isSelected ? '#f0f9ff' : '#ffffff',
+                          borderRadius: '8px',
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <strong style={{ color: '#0f172a', fontSize: '13px' }}>{p.purchase_no}</strong>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>({formatDate(p.date)})</span>
+                            <span className="badge badge-partial">{p.payment_status}</span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', maxWidth: '380px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {itemsStr}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>Pending Payable</div>
+                          <div style={{ fontSize: '14px', fontWeight: 800, color: '#d97706' }}>
+                            {formatCurrency(p.pending_amount)}
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
-            </select>
+            </div>
           </div>
         )}
 
-        {/* Highlight details of linked bill */}
+        {/* Selected Bill Breakdown Card */}
         {(selectedSale || selectedPurchase) && (
           <div style={{
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            background: '#f8fafc',
+            border: '1px solid #cbd5e1',
             borderRadius: '10px',
             padding: '14px 16px',
-            marginBottom: '16px',
-            fontSize: '13px'
+            marginBottom: '16px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontWeight: 700, color: '#166534', fontSize: '14px' }}>
-                Bill #{selectedSale?.invoice_no || selectedPurchase?.purchase_no} ({formatDate(selectedSale?.date || selectedPurchase?.date)})
+              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>
+                Target Bill: #{selectedSale?.invoice_no || selectedPurchase?.purchase_no} ({formatDate(selectedSale?.date || selectedPurchase?.date)})
               </span>
               <span className="badge badge-paid">
-                {selectedSale?.payment_status || selectedPurchase?.payment_status}
+                Total Bill: {formatCurrency(targetBillTotal)}
               </span>
             </div>
 
-            {/* Products on this bill */}
+            {/* Products on bill */}
             {docItems.length > 0 && (
-              <div style={{ background: '#ffffff', border: '1px solid #dcfce7', borderRadius: '6px', padding: '8px 10px', marginBottom: '8px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  PRODUCTS ON THIS BILL:
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '8px 10px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>
+                  ITEMS IN THIS BILL:
                 </div>
                 {docItems.map((i, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#1e293b', marginBottom: '2px' }}>
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#334155', marginBottom: '2px' }}>
                     <span>• {i.product_name}</span>
-                    <span style={{ color: '#64748b' }}>
-                      {i.quantity} {i.unit || ''} × {formatCurrency(i.selling_price || i.purchase_price)} = {formatCurrency(i.total || (i.quantity * (i.selling_price || i.purchase_price)))}
-                    </span>
+                    <span>{i.quantity} × {formatCurrency(i.selling_price || i.purchase_price)} = {formatCurrency(i.total || (i.quantity * (i.selling_price || i.purchase_price)))}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534', fontWeight: 600 }}>
-              <span>Total Bill Amount:</span>
-              <span>{formatCurrency(selectedSale?.total_amount || selectedPurchase?.total_amount)}</span>
+            {/* Previous Payments Info */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#475569' }}>
+              <span>Previously Paid on this Bill:</span>
+              <strong style={{ color: '#059669' }}>{formatCurrency(targetPreviousPaid)}</strong>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#166534', marginTop: '4px' }}>
-              <span>Already Paid Previously:</span>
-              <span>{formatCurrency(selectedSale?.paid_amount || selectedPurchase?.paid_amount)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b91c1c', fontWeight: 800, marginTop: '4px', borderTop: '1px dashed #a7f3d0', paddingTop: '6px', fontSize: '14px' }}>
-              <span>Remaining Pending on this Bill:</span>
-              <span>{formatCurrency(selectedSale?.pending_amount || selectedPurchase?.pending_amount)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#e11d48', fontWeight: 700, marginTop: '4px', borderTop: '1px dashed #cbd5e1', paddingTop: '6px' }}>
+              <span>Current Unpaid Balance:</span>
+              <span>{formatCurrency(targetPendingBefore)}</span>
             </div>
           </div>
         )}
 
-        {/* Amount & Mode */}
-        <div className="form-row">
-          <div className="form-group">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label className="form-label" style={{ margin: 0 }}>Payment Amount (₹) *</label>
-              {(selectedSale?.pending_amount > 0 || selectedPurchase?.pending_amount > 0 || partyPendingTotal > 0) && (
+        {/* Amount Input with Quick-Fill Chips */}
+        <div className="form-group" style={{ marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>
+              Payment Amount to Record (₹) *
+            </label>
+            {targetPendingBefore > 0 && (
+              <div style={{ display: 'flex', gap: '4px' }}>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  style={{ fontSize: '11px', padding: '1px 8px' }}
-                  onClick={() => setAmount(String(selectedSale?.pending_amount || selectedPurchase?.pending_amount || partyPendingTotal))}
+                  style={{ fontSize: '11px', padding: '2px 8px', fontWeight: 600 }}
+                  onClick={() => setAmount(String(targetPendingBefore))}
                 >
-                  Pay Full Due ({formatCurrency(selectedSale?.pending_amount || selectedPurchase?.pending_amount || partyPendingTotal)})
+                  Full Due ({formatCurrency(targetPendingBefore)})
                 </button>
-              )}
+                {targetPendingBefore >= 2000 && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '11px', padding: '2px 8px' }}
+                    onClick={() => setAmount(String(Math.floor(targetPendingBefore / 2)))}
+                  >
+                    50% ({formatCurrency(Math.floor(targetPendingBefore / 2))})
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#64748b' }}>
+              ₹
+            </span>
+            <input
+              type="number"
+              className="form-input"
+              required
+              min="1"
+              placeholder="e.g. 5000"
+              style={{ paddingLeft: '28px', fontSize: '16px', fontWeight: 700 }}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Live Calculation Preview */}
+        {numAmount > 0 && (selectedSale || selectedPurchase || partyId) && (
+          <div style={{
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '10px',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            fontSize: '12px'
+          }}>
+            <div style={{ fontWeight: 700, color: '#1e40af', marginBottom: '6px' }}>
+              LIVE LEDGER CALCULATION PREVIEW:
             </div>
-            <input
-              type="number"
-              className="form-input"
-              required
-              min="1"
-              placeholder="e.g. 15000"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center' }}>
+              <div style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '6px', border: '1px solid #dbeafe' }}>
+                <div style={{ color: '#64748b', fontSize: '11px' }}>Previous Paid</div>
+                <strong style={{ color: '#0f172a', fontSize: '13px' }}>{formatCurrency(targetPreviousPaid)}</strong>
+              </div>
+              <div style={{ background: '#ecfdf5', padding: '6px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                <div style={{ color: '#047857', fontSize: '11px' }}>This Payment</div>
+                <strong style={{ color: '#059669', fontSize: '13px' }}>+{formatCurrency(numAmount)}</strong>
+              </div>
+              <div style={{ background: projectedRemaining === 0 ? '#ecfdf5' : '#fef2f2', padding: '6px 8px', borderRadius: '6px', border: `1px solid ${projectedRemaining === 0 ? '#a7f3d0' : '#fecaca'}` }}>
+                <div style={{ color: projectedRemaining === 0 ? '#047857' : '#be123c', fontSize: '11px' }}>New Balance</div>
+                <strong style={{ color: projectedRemaining === 0 ? '#059669' : '#e11d48', fontSize: '13px' }}>{formatCurrency(projectedRemaining)}</strong>
+              </div>
+            </div>
+            {projectedRemaining === 0 && (
+              <div style={{ marginTop: '8px', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CheckCircle2 size={14} /> This payment will fully settle and mark this bill as Paid!
+              </div>
+            )}
           </div>
+        )}
 
-          <div className="form-group">
-            <label className="form-label">Payment Mode *</label>
-            <input
-              type="number"
-              className="form-input"
-              required
-              min="1"
-              placeholder="e.g. 15000"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
+        {/* Payment Mode Selection */}
+        <div className="form-row" style={{ marginBottom: '12px' }}>
+          <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label">Payment Mode *</label>
             <select
               className="form-select"
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value)}
             >
-              <option value="UPI">UPI (PhonePe / GPay / Paytm)</option>
               <option value="Cash">Cash (Hand-to-Hand)</option>
-              <option value="Bank Transfer">Bank Transfer (NEFT/RTGS/IMPS)</option>
+              <option value="UPI">UPI (PhonePe / GPay / Paytm)</option>
+              <option value="Bank Transfer">Bank Transfer (NEFT / IMPS / RTGS)</option>
               <option value="Cheque">Cheque</option>
               <option value="Other">Other</option>
             </select>
           </div>
+
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label">Reference / UTR / Cheque #</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. UPI-260916-99128"
+              value={referenceNo}
+              onChange={(e) => setReferenceNo(e.target.value)}
+            />
+          </div>
         </div>
 
-        {/* Date, Time, Ref */}
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Payment Date</label>
+        {/* Date & Time */}
+        <div className="form-row" style={{ marginBottom: '12px' }}>
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label">Date</label>
             <input
               type="date"
               className="form-input"
@@ -366,8 +533,8 @@ export const RecordPaymentModal = ({
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Exact Time</label>
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label">Time</label>
             <input
               type="text"
               className="form-input"
@@ -375,36 +542,44 @@ export const RecordPaymentModal = ({
               onChange={(e) => setTime(e.target.value)}
             />
           </div>
-
-          <div className="form-group">
-            <label className="form-label">Transaction Reference / UTR #</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="e.g. UPI/260916/88912"
-              value={referenceNo}
-              onChange={(e) => setReferenceNo(e.target.value)}
-            />
-          </div>
         </div>
 
-        <div className="form-group">
-          <label className="form-label">Notes</label>
+        <div className="form-group" style={{ marginBottom: '16px' }}>
+          <label className="form-label">Notes / Remarks</label>
           <input
             type="text"
             className="form-input"
-            placeholder="e.g. 2nd Installment paid at shop"
+            placeholder="e.g. 2nd Installment collected at shop"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
+        </div>
+
+        {/* Safety & Independent Voucher Assurance */}
+        <div style={{
+          background: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: '8px',
+          padding: '10px 14px',
+          fontSize: '12px',
+          color: '#166534',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '16px'
+        }}>
+          <ShieldCheck size={18} color="#15803d" />
+          <span>
+            <strong>Independent Record:</strong> This entry will be saved as a brand-new receipt voucher (REC-xxx) in the customer's passbook. Previous payment records remain permanently intact.
+          </span>
         </div>
 
         <div className="modal-footer" style={{ margin: '16px -24px -24px', padding: '16px 24px' }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary">
-            Record Individual Payment Slip
+          <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', fontWeight: 700 }}>
+            <Receipt size={16} /> Save & Record Payment Voucher
           </button>
         </div>
       </form>

@@ -167,7 +167,11 @@ export const CustomerList = ({
                                 border: '1px solid #a7f3d0',
                                 fontWeight: 700
                               }}
-                              onClick={() => onOpenPayment && onOpenPayment(cust.id, 'customer')}
+                              onClick={() => {
+                                const pendingSales = dataService.getSales().filter((s) => s.customer_id === cust.id && s.pending_amount > 0);
+                                const firstSaleId = pendingSales.length > 0 ? pendingSales[0].id : '';
+                                onOpenPayment && onOpenPayment(cust.id, 'customer', firstSaleId);
+                              }}
                               title="Collect / Update Pending Khata Balance"
                             >
                               <Receipt size={13} /> Collect
@@ -292,7 +296,11 @@ export const CustomerList = ({
                     <button
                       className="btn btn-sm"
                       style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}
-                      onClick={() => onOpenPayment && onOpenPayment(cust.id, 'customer')}
+                      onClick={() => {
+                        const pendingSales = dataService.getSales().filter((s) => s.customer_id === cust.id && s.pending_amount > 0);
+                        const firstSaleId = pendingSales.length > 0 ? pendingSales[0].id : '';
+                        onOpenPayment && onOpenPayment(cust.id, 'customer', firstSaleId);
+                      }}
                     >
                       <Receipt size={14} /> Collect ({formatCurrency(ledger.pendingBalance)})
                     </button>

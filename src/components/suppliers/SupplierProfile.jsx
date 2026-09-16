@@ -29,6 +29,8 @@ export const SupplierProfile = ({
   const ledgerData = dataService.getSupplierLedger(supplierId);
   const purchases = dataService.getPurchases().filter((p) => p.supplier_id === supplierId);
   const payments = dataService.getPayments().filter((p) => p.supplier_id === supplierId && p.type === 'supplier_payment');
+  const pendingPurchases = purchases.filter((p) => p.pending_amount > 0);
+  const firstPurchaseId = pendingPurchases.length > 0 ? pendingPurchases[0].id : '';
 
   const handleDeleteSupplier = () => {
     const warning = ledgerData.pendingBalance > 0
@@ -131,7 +133,7 @@ export const SupplierProfile = ({
             </button>
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => onOpenPayment(supplier.id, 'supplier')}
+              onClick={() => onOpenPayment(supplier.id, 'supplier', firstPurchaseId)}
             >
               <Receipt size={15} color="#0284c7" /> Pay Supplier
             </button>
@@ -192,7 +194,7 @@ export const SupplierProfile = ({
                     padding: '2px 8px',
                     fontSize: '11px'
                   }}
-                  onClick={() => onOpenPayment && onOpenPayment(supplier.id, 'supplier')}
+                  onClick={() => onOpenPayment && onOpenPayment(supplier.id, 'supplier', firstPurchaseId)}
                 >
                   <Receipt size={12} /> Pay Balance
                 </button>

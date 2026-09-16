@@ -27,6 +27,7 @@ import { DailyTransactions } from './components/daybook/DailyTransactions';
 import { ManualAdjustmentModal } from './components/inventory/ManualAdjustmentModal';
 import { RevenueProfitReport } from './components/reports/RevenueProfitReport';
 import { BottomNav } from './components/common/BottomNav';
+import { Footer } from './components/common/Footer';
 
 import { dataService } from './api/dataService';
 
@@ -346,6 +347,8 @@ export const App = () => {
             <DailyTransactions dataService={dataService} />
           )}
         </main>
+
+        <Footer />
       </div>
 
       {/* Global Modals */}

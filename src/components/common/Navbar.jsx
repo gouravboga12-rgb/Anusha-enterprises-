@@ -8,7 +8,7 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
 
   return (
     <header className="top-navbar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button
           onClick={onToggleSidebar}
           style={{
@@ -25,6 +25,31 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
         >
           <Menu size={22} />
         </button>
+
+        {/* Brand Logo & Name in Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img
+            src="/logo.png"
+            alt="Anusha Enterprises"
+            style={{
+              height: '32px',
+              width: 'auto',
+              objectFit: 'contain',
+              borderRadius: '4px'
+            }}
+          />
+          <span style={{
+            fontWeight: 800,
+            fontSize: '14px',
+            color: '#0f172a',
+            letterSpacing: '-0.01em',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            ANUSHA <span style={{ color: '#0284c7', fontWeight: 600 }}>ENTERPRISES</span>
+          </span>
+        </div>
 
         <div className="header-trust-badges" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span className="badge-trust" style={{

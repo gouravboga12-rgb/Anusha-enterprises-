@@ -142,7 +142,11 @@ export const CustomerProfile = ({
             </button>
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => onOpenPayment(customer.id, 'customer')}
+              onClick={() => {
+                const pendingSales = sales.filter((s) => s.pending_amount > 0);
+                const firstSaleId = pendingSales.length > 0 ? pendingSales[0].id : '';
+                onOpenPayment(customer.id, 'customer', firstSaleId);
+              }}
             >
               <Receipt size={15} color="#0284c7" /> Collect Payment
             </button>
@@ -203,7 +207,11 @@ export const CustomerProfile = ({
                     padding: '2px 8px',
                     fontSize: '11px'
                   }}
-                  onClick={() => onOpenPayment && onOpenPayment(customer.id, 'customer')}
+                  onClick={() => {
+                    const pendingSales = sales.filter((s) => s.pending_amount > 0);
+                    const firstSaleId = pendingSales.length > 0 ? pendingSales[0].id : '';
+                    onOpenPayment && onOpenPayment(customer.id, 'customer', firstSaleId);
+                  }}
                 >
                   <Receipt size={12} /> Collect Due
                 </button>
