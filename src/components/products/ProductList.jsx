@@ -45,7 +45,7 @@ export const ProductList = ({
             Accurate real-time stock levels automatically updated by sales and purchases.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="header-actions-group" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" onClick={onAdjustStock}>
             <Sliders size={15} color="#7c3aed" /> Manual Stock Adjustment
           </button>

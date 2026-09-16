@@ -1074,6 +1074,32 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: center !important;
   }
 
+  /* Subnav Tabs Bar on Mobile (e.g. Day Book vs Profit Reports) */
+  .subnav-tabs-bar {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .subnav-tabs-bar .btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Header Actions Group on Mobile (e.g. Products page header buttons) */
+  .header-actions-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .header-actions-group .btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
   /* Footer on mobile */
   .app-footer {
     padding: 18px 14px 85px !important;
@@ -1133,15 +1159,17 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Quick Actions Bar on Mobile */
   .quick-actions {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 8px !important;
+    width: 100% !important;
   }
 
   .quick-actions .btn {
-    font-size: 12px !important;
-    padding: 8px 10px !important;
-    width: 100%;
+    font-size: 13px !important;
+    padding: 10px 14px !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
   }
 
   /* Modals on Mobile: Touch-friendly layout */

@@ -8,6 +8,11 @@ export const ImageUploader = ({ currentImageUrl, onImageUploaded }) => {
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
 
+  // Sync state whenever currentImageUrl prop changes (e.g. opening edit modal)
+  React.useEffect(() => {
+    setPreviewUrl(currentImageUrl || '');
+  }, [currentImageUrl]);
+
   const handleFile = async (file) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -66,33 +71,45 @@ export const ImageUploader = ({ currentImageUrl, onImageUploaded }) => {
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '14px',
+          gap: '12px',
           padding: '12px',
           border: '1px solid #bae6fd',
           borderRadius: '10px',
-          background: '#f0f9ff'
+          background: '#f0f9ff',
+          flexWrap: 'wrap'
         }}>
           <img
             src={previewUrl}
-            alt="Preview"
-            style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+            alt="Product Preview"
+            style={{ width: '60px', height: '60px', objectFit: 'contain', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '2px', flexShrink: 0 }}
           />
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: '1 1 120px', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0284c7', fontSize: '13px', fontWeight: 600 }}>
-              <CheckCircle2 size={16} color="#10b981" /> Image Uploaded & Stored
+              <CheckCircle2 size={16} color="#10b981" /> Photo Attached
             </div>
             <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-              Cloudinary Cloud Storage Active
+              Active product photo
             </p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={handleClear}
-            title="Remove image"
-          >
-            <X size={14} /> Remove
-          </button>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              title="Upload new image"
+            >
+              Change
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+              onClick={handleClear}
+              title="Remove image"
+            >
+              <X size={14} /> Remove
+            </button>
+          </div>
         </div>
       ) : (
         <div

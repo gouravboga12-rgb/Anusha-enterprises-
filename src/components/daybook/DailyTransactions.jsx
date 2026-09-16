@@ -30,7 +30,7 @@ export const DailyTransactions = ({ dataService }) => {
   return (
     <div>
       {/* Top Mode Toggle */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }}>
+      <div className="subnav-tabs-bar" style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
         <button
           className={`btn ${activeSubTab === 'daybook' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveSubTab('daybook')}
@@ -56,7 +56,7 @@ export const DailyTransactions = ({ dataService }) => {
                 Instant single-page answer to: <strong>"What happened in my business today?"</strong>
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="header-actions-group" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => window.print()}>
                 <Printer size={15} /> Print Day Book
               </button>
