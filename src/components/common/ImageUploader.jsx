@@ -82,7 +82,7 @@ export const ImageUploader = ({ currentImageUrl, onImageUploaded }) => {
               <CheckCircle2 size={16} color="#10b981" /> Image Uploaded & Stored
             </div>
             <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-              Cloudinary Ready: Preset `anusha_products`
+              Cloudinary Cloud Storage Active
             </p>
           </div>
           <button

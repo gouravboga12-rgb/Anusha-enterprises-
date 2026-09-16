@@ -137,10 +137,47 @@ export const App = () => {
       {/* Main Content Area */}
       <div className="main-content">
         <Navbar
+          isLiveConnected={dataService.isLiveConnected}
+          isLoading={dataService.isLoading}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onOpenNewSale={() => openNewSale()}
           onOpenPayment={() => openPayment()}
         />
+
+        {!dataService.isLiveConnected && (
+          <div style={{
+            background: 'linear-gradient(90deg, #eff6ff 0%, #f0fdf4 100%)',
+            borderBottom: '1px solid #bfdbfe',
+            padding: '8px 16px',
+            fontSize: '12px',
+            color: '#1e40af',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontWeight: 700, background: '#3b82f6', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontSize: '10px' }}>SUPABASE</span>
+              <span>Live cloud engine active. Ensure you ran <strong>supabase_schema.sql</strong> in your Supabase SQL Editor to enable full cloud table sync across all devices!</span>
+            </div>
+            <button
+              onClick={() => dataService.init()}
+              style={{
+                background: '#2563eb',
+                color: '#fff',
+                border: 'none',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Check Tables
+            </button>
+          </div>
+        )}
 
         <main className="page-content">
           {activeTab === 'dashboard' && (

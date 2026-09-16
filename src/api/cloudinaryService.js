@@ -1,9 +1,22 @@
 // Cloudinary unsigned upload service for Anusha Enterprises CRM
 
+const getEnv = (key) => {
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+    return import.meta.env[key];
+  }
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    return process.env[key];
+  }
+  return '';
+};
+
+const cloudName = getEnv('VITE_CLOUDINARY_CLOUD_NAME');
+const uploadPreset = getEnv('VITE_CLOUDINARY_UPLOAD_PRESET');
+
 export const CLOUDINARY_CONFIG = {
-  cloudName: 'df7cgufv',
-  uploadPreset: 'anusha_products',
-  apiUrl: 'https://api.cloudinary.com/v1_1/df7cgufv/image/upload'
+  cloudName,
+  uploadPreset,
+  apiUrl: cloudName ? `https://api.cloudinary.com/v1_1/${cloudName}/image/upload` : ''
 };
 
 /**

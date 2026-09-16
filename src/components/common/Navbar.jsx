@@ -1,9 +1,9 @@
 import React from 'react';
-import { Menu, Search, PlusCircle, Receipt, MapPin, Calendar } from 'lucide-react';
+import { Menu, Search, PlusCircle, Receipt, MapPin, Calendar, Database, Cloud } from 'lucide-react';
 import { AiVoiceWidget } from './AiVoiceWidget';
 import { formatDate, getTodayDateString } from '../../utils/formatters';
 
-export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment }) => {
+export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveConnected, isLoading }) => {
   const todayStr = formatDate(getTodayDateString());
 
   return (
@@ -43,6 +43,32 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment }) => {
             <MapPin size={13} color="#0284c7" />
             <span>Nandipet</span>
           </div>
+        </div>
+
+        {/* Live Supabase Connection Badge */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 10px',
+          borderRadius: '9999px',
+          fontSize: '11px',
+          fontWeight: 600,
+          background: isLiveConnected ? '#ecfdf5' : '#fef3c7',
+          color: isLiveConnected ? '#059669' : '#d97706',
+          border: `1px solid ${isLiveConnected ? '#a7f3d0' : '#fde68a'}`
+        }}
+        title={isLiveConnected ? 'Connected to live Supabase PostgreSQL database' : 'Connecting to Supabase (run supabase_schema.sql in dashboard)'}
+        >
+          <span style={{
+            width: '7px',
+            height: '7px',
+            borderRadius: '50%',
+            background: isLiveConnected ? '#10b981' : '#f59e0b',
+            boxShadow: isLiveConnected ? '0 0 6px #10b981' : 'none'
+          }} />
+          <Cloud size={12} />
+          <span>{isLiveConnected ? 'Supabase Live' : 'Cloud Sync Ready'}</span>
         </div>
       </div>
 

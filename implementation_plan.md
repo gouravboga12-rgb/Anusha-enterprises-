@@ -37,11 +37,11 @@ To ensure you can review, test, and refine the look, feel, and daily bookkeeping
 **Goal**: Connect the verified UI to live Supabase tables and direct Cloudinary uploads.
 
 1. **Supabase Database Provisioning**:
-   - Generate and run `supabase_schema.sql` on `https://kboqrpfifsorfkexkpfd.supabase.co`.
+   - Generate and run `supabase_schema.sql` on your Supabase project.
    - Tables: `customers`, `suppliers`, `products`, `customer_sales`, `customer_sale_items`, `supplier_purchases`, `supplier_purchase_items`, `customer_payments`, `supplier_payments`, `stock_movements`, `manual_stock_adjustments`, `audit_logs`.
    - Foreign keys, constraints, and indexes.
 2. **Cloudinary Integration**:
-   - Activate live upload to Cloud Name: `df7cgufv`, Upload Preset: `anusha_products`.
+   - Activate live upload to configured Cloudinary upload preset.
    - Test live image uploads from desktop and mobile camera/gallery directly into Cloudinary.
 3. **Data Service Switchover**:
    - Switch data service from local state to live Supabase client (`@supabase/supabase-js`).

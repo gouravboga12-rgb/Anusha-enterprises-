@@ -1,5 +1,7 @@
-// Centralized Data Engine & Business Logic for Anusha Enterprises CRM
+// Centralized Live Supabase Data Engine & Business Logic for Anusha Enterprises CRM
+// Zero localStorage reliance - powered directly by PostgreSQL via Supabase
 
+import { supabase } from './supabaseClient.js';
 import {
   initialProducts,
   initialCustomers,
@@ -11,46 +13,24 @@ import {
 } from '../mock/initialData.js';
 import { generateId, getTodayDateString, getCurrentTimeString } from '../utils/formatters.js';
 
-const STORAGE_KEYS = {
-  PRODUCTS: 'anusha_products_v1',
-  CUSTOMERS: 'anusha_customers_v1',
-  SUPPLIERS: 'anusha_suppliers_v1',
-  SALES: 'anusha_sales_v1',
-  PURCHASES: 'anusha_purchases_v1',
-  PAYMENTS: 'anusha_payments_v1',
-  ADJUSTMENTS: 'anusha_adjustments_v1'
-};
-
-const getStored = (key, defaultVal) => {
-  try {
-    if (typeof localStorage === 'undefined') return defaultVal;
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultVal;
-  } catch (e) {
-    console.warn('Storage read failed for', key, e);
-    return defaultVal;
-  }
-};
-
-const setStored = (key, val) => {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch (e) {
-    console.warn('Storage write failed for', key, e);
-  }
-};
-
 class DataService {
   constructor() {
-    this.products = getStored(STORAGE_KEYS.PRODUCTS, initialProducts);
-    this.customers = getStored(STORAGE_KEYS.CUSTOMERS, initialCustomers);
-    this.suppliers = getStored(STORAGE_KEYS.SUPPLIERS, initialSuppliers);
-    this.sales = getStored(STORAGE_KEYS.SALES, initialSales);
-    this.purchases = getStored(STORAGE_KEYS.PURCHASES, initialPurchases);
-    this.payments = getStored(STORAGE_KEYS.PAYMENTS, initialPayments);
-    this.adjustments = getStored(STORAGE_KEYS.ADJUSTMENTS, initialAdjustments);
+    this.products = [];
+    this.customers = [];
+    this.suppliers = [];
+    this.sales = [];
+    this.purchases = [];
+    this.payments = [];
+    this.adjustments = [];
+
+    this.isLiveConnected = false;
+    this.isLoading = true;
+    this.connectionError = null;
     this.listeners = new Set();
+    this.realtimeChannel = null;
+
+    // Automatically initialize on startup
+    this.init();
   }
 
   subscribe(listener) {
@@ -62,26 +42,233 @@ class DataService {
     this.listeners.forEach((fn) => fn());
   }
 
-  saveAll() {
-    setStored(STORAGE_KEYS.PRODUCTS, this.products);
-    setStored(STORAGE_KEYS.CUSTOMERS, this.customers);
-    setStored(STORAGE_KEYS.SUPPLIERS, this.suppliers);
-    setStored(STORAGE_KEYS.SALES, this.sales);
-    setStored(STORAGE_KEYS.PURCHASES, this.purchases);
-    setStored(STORAGE_KEYS.PAYMENTS, this.payments);
-    setStored(STORAGE_KEYS.ADJUSTMENTS, this.adjustments);
-    this.notify();
+  /**
+   * Initializes data from live Supabase tables and establishes realtime listeners
+   */
+  async init() {
+    try {
+      this.isLoading = true;
+      this.notify();
+
+      await this.fetchAll();
+      this.setupRealtimeSubscription();
+      this.isLiveConnected = true;
+      this.connectionError = null;
+    } catch (err) {
+      console.warn('Supabase initialization warning:', err.message);
+      this.isLiveConnected = false;
+      this.connectionError = err.message || 'Connecting to Supabase...';
+
+      // If tables are missing or not yet run in Supabase SQL editor, populate in-memory so UI works
+      if (this.products.length === 0) {
+        this.products = JSON.parse(JSON.stringify(initialProducts));
+        this.customers = JSON.parse(JSON.stringify(initialCustomers));
+        this.suppliers = JSON.parse(JSON.stringify(initialSuppliers));
+        this.sales = JSON.parse(JSON.stringify(initialSales));
+        this.purchases = JSON.parse(JSON.stringify(initialPurchases));
+        this.payments = JSON.parse(JSON.stringify(initialPayments));
+        this.adjustments = JSON.parse(JSON.stringify(initialAdjustments));
+      }
+    } finally {
+      this.isLoading = false;
+      this.notify();
+    }
   }
 
-  resetToDemo() {
-    this.products = [...initialProducts];
-    this.customers = [...initialCustomers];
-    this.suppliers = [...initialSuppliers];
-    this.sales = [...initialSales];
-    this.purchases = [...initialPurchases];
-    this.payments = [...initialPayments];
-    this.adjustments = [...initialAdjustments];
-    this.saveAll();
+  /**
+   * Fetches all records from Supabase tables
+   */
+  async fetchAll() {
+    try {
+      // 1. Fetch Products
+      const { data: prods, error: pErr } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      if (pErr) throw pErr;
+
+      // 2. Fetch Customers
+      const { data: custs, error: cErr } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+      if (cErr) throw cErr;
+
+      // 3. Fetch Suppliers
+      const { data: supps, error: sErr } = await supabase.from('suppliers').select('*').order('created_at', { ascending: false });
+      if (sErr) throw sErr;
+
+      // 4. Fetch Sales with line items
+      const { data: salesData, error: saleErr } = await supabase
+        .from('customer_sales')
+        .select('*, items:customer_sale_items(*)')
+        .order('date', { ascending: false });
+      if (saleErr) throw saleErr;
+
+      // 5. Fetch Purchases with line items
+      const { data: purData, error: purErr } = await supabase
+        .from('supplier_purchases')
+        .select('*, items:supplier_purchase_items(*)')
+        .order('date', { ascending: false });
+      if (purErr) throw purErr;
+
+      // 6. Fetch Customer Payments
+      const { data: custPayments, error: cpErr } = await supabase
+        .from('customer_payments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (cpErr) throw cpErr;
+
+      // 7. Fetch Supplier Payments
+      const { data: suppPayments, error: spErr } = await supabase
+        .from('supplier_payments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (spErr) throw spErr;
+
+      // 8. Fetch Adjustments
+      const { data: adjs, error: adjErr } = await supabase
+        .from('manual_stock_adjustments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (adjErr) throw adjErr;
+
+      // Normalize format to match CRM UI
+      this.products = (prods || []).map((p) => ({
+        ...p,
+        current_stock: Number(p.current_stock) || 0,
+        purchase_price: Number(p.purchase_price) || 0,
+        selling_price: Number(p.selling_price) || 0
+      }));
+
+      this.customers = custs || [];
+      this.suppliers = supps || [];
+
+      this.sales = (salesData || []).map((s) => ({
+        ...s,
+        total_amount: Number(s.total_amount) || 0,
+        paid_amount: Number(s.paid_amount) || 0,
+        pending_amount: Number(s.pending_amount) || 0,
+        items: (s.items || []).map((i) => ({
+          ...i,
+          quantity: Number(i.quantity) || 0,
+          selling_price: Number(i.selling_price) || 0,
+          total: Number(i.total) || 0
+        }))
+      }));
+
+      this.purchases = (purData || []).map((p) => ({
+        ...p,
+        total_amount: Number(p.total_amount) || 0,
+        paid_amount: Number(p.paid_amount) || 0,
+        pending_amount: Number(p.pending_amount) || 0,
+        items: (p.items || []).map((i) => ({
+          ...i,
+          quantity: Number(i.quantity) || 0,
+          purchase_price: Number(i.purchase_price) || 0,
+          total: Number(i.total) || 0
+        }))
+      }));
+
+      const unifiedCustomerPayments = (custPayments || []).map((p) => ({
+        ...p,
+        type: 'customer_payment',
+        amount: Number(p.amount) || 0
+      }));
+
+      const unifiedSupplierPayments = (suppPayments || []).map((p) => ({
+        ...p,
+        type: 'supplier_payment',
+        amount: Number(p.amount) || 0
+      }));
+
+      this.payments = [...unifiedCustomerPayments, ...unifiedSupplierPayments].sort((a, b) => {
+        return new Date(b.created_at || b.date) - new Date(a.created_at || a.date);
+      });
+
+      this.adjustments = (adjs || []).map((a) => ({
+        ...a,
+        quantity: Number(a.quantity) || 0
+      }));
+
+      // If database is completely brand-new and empty, seed initial data to Supabase
+      if (this.products.length === 0 && this.customers.length === 0) {
+        await this.seedInitialDataToSupabase();
+      }
+
+      this.isLiveConnected = true;
+      this.connectionError = null;
+      this.notify();
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  /**
+   * Seeds clean starter catalog directly into live Supabase
+   */
+  async seedInitialDataToSupabase() {
+    try {
+      console.log('Seeding initial business records to Supabase...');
+
+      // Seed Products
+      const cleanProducts = initialProducts.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        current_stock: p.current_stock,
+        unit: p.unit,
+        purchase_price: p.purchase_price,
+        selling_price: p.selling_price,
+        min_stock_alert: p.low_stock_threshold || 20,
+        image_url: p.image_url || null,
+        is_active: p.is_active !== undefined ? p.is_active : true,
+        description: p.description || null
+      }));
+      await supabase.from('products').upsert(cleanProducts);
+
+      // Seed Customers
+      const cleanCustomers = initialCustomers.map((c) => ({
+        id: c.id,
+        customer_id: c.customer_id,
+        name: c.name,
+        mobile: c.mobile,
+        area: c.area,
+        address: c.address || null,
+        status: c.status || 'active',
+        notes: c.notes || null
+      }));
+      await supabase.from('customers').upsert(cleanCustomers);
+
+      // Seed Suppliers
+      const cleanSuppliers = initialSuppliers.map((s) => ({
+        id: s.id,
+        supplier_id: s.supplier_id,
+        company_name: s.company_name,
+        supplier_name: s.supplier_name,
+        mobile: s.mobile,
+        area: s.area,
+        address: s.address || null,
+        notes: s.notes || null
+      }));
+      await supabase.from('suppliers').upsert(cleanSuppliers);
+
+      // Re-fetch now that seed data is inserted
+      await this.fetchAll();
+    } catch (e) {
+      console.warn('Seed error (tables may need schema creation):', e);
+    }
+  }
+
+  /**
+   * Establishes real-time subscriptions for multi-device sync
+   */
+  setupRealtimeSubscription() {
+    if (this.realtimeChannel) {
+      supabase.removeChannel(this.realtimeChannel);
+    }
+
+    this.realtimeChannel = supabase
+      .channel('anusha-crm-live')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        // Silently sync state from live database when another tab/user updates
+        this.fetchAll().catch((e) => console.warn('Realtime refresh error:', e));
+      })
+      .subscribe();
   }
 
   // --- PRODUCTS ---
@@ -94,43 +281,61 @@ class DataService {
   }
 
   saveProduct(productData) {
+    const isNew = !productData.id;
+    const prodId = productData.id || 'prod-' + Date.now();
+
+    const dbRecord = {
+      id: prodId,
+      sku: productData.sku || `SKU-${Math.floor(100 + Math.random() * 900)}`,
+      name: productData.name,
+      current_stock: Number(productData.current_stock) || 0,
+      unit: productData.unit || 'boxes',
+      purchase_price: Number(productData.purchase_price) || 0,
+      selling_price: Number(productData.selling_price) || 0,
+      min_stock_alert: Number(productData.low_stock_threshold || productData.min_stock_alert) || 20,
+      image_url: productData.image_url || null,
+      cloudinary_public_id: productData.cloudinary_public_id || null,
+      is_active: productData.is_active !== undefined ? productData.is_active : true,
+      description: productData.description || null,
+      updated_at: new Date().toISOString()
+    };
+
     let saved;
-    if (productData.id) {
-      this.products = this.products.map((p) => {
-        if (p.id === productData.id) {
-          saved = { ...p, ...productData, updated_at: new Date().toISOString() };
-          return saved;
-        }
-        return p;
-      });
+    if (isNew) {
+      saved = { ...dbRecord, created_at: new Date().toISOString() };
+      this.products = [saved, ...this.products];
     } else {
-      const newProduct = {
-        ...productData,
-        id: 'prod-' + Date.now(),
-        sku: productData.sku || `SKU-${Math.floor(100 + Math.random() * 900)}`,
-        current_stock: Number(productData.current_stock) || 0,
-        purchase_price: Number(productData.purchase_price) || 0,
-        selling_price: Number(productData.selling_price) || 0,
-        is_active: productData.is_active !== undefined ? productData.is_active : true,
-        created_at: new Date().toISOString()
-      };
-      this.products = [newProduct, ...this.products];
-      saved = newProduct;
+      saved = { ...this.getProductById(prodId), ...dbRecord };
+      this.products = this.products.map((p) => (p.id === prodId ? saved : p));
     }
-    this.saveAll();
+    this.notify();
+
+    // Async write to Supabase
+    if (isNew) {
+      supabase.from('products').insert([dbRecord]).then().catch((e) => console.warn('Live saveProduct error:', e));
+    } else {
+      supabase.from('products').update(dbRecord).eq('id', prodId).then().catch((e) => console.warn('Live saveProduct error:', e));
+    }
+
     return saved;
   }
 
   deleteProduct(id) {
     this.products = this.products.filter((p) => p.id !== id);
-    this.saveAll();
+    this.notify();
+
+    supabase.from('products').delete().eq('id', id).then().catch((e) => console.warn('Live deleteProduct error:', e));
   }
 
   toggleProductActive(id) {
-    this.products = this.products.map((p) =>
-      p.id === id ? { ...p, is_active: !p.is_active } : p
-    );
-    this.saveAll();
+    const prod = this.getProductById(id);
+    if (!prod) return;
+    const newStatus = !prod.is_active;
+
+    this.products = this.products.map((p) => (p.id === id ? { ...p, is_active: newStatus } : p));
+    this.notify();
+
+    supabase.from('products').update({ is_active: newStatus }).eq('id', id).then().catch((e) => console.warn('Live toggleProductActive error:', e));
   }
 
   // --- CUSTOMERS ---
@@ -143,37 +348,47 @@ class DataService {
   }
 
   saveCustomer(custData) {
+    const isNew = !custData.id;
+    const custId = custData.id || 'cust-' + Date.now();
+
+    const dbRecord = {
+      id: custId,
+      customer_id: custData.customer_id || `CUST-${100 + this.customers.length + 1}`,
+      name: custData.name,
+      mobile: custData.mobile || null,
+      area: custData.area || null,
+      address: custData.address || null,
+      status: custData.status || 'active',
+      notes: custData.notes || null,
+      updated_at: new Date().toISOString()
+    };
+
     let saved;
-    if (custData.id) {
-      this.customers = this.customers.map((c) => {
-        if (c.id === custData.id) {
-          saved = { ...c, ...custData, updated_at: new Date().toISOString() };
-          return saved;
-        }
-        return c;
-      });
+    if (isNew) {
+      saved = { ...dbRecord, created_at: new Date().toISOString() };
+      this.customers = [saved, ...this.customers];
     } else {
-      const newCust = {
-        ...custData,
-        id: 'cust-' + Date.now(),
-        customer_id: custData.customer_id || `CUST-${100 + this.customers.length + 1}`,
-        status: custData.status || 'active',
-        created_at: new Date().toISOString()
-      };
-      this.customers = [newCust, ...this.customers];
-      saved = newCust;
+      saved = { ...this.getCustomerById(custId), ...dbRecord };
+      this.customers = this.customers.map((c) => (c.id === custId ? saved : c));
     }
-    this.saveAll();
+    this.notify();
+
+    if (isNew) {
+      supabase.from('customers').insert([dbRecord]).then().catch((e) => console.warn('Live saveCustomer error:', e));
+    } else {
+      supabase.from('customers').update(dbRecord).eq('id', custId).then().catch((e) => console.warn('Live saveCustomer error:', e));
+    }
+
     return saved;
   }
 
   deleteCustomer(id) {
-    // Remove customer
     this.customers = this.customers.filter((c) => c.id !== id);
-    // Also remove associated sales and payments
     this.sales = this.sales.filter((s) => s.customer_id !== id);
     this.payments = this.payments.filter((p) => p.customer_id !== id);
-    this.saveAll();
+    this.notify();
+
+    supabase.from('customers').delete().eq('id', id).then().catch((e) => console.warn('Live deleteCustomer error:', e));
   }
 
   // --- SUPPLIERS ---
@@ -186,26 +401,37 @@ class DataService {
   }
 
   saveSupplier(suppData) {
+    const isNew = !suppData.id;
+    const suppId = suppData.id || 'supp-' + Date.now();
+
+    const dbRecord = {
+      id: suppId,
+      supplier_id: suppData.supplier_id || `SUPP-${100 + this.suppliers.length + 1}`,
+      company_name: suppData.company_name,
+      supplier_name: suppData.supplier_name || null,
+      mobile: suppData.mobile || null,
+      area: suppData.area || null,
+      address: suppData.address || null,
+      notes: suppData.notes || null,
+      updated_at: new Date().toISOString()
+    };
+
     let saved;
-    if (suppData.id) {
-      this.suppliers = this.suppliers.map((s) => {
-        if (s.id === suppData.id) {
-          saved = { ...s, ...suppData, updated_at: new Date().toISOString() };
-          return saved;
-        }
-        return s;
-      });
+    if (isNew) {
+      saved = { ...dbRecord, created_at: new Date().toISOString() };
+      this.suppliers = [saved, ...this.suppliers];
     } else {
-      const newSupp = {
-        ...suppData,
-        id: 'supp-' + Date.now(),
-        supplier_id: suppData.supplier_id || `SUPP-${100 + this.suppliers.length + 1}`,
-        created_at: new Date().toISOString()
-      };
-      this.suppliers = [newSupp, ...this.suppliers];
-      saved = newSupp;
+      saved = { ...this.getSupplierById(suppId), ...dbRecord };
+      this.suppliers = this.suppliers.map((s) => (s.id === suppId ? saved : s));
     }
-    this.saveAll();
+    this.notify();
+
+    if (isNew) {
+      supabase.from('suppliers').insert([dbRecord]).then().catch((e) => console.warn('Live saveSupplier error:', e));
+    } else {
+      supabase.from('suppliers').update(dbRecord).eq('id', suppId).then().catch((e) => console.warn('Live saveSupplier error:', e));
+    }
+
     return saved;
   }
 
@@ -213,587 +439,686 @@ class DataService {
     this.suppliers = this.suppliers.filter((s) => s.id !== id);
     this.purchases = this.purchases.filter((p) => p.supplier_id !== id);
     this.payments = this.payments.filter((p) => p.supplier_id !== id);
-    this.saveAll();
+    this.notify();
+
+    supabase.from('suppliers').delete().eq('id', id).then().catch((e) => console.warn('Live deleteSupplier error:', e));
   }
 
-  // --- SALES (Customer Invoicing) ---
+  // --- SALES (CUSTOMER BILLING) ---
   getSales() {
     return this.sales;
   }
 
   getSaleById(id) {
-    const sale = this.sales.find((s) => s.id === id);
-    if (!sale) return null;
-    const payments = this.payments.filter((p) => p.sale_id === id && p.type === 'customer_payment');
-    return { ...sale, payments };
+    return this.sales.find((s) => s.id === id);
   }
 
   getSalePayments(saleId) {
     return this.payments.filter((p) => p.sale_id === saleId && p.type === 'customer_payment');
   }
 
-  recordSale({ customer_id, items, date, time, initial_payment, payment_mode, reference_no, notes }) {
-    if (!customer_id) throw new Error('Please select a customer');
-    if (!items || items.length === 0) throw new Error('At least one product item is required');
-
-    // 1. STRICT STOCK VALIDATION BEFORE ANY TRANSACTION IS PROCESSED
-    for (const item of items) {
+  recordSale(saleData) {
+    // 1. STRICT STOCK VALIDATION: Block if requested quantity > current stock
+    for (const item of saleData.items) {
       const prod = this.getProductById(item.product_id);
       const reqQty = Number(item.quantity) || 0;
-      if (reqQty <= 0) {
-        throw new Error(`Quantity for ${prod ? prod.name : 'product'} must be at least 1`);
-      }
       if (!prod) {
-        throw new Error(`Product not found for item`);
+        throw new Error(`Product not found: ${item.product_name || item.product_id}`);
       }
-      const availableStock = prod.current_stock || 0;
-      if (reqQty > availableStock) {
-        throw new Error(`Only ${availableStock} units of "${prod.name}" are currently available. You cannot sell ${reqQty} units.`);
+      if (reqQty > prod.current_stock) {
+        throw new Error(
+          `Cannot complete sale: requested ${reqQty} ${prod.unit || 'units'} of "${prod.name}", but only ${prod.current_stock} ${prod.unit || 'units'} are available in stock.`
+        );
       }
     }
 
-    // 2. AUTOMATIC INVENTORY DECREASE & LINE CALCULATION
-    let totalAmount = 0;
-    const processedItems = items.map((item) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.selling_price) || 0;
-      const lineTotal = qty * price;
-      totalAmount += lineTotal;
-
-      const prod = this.getProductById(item.product_id);
-      prod.current_stock = Math.max(0, (prod.current_stock || 0) - qty);
-
-      return {
-        product_id: item.product_id,
-        product_name: prod ? prod.name : item.product_name,
-        quantity: qty,
-        selling_price: price,
-        total: lineTotal
-      };
-    });
-
     const saleId = 'sale-' + Date.now();
-    const invoiceNo = `INV-2026-${String(this.sales.length + 1).padStart(3, '0')}`;
-    const saleDate = date || getTodayDateString();
-    const saleTime = time || getCurrentTimeString();
+    const invoiceNo = `INV-${Math.floor(100 + Math.random() * 900)}`;
+    const initialPay = Math.max(0, Number(saleData.initial_payment) || 0);
 
-    const initPaid = Math.min(totalAmount, Math.max(0, Number(initial_payment) || 0));
-    const pendingAmount = Math.max(0, totalAmount - initPaid);
-    const paymentStatus = pendingAmount === 0 ? 'Paid' : (initPaid > 0 ? 'Partially Paid' : 'Pending');
+    const totalAmount = saleData.items.reduce((acc, item) => {
+      return acc + (Number(item.quantity) || 0) * (Number(item.selling_price) || 0);
+    }, 0);
+
+    const pendingAmount = Math.max(0, totalAmount - initialPay);
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
+
+    const cleanItems = saleData.items.map((i, idx) => ({
+      id: `item-${Date.now()}-${idx}`,
+      sale_id: saleId,
+      product_id: i.product_id,
+      product_name: i.product_name || this.getProductById(i.product_id)?.name || 'Product',
+      quantity: Number(i.quantity) || 0,
+      selling_price: Number(i.selling_price) || 0,
+      total: (Number(i.quantity) || 0) * (Number(i.selling_price) || 0)
+    }));
 
     const newSale = {
       id: saleId,
       invoice_no: invoiceNo,
-      customer_id,
-      date: saleDate,
-      time: saleTime,
-      items: processedItems,
+      customer_id: saleData.customer_id,
+      date: saleData.date || getTodayDateString(),
+      time: saleData.time || getCurrentTimeString(),
+      items: cleanItems,
       total_amount: totalAmount,
-      paid_amount: initPaid,
+      paid_amount: initialPay,
       pending_amount: pendingAmount,
       payment_status: paymentStatus,
+      notes: saleData.notes || '',
       recorded_by: 'Admin',
-      notes: notes || ''
+      created_at: new Date().toISOString()
     };
+
+    // Deduct stock in memory
+    for (const item of cleanItems) {
+      const prod = this.getProductById(item.product_id);
+      if (prod) {
+        prod.current_stock = Math.max(0, prod.current_stock - item.quantity);
+      }
+    }
 
     this.sales = [newSale, ...this.sales];
 
-    // If initial payment was entered, record as a separate customer payment record
-    if (initPaid > 0) {
-      const newPay = {
-        id: 'pay-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-        receipt_no: `RCPT-${1000 + this.payments.length + 1}`,
+    // Record initial payment as independent voucher
+    let newPayment = null;
+    if (initialPay > 0) {
+      newPayment = {
+        id: 'pay-' + Date.now(),
+        receipt_no: `REC-${Math.floor(100 + Math.random() * 900)}`,
         type: 'customer_payment',
-        customer_id,
+        customer_id: saleData.customer_id,
         sale_id: saleId,
-        amount: initPaid,
-        payment_mode: payment_mode || 'Cash',
-        reference_no: reference_no || '',
-        date: saleDate,
-        time: saleTime,
-        notes: notes ? `Initial payment for ${invoiceNo} - ${notes}` : `Initial payment for ${invoiceNo}`,
-        recorded_by: 'Admin'
+        amount: initialPay,
+        payment_mode: saleData.payment_mode || 'Cash',
+        reference_no: saleData.reference_no || '',
+        date: saleData.date || getTodayDateString(),
+        time: saleData.time || getCurrentTimeString(),
+        notes: `Initial down payment for ${invoiceNo}`,
+        recorded_by: 'Admin',
+        created_at: new Date().toISOString()
       };
-      this.payments = [newPay, ...this.payments];
+      this.payments = [newPayment, ...this.payments];
     }
 
-    this.saveAll();
+    this.notify();
+
+    // Background write to Supabase
+    supabase.from('customer_sales').insert([{
+      id: newSale.id,
+      invoice_no: newSale.invoice_no,
+      customer_id: newSale.customer_id,
+      date: newSale.date,
+      time: newSale.time,
+      total_amount: newSale.total_amount,
+      paid_amount: newSale.paid_amount,
+      pending_amount: newSale.pending_amount,
+      payment_status: newSale.payment_status,
+      notes: newSale.notes,
+      recorded_by: newSale.recorded_by
+    }]).then(() => {
+      supabase.from('customer_sale_items').insert(
+        cleanItems.map((i) => ({
+          id: i.id,
+          sale_id: i.sale_id,
+          product_id: i.product_id,
+          product_name: i.product_name,
+          quantity: i.quantity,
+          selling_price: i.selling_price,
+          total: i.total
+        }))
+      ).then().catch((e) => console.warn(e));
+
+      for (const item of cleanItems) {
+        const prod = this.getProductById(item.product_id);
+        if (prod) {
+          supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', item.product_id).then().catch((e) => console.warn(e));
+        }
+      }
+
+      if (newPayment) {
+        supabase.from('customer_payments').insert([{
+          id: newPayment.id,
+          receipt_no: newPayment.receipt_no,
+          customer_id: newPayment.customer_id,
+          sale_id: newPayment.sale_id,
+          amount: newPayment.amount,
+          payment_mode: newPayment.payment_mode,
+          reference_no: newPayment.reference_no,
+          date: newPayment.date,
+          time: newPayment.time,
+          notes: newPayment.notes,
+          recorded_by: newPayment.recorded_by
+        }]).then().catch((e) => console.warn(e));
+      }
+    }).catch((e) => console.warn('Live recordSale error:', e));
+
     return newSale;
   }
 
-  updateSale(saleId, { customer_id, items, date, time, notes }) {
-    const saleIndex = this.sales.findIndex((s) => s.id === saleId);
-    if (saleIndex === -1) throw new Error('Sale invoice not found');
-    const oldSale = this.sales[saleIndex];
+  updateSale(saleId, updatedData) {
+    const existingSale = this.getSaleById(saleId);
+    if (!existingSale) throw new Error('Sale invoice not found');
 
-    if (!items || items.length === 0) {
-      throw new Error('At least one product item is required');
-    }
+    const newItems = updatedData.items || existingSale.items;
 
-    // Map old quantities: product_id -> oldQty
-    const oldQtyMap = {};
-    oldSale.items.forEach((item) => {
-      oldQtyMap[item.product_id] = (oldQtyMap[item.product_id] || 0) + (Number(item.quantity) || 0);
+    // Validate stock delta
+    const oldItemMap = {};
+    existingSale.items.forEach((i) => {
+      oldItemMap[i.product_id] = (oldItemMap[i.product_id] || 0) + i.quantity;
     });
 
-    // Map new quantities: product_id -> newQty
-    const newQtyMap = {};
-    items.forEach((item) => {
-      const qty = Number(item.quantity) || 0;
-      if (qty <= 0) {
-        const prod = this.getProductById(item.product_id);
-        throw new Error(`Quantity for ${prod ? prod.name : 'product'} must be at least 1`);
-      }
-      newQtyMap[item.product_id] = (newQtyMap[item.product_id] || 0) + qty;
+    const newItemMap = {};
+    newItems.forEach((i) => {
+      newItemMap[i.product_id] = (newItemMap[i.product_id] || 0) + Number(i.quantity);
     });
 
-    // Validate available stock for all positive deltas (newQty > oldQty)
-    for (const [prodId, newQty] of Object.entries(newQtyMap)) {
-      const oldQty = oldQtyMap[prodId] || 0;
+    for (const prodId of Object.keys(newItemMap)) {
+      const oldQty = oldItemMap[prodId] || 0;
+      const newQty = newItemMap[prodId];
       const delta = newQty - oldQty;
       if (delta > 0) {
         const prod = this.getProductById(prodId);
-        if (!prod) throw new Error('Product not found');
-        const availableStock = prod.current_stock || 0;
-        if (availableStock < delta) {
-          throw new Error(`Only ${availableStock} additional units of "${prod.name}" are currently available. You cannot increase quantity by ${delta} units.`);
+        if (!prod || prod.current_stock < delta) {
+          throw new Error(`Insufficient stock for ${prod?.name || prodId}. Needed additional: ${delta}, Available: ${prod?.current_stock || 0}`);
         }
       }
     }
 
-    // Apply exact inventory adjustments:
-    // 1. Existing or changed items: adjust by delta (newQty - oldQty)
-    for (const [prodId, newQty] of Object.entries(newQtyMap)) {
-      const oldQty = oldQtyMap[prodId] || 0;
+    // Adjust stock by delta
+    const allProdIds = new Set([...Object.keys(oldItemMap), ...Object.keys(newItemMap)]);
+    for (const prodId of allProdIds) {
+      const oldQty = oldItemMap[prodId] || 0;
+      const newQty = newItemMap[prodId] || 0;
       const delta = newQty - oldQty;
       const prod = this.getProductById(prodId);
-      if (prod) {
-        prod.current_stock = Math.max(0, (prod.current_stock || 0) - delta);
-      }
-    }
-    // 2. Completely removed items: return oldQty to stock
-    for (const [prodId, oldQty] of Object.entries(oldQtyMap)) {
-      if (!newQtyMap[prodId]) {
-        const prod = this.getProductById(prodId);
-        if (prod) {
-          prod.current_stock = (prod.current_stock || 0) + oldQty;
-        }
+      if (prod && delta !== 0) {
+        prod.current_stock = Math.max(0, prod.current_stock - delta);
+        supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', prodId).then().catch((e) => console.warn(e));
       }
     }
 
-    // Recalculate bill total
-    let totalAmount = 0;
-    const processedItems = items.map((item) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.selling_price) || 0;
-      const lineTotal = qty * price;
-      totalAmount += lineTotal;
-      const prod = this.getProductById(item.product_id);
-      return {
-        product_id: item.product_id,
-        product_name: prod ? prod.name : item.product_name,
-        quantity: qty,
-        selling_price: price,
-        total: lineTotal
-      };
-    });
+    const cleanItems = newItems.map((i, idx) => ({
+      id: i.id || `item-${Date.now()}-${idx}`,
+      sale_id: saleId,
+      product_id: i.product_id,
+      product_name: i.product_name || this.getProductById(i.product_id)?.name || 'Product',
+      quantity: Number(i.quantity) || 0,
+      selling_price: Number(i.selling_price) || 0,
+      total: (Number(i.quantity) || 0) * (Number(i.selling_price) || 0)
+    }));
 
-    // Synchronize payments: recalculate total paid for this sale from independent payment records
-    const salePayments = this.payments.filter((p) => p.sale_id === saleId && p.type === 'customer_payment');
-    const paidAmount = salePayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+    const totalAmount = cleanItems.reduce((acc, i) => acc + i.total, 0);
+    const linkedPayments = this.getSalePayments(saleId);
+    const paidAmount = linkedPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
     const pendingAmount = Math.max(0, totalAmount - paidAmount);
-    const paymentStatus = pendingAmount === 0 ? 'Paid' : (paidAmount > 0 ? 'Partially Paid' : 'Pending');
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
     const updatedSale = {
-      ...oldSale,
-      customer_id: customer_id || oldSale.customer_id,
-      date: date || oldSale.date,
-      time: time || oldSale.time,
-      items: processedItems,
+      ...existingSale,
+      ...updatedData,
+      items: cleanItems,
       total_amount: totalAmount,
       paid_amount: paidAmount,
       pending_amount: pendingAmount,
       payment_status: paymentStatus,
-      notes: notes !== undefined ? notes : oldSale.notes,
       updated_at: new Date().toISOString()
     };
 
-    this.sales[saleIndex] = updatedSale;
-    this.saveAll();
+    this.sales = this.sales.map((s) => (s.id === saleId ? updatedSale : s));
+    this.notify();
+
+    // Background write to Supabase
+    supabase.from('customer_sales').update({
+      total_amount: totalAmount,
+      paid_amount: paidAmount,
+      pending_amount: pendingAmount,
+      payment_status: paymentStatus,
+      date: updatedSale.date,
+      time: updatedSale.time,
+      notes: updatedSale.notes
+    }).eq('id', saleId).then(async () => {
+      await supabase.from('customer_sale_items').delete().eq('sale_id', saleId);
+      await supabase.from('customer_sale_items').insert(
+        cleanItems.map((i) => ({
+          id: i.id,
+          sale_id: saleId,
+          product_id: i.product_id,
+          product_name: i.product_name,
+          quantity: i.quantity,
+          selling_price: i.selling_price,
+          total: i.total
+        }))
+      );
+    }).catch((e) => console.warn('Live updateSale error:', e));
+
     return updatedSale;
   }
 
-  // --- PURCHASES (Supplier Inward) ---
+  deleteSale(id) {
+    const sale = this.getSaleById(id);
+    if (!sale) return;
+
+    // Restore stock
+    for (const item of sale.items) {
+      const prod = this.getProductById(item.product_id);
+      if (prod) {
+        prod.current_stock += item.quantity;
+        supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', item.product_id).then().catch((e) => console.warn(e));
+      }
+    }
+
+    this.sales = this.sales.filter((s) => s.id !== id);
+    this.payments = this.payments.filter((p) => p.sale_id !== id);
+    this.notify();
+
+    supabase.from('customer_sales').delete().eq('id', id).then().catch((e) => console.warn('Live deleteSale error:', e));
+  }
+
+  // --- PURCHASES (SUPPLIER INWARD) ---
   getPurchases() {
     return this.purchases;
   }
 
   getPurchaseById(id) {
-    const pur = this.purchases.find((p) => p.id === id);
-    if (!pur) return null;
-    const payments = this.payments.filter((p) => p.purchase_id === id && p.type === 'supplier_payment');
-    return { ...pur, payments };
+    return this.purchases.find((p) => p.id === id);
   }
 
   getPurchasePayments(purchaseId) {
     return this.payments.filter((p) => p.purchase_id === purchaseId && p.type === 'supplier_payment');
   }
 
-  recordPurchase({ supplier_id, items, date, time, initial_payment, payment_mode, reference_no, notes }) {
-    if (!supplier_id) throw new Error('Please select a supplier');
-    if (!items || items.length === 0) throw new Error('At least one product item is required');
+  recordPurchase(purData) {
+    const purId = 'pur-' + Date.now();
+    const purchaseNo = `PUR-${Math.floor(100 + Math.random() * 900)}`;
+    const initialPay = Math.max(0, Number(purData.initial_payment) || 0);
 
-    let totalAmount = 0;
-    const processedItems = items.map((item) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.purchase_price) || 0;
-      const lineTotal = qty * price;
-      totalAmount += lineTotal;
+    const totalAmount = purData.items.reduce((acc, item) => {
+      return acc + (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0);
+    }, 0);
 
-      // AUTOMATIC INVENTORY INCREASE
-      const prod = this.getProductById(item.product_id);
-      if (prod) {
-        prod.current_stock = (prod.current_stock || 0) + qty;
-      }
+    const pendingAmount = Math.max(0, totalAmount - initialPay);
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
 
-      return {
-        product_id: item.product_id,
-        product_name: prod ? prod.name : item.product_name,
-        quantity: qty,
-        purchase_price: price,
-        total: lineTotal
-      };
-    });
-
-    const purchaseId = 'pur-' + Date.now();
-    const purchaseNo = `PUR-2026-${String(this.purchases.length + 1).padStart(3, '0')}`;
-    const purDate = date || getTodayDateString();
-    const purTime = time || getCurrentTimeString();
-
-    const initPaid = Math.min(totalAmount, Math.max(0, Number(initial_payment) || 0));
-    const pendingAmount = Math.max(0, totalAmount - initPaid);
-    const paymentStatus = pendingAmount === 0 ? 'Paid' : (initPaid > 0 ? 'Partially Paid' : 'Pending');
+    const cleanItems = purData.items.map((i, idx) => ({
+      id: `pitem-${Date.now()}-${idx}`,
+      purchase_id: purId,
+      product_id: i.product_id,
+      product_name: i.product_name || this.getProductById(i.product_id)?.name || 'Product',
+      quantity: Number(i.quantity) || 0,
+      purchase_price: Number(i.purchase_price) || 0,
+      total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0)
+    }));
 
     const newPur = {
-      id: purchaseId,
+      id: purId,
       purchase_no: purchaseNo,
-      supplier_id,
-      date: purDate,
-      time: purTime,
-      items: processedItems,
+      supplier_id: purData.supplier_id,
+      date: purData.date || getTodayDateString(),
+      time: purData.time || getCurrentTimeString(),
+      items: cleanItems,
       total_amount: totalAmount,
-      paid_amount: initPaid,
+      paid_amount: initialPay,
       pending_amount: pendingAmount,
       payment_status: paymentStatus,
+      notes: purData.notes || '',
       recorded_by: 'Admin',
-      notes: notes || ''
+      created_at: new Date().toISOString()
     };
+
+    // Increase stock in memory
+    for (const item of cleanItems) {
+      const prod = this.getProductById(item.product_id);
+      if (prod) {
+        prod.current_stock += item.quantity;
+      }
+    }
 
     this.purchases = [newPur, ...this.purchases];
 
-    // If initial payment was made to supplier, record individual payment voucher
-    if (initPaid > 0) {
-      const newPay = {
-        id: 'pay-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-        receipt_no: `VCHR-${2000 + this.payments.length + 1}`,
+    let newPayment = null;
+    if (initialPay > 0) {
+      newPayment = {
+        id: 'pay-' + Date.now(),
+        receipt_no: `VOUCH-${Math.floor(100 + Math.random() * 900)}`,
         type: 'supplier_payment',
-        supplier_id,
-        purchase_id: purchaseId,
-        amount: initPaid,
-        payment_mode: payment_mode || 'Bank Transfer',
-        reference_no: reference_no || '',
-        date: purDate,
-        time: purTime,
-        notes: notes ? `Initial payment for ${purchaseNo} - ${notes}` : `Initial payment for ${purchaseNo}`,
-        recorded_by: 'Admin'
+        supplier_id: purData.supplier_id,
+        purchase_id: purId,
+        amount: initialPay,
+        payment_mode: purData.payment_mode || 'Bank Transfer',
+        reference_no: purData.reference_no || '',
+        date: purData.date || getTodayDateString(),
+        time: purData.time || getCurrentTimeString(),
+        notes: `Initial advance payout for ${purchaseNo}`,
+        recorded_by: 'Admin',
+        created_at: new Date().toISOString()
       };
-      this.payments = [newPay, ...this.payments];
+      this.payments = [newPayment, ...this.payments];
     }
 
-    this.saveAll();
+    this.notify();
+
+    // Background write to Supabase
+    supabase.from('supplier_purchases').insert([{
+      id: newPur.id,
+      purchase_no: newPur.purchase_no,
+      supplier_id: newPur.supplier_id,
+      date: newPur.date,
+      time: newPur.time,
+      total_amount: newPur.total_amount,
+      paid_amount: newPur.paid_amount,
+      pending_amount: newPur.pending_amount,
+      payment_status: newPur.payment_status,
+      notes: newPur.notes,
+      recorded_by: newPur.recorded_by
+    }]).then(() => {
+      supabase.from('supplier_purchase_items').insert(
+        cleanItems.map((i) => ({
+          id: i.id,
+          purchase_id: i.purchase_id,
+          product_id: i.product_id,
+          product_name: i.product_name,
+          quantity: i.quantity,
+          purchase_price: i.purchase_price,
+          total: i.total
+        }))
+      ).then().catch((e) => console.warn(e));
+
+      for (const item of cleanItems) {
+        const prod = this.getProductById(item.product_id);
+        if (prod) {
+          supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', item.product_id).then().catch((e) => console.warn(e));
+        }
+      }
+
+      if (newPayment) {
+        supabase.from('supplier_payments').insert([{
+          id: newPayment.id,
+          receipt_no: newPayment.receipt_no,
+          supplier_id: newPayment.supplier_id,
+          purchase_id: newPayment.purchase_id,
+          amount: newPayment.amount,
+          payment_mode: newPayment.payment_mode,
+          reference_no: newPayment.reference_no,
+          date: newPayment.date,
+          time: newPayment.time,
+          notes: newPayment.notes,
+          recorded_by: newPayment.recorded_by
+        }]).then().catch((e) => console.warn(e));
+      }
+    }).catch((e) => console.warn('Live recordPurchase error:', e));
+
     return newPur;
   }
 
-  updatePurchase(purchaseId, { supplier_id, items, date, time, notes }) {
-    const purIndex = this.purchases.findIndex((p) => p.id === purchaseId);
-    if (purIndex === -1) throw new Error('Purchase record not found');
-    const oldPur = this.purchases[purIndex];
+  updatePurchase(purId, updatedData) {
+    const existingPur = this.getPurchaseById(purId);
+    if (!existingPur) throw new Error('Purchase record not found');
 
-    if (!items || items.length === 0) {
-      throw new Error('At least one product item is required');
-    }
+    const newItems = updatedData.items || existingPur.items;
 
-    const oldQtyMap = {};
-    oldPur.items.forEach((item) => {
-      oldQtyMap[item.product_id] = (oldQtyMap[item.product_id] || 0) + (Number(item.quantity) || 0);
+    const oldItemMap = {};
+    existingPur.items.forEach((i) => {
+      oldItemMap[i.product_id] = (oldItemMap[i.product_id] || 0) + i.quantity;
     });
 
-    const newQtyMap = {};
-    items.forEach((item) => {
-      const qty = Number(item.quantity) || 0;
-      if (qty <= 0) {
-        const prod = this.getProductById(item.product_id);
-        throw new Error(`Quantity for ${prod ? prod.name : 'product'} must be at least 1`);
-      }
-      newQtyMap[item.product_id] = (newQtyMap[item.product_id] || 0) + qty;
+    const newItemMap = {};
+    newItems.forEach((i) => {
+      newItemMap[i.product_id] = (newItemMap[i.product_id] || 0) + Number(i.quantity);
     });
 
-    // Check if decreasing purchase causes stock to go negative
-    for (const [prodId, oldQty] of Object.entries(oldQtyMap)) {
-      const newQty = newQtyMap[prodId] || 0;
-      if (newQty < oldQty) {
-        const diff = oldQty - newQty;
-        const prod = this.getProductById(prodId);
-        if (prod && (prod.current_stock || 0) < diff) {
-          throw new Error(`Cannot decrease purchase quantity of "${prod.name}" by ${diff} units. Current stock is only ${prod.current_stock}.`);
-        }
-      }
-    }
-
-    // Apply delta stock adjustments:
-    for (const [prodId, newQty] of Object.entries(newQtyMap)) {
-      const oldQty = oldQtyMap[prodId] || 0;
+    // Adjust stock by delta
+    const allProdIds = new Set([...Object.keys(oldItemMap), ...Object.keys(newItemMap)]);
+    for (const prodId of allProdIds) {
+      const oldQty = oldItemMap[prodId] || 0;
+      const newQty = newItemMap[prodId] || 0;
       const delta = newQty - oldQty;
       const prod = this.getProductById(prodId);
-      if (prod) {
-        prod.current_stock = Math.max(0, (prod.current_stock || 0) + delta);
-      }
-    }
-    for (const [prodId, oldQty] of Object.entries(oldQtyMap)) {
-      if (!newQtyMap[prodId]) {
-        const prod = this.getProductById(prodId);
-        if (prod) {
-          prod.current_stock = Math.max(0, (prod.current_stock || 0) - oldQty);
-        }
+      if (prod && delta !== 0) {
+        prod.current_stock = Math.max(0, prod.current_stock + delta);
+        supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', prodId).then().catch((e) => console.warn(e));
       }
     }
 
-    let totalAmount = 0;
-    const processedItems = items.map((item) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.purchase_price) || 0;
-      const lineTotal = qty * price;
-      totalAmount += lineTotal;
-      const prod = this.getProductById(item.product_id);
-      return {
-        product_id: item.product_id,
-        product_name: prod ? prod.name : item.product_name,
-        quantity: qty,
-        purchase_price: price,
-        total: lineTotal
-      };
-    });
+    const cleanItems = newItems.map((i, idx) => ({
+      id: i.id || `pitem-${Date.now()}-${idx}`,
+      purchase_id: purId,
+      product_id: i.product_id,
+      product_name: i.product_name || this.getProductById(i.product_id)?.name || 'Product',
+      quantity: Number(i.quantity) || 0,
+      purchase_price: Number(i.purchase_price) || 0,
+      total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0)
+    }));
 
-    const purPayments = this.payments.filter((p) => p.purchase_id === purchaseId && p.type === 'supplier_payment');
-    const paidAmount = purPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+    const totalAmount = cleanItems.reduce((acc, i) => acc + i.total, 0);
+    const linkedPayments = this.getPurchasePayments(purId);
+    const paidAmount = linkedPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
     const pendingAmount = Math.max(0, totalAmount - paidAmount);
-    const paymentStatus = pendingAmount === 0 ? 'Paid' : (paidAmount > 0 ? 'Partially Paid' : 'Pending');
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
     const updatedPur = {
-      ...oldPur,
-      supplier_id: supplier_id || oldPur.supplier_id,
-      date: date || oldPur.date,
-      time: time || oldPur.time,
-      items: processedItems,
+      ...existingPur,
+      ...updatedData,
+      items: cleanItems,
       total_amount: totalAmount,
       paid_amount: paidAmount,
       pending_amount: pendingAmount,
       payment_status: paymentStatus,
-      notes: notes !== undefined ? notes : oldPur.notes,
       updated_at: new Date().toISOString()
     };
 
-    this.purchases[purIndex] = updatedPur;
-    this.saveAll();
+    this.purchases = this.purchases.map((p) => (p.id === purId ? updatedPur : p));
+    this.notify();
+
+    supabase.from('supplier_purchases').update({
+      total_amount: totalAmount,
+      paid_amount: paidAmount,
+      pending_amount: pendingAmount,
+      payment_status: paymentStatus,
+      date: updatedPur.date,
+      time: updatedPur.time,
+      notes: updatedPur.notes
+    }).eq('id', purId).then(async () => {
+      await supabase.from('supplier_purchase_items').delete().eq('purchase_id', purId);
+      await supabase.from('supplier_purchase_items').insert(
+        cleanItems.map((i) => ({
+          id: i.id,
+          purchase_id: purId,
+          product_id: i.product_id,
+          product_name: i.product_name,
+          quantity: i.quantity,
+          purchase_price: i.purchase_price,
+          total: i.total
+        }))
+      );
+    }).catch((e) => console.warn('Live updatePurchase error:', e));
+
     return updatedPur;
   }
 
-  // --- SYNCHRONIZATION HELPERS ---
-  syncSalePaymentTotals(saleId) {
-    const sale = this.sales.find((s) => s.id === saleId);
-    if (!sale) return;
-    const salePayments = this.payments.filter((p) => p.sale_id === saleId && p.type === 'customer_payment');
-    const totalPaid = salePayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-    sale.paid_amount = totalPaid;
-    sale.pending_amount = Math.max(0, (sale.total_amount || 0) - totalPaid);
-    sale.payment_status = sale.pending_amount === 0 ? 'Paid' : (sale.paid_amount > 0 ? 'Partially Paid' : 'Pending');
-  }
-
-  syncPurchasePaymentTotals(purchaseId) {
-    const pur = this.purchases.find((p) => p.id === purchaseId);
+  deletePurchase(id) {
+    const pur = this.getPurchaseById(id);
     if (!pur) return;
-    const purPayments = this.payments.filter((p) => p.purchase_id === purchaseId && p.type === 'supplier_payment');
-    const totalPaid = purPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-    pur.paid_amount = totalPaid;
-    pur.pending_amount = Math.max(0, (pur.total_amount || 0) - totalPaid);
-    pur.payment_status = pur.pending_amount === 0 ? 'Paid' : (pur.paid_amount > 0 ? 'Partially Paid' : 'Pending');
+
+    // Deduct inward stock
+    for (const item of pur.items) {
+      const prod = this.getProductById(item.product_id);
+      if (prod) {
+        prod.current_stock = Math.max(0, prod.current_stock - item.quantity);
+        supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', item.product_id).then().catch((e) => console.warn(e));
+      }
+    }
+
+    this.purchases = this.purchases.filter((p) => p.id !== id);
+    this.payments = this.payments.filter((p) => p.purchase_id !== id);
+    this.notify();
+
+    supabase.from('supplier_purchases').delete().eq('id', id).then().catch((e) => console.warn('Live deletePurchase error:', e));
   }
 
-  // --- PAYMENTS (Non-destructive Individual Receipts & Vouchers) ---
+  // --- PAYMENTS (INDEPENDENT FINANCIAL TRANSACTIONS) ---
   getPayments() {
     return this.payments;
   }
 
-  recordCustomerPayment({ customer_id, sale_id, amount, payment_mode, reference_no, date, time, notes }) {
-    const payAmount = Number(amount) || 0;
-    if (payAmount <= 0) throw new Error('Payment amount must be greater than 0');
-    if (!customer_id) throw new Error('Please select a customer');
+  getPaymentById(id) {
+    return this.payments.find((p) => p.id === id);
+  }
 
-    const payDate = date || getTodayDateString();
-    const payTime = time || getCurrentTimeString();
+  recordCustomerPayment(payData) {
+    const payId = 'pay-' + Date.now();
+    const receiptNo = `REC-${Math.floor(100 + Math.random() * 900)}`;
+    const amt = Number(payData.amount) || 0;
 
     const newPayment = {
-      id: 'pay-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-      receipt_no: `RCPT-${1000 + this.payments.length + 1}`,
+      id: payId,
+      receipt_no: receiptNo,
       type: 'customer_payment',
-      customer_id,
-      sale_id: sale_id || null,
-      amount: payAmount,
-      payment_mode: payment_mode || 'Cash',
-      reference_no: reference_no || '',
-      date: payDate,
-      time: payTime,
-      notes: notes || '',
-      recorded_by: 'Admin'
+      customer_id: payData.customer_id,
+      sale_id: payData.sale_id || null,
+      amount: amt,
+      payment_mode: payData.payment_mode || 'Cash',
+      reference_no: payData.reference_no || '',
+      date: payData.date || getTodayDateString(),
+      time: payData.time || getCurrentTimeString(),
+      notes: payData.notes || '',
+      recorded_by: 'Admin',
+      created_at: new Date().toISOString()
     };
 
     this.payments = [newPayment, ...this.payments];
 
-    // Recalculate linked sale's totals without mutating other sales
-    if (sale_id) {
-      this.syncSalePaymentTotals(sale_id);
+    // If linked to sale_id, recalculate and sync bill
+    if (newPayment.sale_id) {
+      this.syncSalePaymentTotals(newPayment.sale_id);
     }
 
-    this.saveAll();
+    this.notify();
+
+    supabase.from('customer_payments').insert([{
+      id: newPayment.id,
+      receipt_no: newPayment.receipt_no,
+      customer_id: newPayment.customer_id,
+      sale_id: newPayment.sale_id,
+      amount: newPayment.amount,
+      payment_mode: newPayment.payment_mode,
+      reference_no: newPayment.reference_no,
+      date: newPayment.date,
+      time: newPayment.time,
+      notes: newPayment.notes,
+      recorded_by: newPayment.recorded_by
+    }]).then().catch((e) => console.warn('Live recordCustomerPayment error:', e));
+
     return newPayment;
   }
 
-  recordSupplierPayment({ supplier_id, purchase_id, amount, payment_mode, reference_no, date, time, notes }) {
-    const payAmount = Number(amount) || 0;
-    if (payAmount <= 0) throw new Error('Payment amount must be greater than 0');
-    if (!supplier_id) throw new Error('Please select a supplier');
-
-    const payDate = date || getTodayDateString();
-    const payTime = time || getCurrentTimeString();
+  recordSupplierPayment(payData) {
+    const payId = 'pay-' + Date.now();
+    const receiptNo = `VOUCH-${Math.floor(100 + Math.random() * 900)}`;
+    const amt = Number(payData.amount) || 0;
 
     const newPayment = {
-      id: 'pay-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-      receipt_no: `VCHR-${2000 + this.payments.length + 1}`,
+      id: payId,
+      receipt_no: receiptNo,
       type: 'supplier_payment',
-      supplier_id,
-      purchase_id: purchase_id || null,
-      amount: payAmount,
-      payment_mode: payment_mode || 'Bank Transfer',
-      reference_no: reference_no || '',
-      date: payDate,
-      time: payTime,
-      notes: notes || '',
-      recorded_by: 'Admin'
+      supplier_id: payData.supplier_id,
+      purchase_id: payData.purchase_id || null,
+      amount: amt,
+      payment_mode: payData.payment_mode || 'Bank Transfer',
+      reference_no: payData.reference_no || '',
+      date: payData.date || getTodayDateString(),
+      time: payData.time || getCurrentTimeString(),
+      notes: payData.notes || '',
+      recorded_by: 'Admin',
+      created_at: new Date().toISOString()
     };
 
     this.payments = [newPayment, ...this.payments];
 
-    if (purchase_id) {
-      this.syncPurchasePaymentTotals(purchase_id);
+    if (newPayment.purchase_id) {
+      this.syncPurchasePaymentTotals(newPayment.purchase_id);
     }
 
-    this.saveAll();
+    this.notify();
+
+    supabase.from('supplier_payments').insert([{
+      id: newPayment.id,
+      receipt_no: newPayment.receipt_no,
+      supplier_id: newPayment.supplier_id,
+      purchase_id: newPayment.purchase_id,
+      amount: newPayment.amount,
+      payment_mode: newPayment.payment_mode,
+      reference_no: newPayment.reference_no,
+      date: newPayment.date,
+      time: newPayment.time,
+      notes: newPayment.notes,
+      recorded_by: newPayment.recorded_by
+    }]).then().catch((e) => console.warn('Live recordSupplierPayment error:', e));
+
     return newPayment;
   }
 
-  updatePayment(paymentId, { amount, payment_mode, reference_no, date, time, notes }) {
-    const pay = this.payments.find((p) => p.id === paymentId);
-    if (!pay) throw new Error('Payment record not found');
-    const numAmount = Number(amount);
-    if (!numAmount || numAmount <= 0) throw new Error('Payment amount must be greater than 0');
+  syncSalePaymentTotals(saleId) {
+    const sale = this.getSaleById(saleId);
+    if (!sale) return;
 
-    pay.amount = numAmount;
-    if (payment_mode) pay.payment_mode = payment_mode;
-    if (reference_no !== undefined) pay.reference_no = reference_no;
-    if (date) pay.date = date;
-    if (time) pay.time = time;
-    if (notes !== undefined) pay.notes = notes;
+    const linkedPayments = this.getSalePayments(saleId);
+    const totalPaid = linkedPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
+    const pendingAmount = Math.max(0, sale.total_amount - totalPaid);
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
 
-    if (pay.sale_id) {
-      this.syncSalePaymentTotals(pay.sale_id);
-    }
-    if (pay.purchase_id) {
-      this.syncPurchasePaymentTotals(pay.purchase_id);
-    }
+    sale.paid_amount = totalPaid;
+    sale.pending_amount = pendingAmount;
+    sale.payment_status = paymentStatus;
 
-    this.saveAll();
-    return pay;
+    try {
+      supabase.from('customer_sales').update({
+        paid_amount: totalPaid,
+        pending_amount: pendingAmount,
+        payment_status: paymentStatus
+      }).eq('id', saleId).then();
+    } catch (e) {}
   }
 
-  deleteSale(id) {
-    const sale = this.sales.find((s) => s.id === id);
-    if (sale) {
-      // 1. AUTOMATIC STOCK RESTORATION: Return sold items back to inventory
-      sale.items.forEach((item) => {
-        const prod = this.getProductById(item.product_id);
-        if (prod) {
-          prod.current_stock = (prod.current_stock || 0) + (Number(item.quantity) || 0);
-        }
-      });
-      // 2. Remove associated payments
-      this.payments = this.payments.filter((p) => p.sale_id !== id);
-      // 3. Remove sale
-      this.sales = this.sales.filter((s) => s.id !== id);
-      this.saveAll();
-    }
-  }
+  syncPurchasePaymentTotals(purchaseId) {
+    const pur = this.getPurchaseById(purchaseId);
+    if (!pur) return;
 
-  deletePurchase(id) {
-    const pur = this.purchases.find((p) => p.id === id);
-    if (pur) {
-      // 1. AUTOMATIC STOCK DEDUCTION: Remove purchased items from inventory
-      pur.items.forEach((item) => {
-        const prod = this.getProductById(item.product_id);
-        if (prod) {
-          prod.current_stock = Math.max(0, (prod.current_stock || 0) - (Number(item.quantity) || 0));
-        }
-      });
-      // 2. Remove associated payments
-      this.payments = this.payments.filter((p) => p.purchase_id !== id);
-      // 3. Remove purchase
-      this.purchases = this.purchases.filter((p) => p.id !== id);
-      this.saveAll();
-    }
+    const linkedPayments = this.getPurchasePayments(purchaseId);
+    const totalPaid = linkedPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
+    const pendingAmount = Math.max(0, pur.total_amount - totalPaid);
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
+
+    pur.paid_amount = totalPaid;
+    pur.pending_amount = pendingAmount;
+    pur.payment_status = paymentStatus;
+
+    try {
+      supabase.from('supplier_purchases').update({
+        paid_amount: totalPaid,
+        pending_amount: pendingAmount,
+        payment_status: paymentStatus
+      }).eq('id', purchaseId).then();
+    } catch (e) {}
   }
 
   deletePayment(id) {
-    const pay = this.payments.find((p) => p.id === id);
-    if (pay) {
-      const saleId = pay.sale_id;
-      const purchaseId = pay.purchase_id;
+    const payment = this.getPaymentById(id);
+    if (!payment) return;
 
-      this.payments = this.payments.filter((p) => p.id !== id);
+    this.payments = this.payments.filter((p) => p.id !== id);
 
-      // Automatically recalculate balance and status on linked bill
-      if (saleId) {
-        this.syncSalePaymentTotals(saleId);
-      }
-      if (purchaseId) {
-        this.syncPurchasePaymentTotals(purchaseId);
-      }
-
-      this.saveAll();
+    if (payment.sale_id) {
+      this.syncSalePaymentTotals(payment.sale_id);
+    } else if (payment.purchase_id) {
+      this.syncPurchasePaymentTotals(payment.purchase_id);
     }
-  }
 
-  deleteAdjustment(id) {
-    const adj = this.adjustments.find((a) => a.id === id);
-    if (adj) {
-      const prod = this.getProductById(adj.product_id);
-      if (prod) {
-        if (adj.adjustment_type === 'increase') {
-          prod.current_stock = Math.max(0, (prod.current_stock || 0) - adj.quantity);
-        } else {
-          prod.current_stock = (prod.current_stock || 0) + adj.quantity;
-        }
-      }
-      this.adjustments = this.adjustments.filter((a) => a.id !== id);
-      this.saveAll();
+    this.notify();
+
+    if (payment.type === 'customer_payment') {
+      supabase.from('customer_payments').delete().eq('id', id).then().catch((e) => console.warn('Live deletePayment error:', e));
+    } else {
+      supabase.from('supplier_payments').delete().eq('id', id).then().catch((e) => console.warn('Live deletePayment error:', e));
     }
   }
 
@@ -802,260 +1127,275 @@ class DataService {
     return this.adjustments;
   }
 
-  recordStockAdjustment({ product_id, adjustment_type, quantity, reason, date, time }) {
-    const qty = Number(quantity) || 0;
-    if (qty <= 0) throw new Error('Adjustment quantity must be greater than 0');
+  recordAdjustment(adjData) {
+    const prod = this.getProductById(adjData.product_id);
+    if (!prod) throw new Error('Product not found for adjustment');
 
-    const prod = this.getProductById(product_id);
-    if (!prod) throw new Error('Product not found');
+    const qty = Number(adjData.quantity) || 0;
+    if (qty <= 0) throw new Error('Quantity must be greater than 0');
 
-    if (adjustment_type === 'decrease') {
-      prod.current_stock = Math.max(0, (prod.current_stock || 0) - qty);
+    if (adjData.adjustment_type === 'decrease' && prod.current_stock < qty) {
+      throw new Error(`Cannot decrease stock by ${qty}. Only ${prod.current_stock} currently in stock.`);
+    }
+
+    if (adjData.adjustment_type === 'increase') {
+      prod.current_stock += qty;
     } else {
-      prod.current_stock = (prod.current_stock || 0) + qty;
+      prod.current_stock = Math.max(0, prod.current_stock - qty);
     }
 
     const newAdj = {
       id: 'adj-' + Date.now(),
-      product_id,
-      product_name: prod.name,
-      adjustment_type,
+      product_id: adjData.product_id,
+      adjustment_type: adjData.adjustment_type,
       quantity: qty,
-      reason: reason || 'Physical stock correction',
-      date: date || getTodayDateString(),
-      time: time || getCurrentTimeString(),
-      recorded_by: 'Admin'
+      reason: adjData.reason,
+      date: adjData.date || getTodayDateString(),
+      time: adjData.time || getCurrentTimeString(),
+      recorded_by: 'Admin',
+      created_at: new Date().toISOString()
     };
 
     this.adjustments = [newAdj, ...this.adjustments];
-    this.saveAll();
+    this.notify();
+
+    supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', prod.id).then().catch((e) => console.warn(e));
+    supabase.from('manual_stock_adjustments').insert([newAdj]).then().catch((e) => console.warn(e));
+
     return newAdj;
   }
 
-  // --- CUSTOMER LEDGER ---
+  // --- DERIVED REPORTS & DIGITAL LEDGER ---
   getCustomerLedger(customerId) {
     const custSales = this.sales.filter((s) => s.customer_id === customerId);
     const custPayments = this.payments.filter((p) => p.customer_id === customerId && p.type === 'customer_payment');
 
+    const totalSales = custSales.reduce((acc, s) => acc + (s.total_amount || 0), 0);
+    const totalPaid = custPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
+    const pendingBalance = Math.max(0, totalSales - totalPaid);
+
+    // Combine into chronological passbook
     const entries = [];
 
     custSales.forEach((s) => {
+      const summary = s.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
       entries.push({
         id: s.id,
         date: s.date,
         time: s.time,
         type: 'SALE',
         reference: s.invoice_no,
-        particulars: `Sale Invoice (${s.items.map((i) => `${i.product_name} x${i.quantity}`).join(', ')})`,
-        debit: s.total_amount, // Customer owes us (Debit)
-        credit: 0,
-        rawTimestamp: new Date(`${s.date} ${s.time}`).getTime() || 0
+        particulars: `Sales Invoice - ${summary}`,
+        debit: s.total_amount,
+        credit: 0
       });
     });
 
     custPayments.forEach((p) => {
+      const linkedSale = p.sale_id ? this.getSaleById(p.sale_id) : null;
+      const refDetail = linkedSale ? `for ${linkedSale.invoice_no}` : (p.reference_no ? `Ref: ${p.reference_no}` : '');
       entries.push({
         id: p.id,
         date: p.date,
         time: p.time,
         type: 'PAYMENT',
         reference: p.receipt_no,
-        particulars: `Payment Received via ${p.payment_mode} ${p.reference_no ? '(' + p.reference_no + ')' : ''} ${p.notes ? '- ' + p.notes : ''}`,
+        particulars: `Payment Received (${p.payment_mode}) ${refDetail}`,
         debit: 0,
-        credit: p.amount, // Payment reduces balance (Credit)
-        rawTimestamp: new Date(`${p.date} ${p.time}`).getTime() || 0
+        credit: p.amount
       });
     });
 
-    // Chronological sort
-    entries.sort((a, b) => a.rawTimestamp - b.rawTimestamp);
+    // Chronological order (oldest to newest for running balance)
+    entries.sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
+      const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
+      return dateA - dateB;
+    });
 
-    // Compute running balance
-    let runningBalance = 0;
-    const ledger = entries.map((entry) => {
-      runningBalance = runningBalance + entry.debit - entry.credit;
+    let running = 0;
+    const computedEntries = entries.map((entry) => {
+      running = running + (entry.debit || 0) - (entry.credit || 0);
       return {
         ...entry,
-        balance: runningBalance
+        balance: Math.max(0, running)
       };
     });
 
-    const totalSales = custSales.reduce((acc, s) => acc + (s.total_amount || 0), 0);
-    const totalPaid = custPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const pendingBalance = totalSales - totalPaid;
-
     return {
-      entries: ledger,
       totalSales,
       totalPaid,
-      pendingBalance
+      pendingBalance,
+      entries: computedEntries
     };
   }
 
-  // --- SUPPLIER LEDGER ---
   getSupplierLedger(supplierId) {
     const suppPurchases = this.purchases.filter((p) => p.supplier_id === supplierId);
     const suppPayments = this.payments.filter((p) => p.supplier_id === supplierId && p.type === 'supplier_payment');
 
+    const totalPurchases = suppPurchases.reduce((acc, p) => acc + (p.total_amount || 0), 0);
+    const totalPaid = suppPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
+    const pendingBalance = Math.max(0, totalPurchases - totalPaid);
+
     const entries = [];
 
     suppPurchases.forEach((p) => {
+      const summary = p.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
       entries.push({
         id: p.id,
         date: p.date,
         time: p.time,
         type: 'PURCHASE',
         reference: p.purchase_no,
-        particulars: `Purchase Inward (${p.items.map((i) => `${i.product_name} x${i.quantity}`).join(', ')})`,
-        credit: p.total_amount, // We owe supplier (Credit)
-        debit: 0,
-        rawTimestamp: new Date(`${p.date} ${p.time}`).getTime() || 0
+        particulars: `Inward Purchase - ${summary}`,
+        credit: p.total_amount,
+        debit: 0
       });
     });
 
-    suppPayments.forEach((pay) => {
+    suppPayments.forEach((p) => {
+      const linkedPur = p.purchase_id ? this.getPurchaseById(p.purchase_id) : null;
+      const refDetail = linkedPur ? `for ${linkedPur.purchase_no}` : (p.reference_no ? `Ref: ${p.reference_no}` : '');
       entries.push({
-        id: pay.id,
-        date: pay.date,
-        time: pay.time,
+        id: p.id,
+        date: p.date,
+        time: p.time,
         type: 'PAYMENT',
-        reference: pay.receipt_no,
-        particulars: `Payment Made via ${pay.payment_mode} ${pay.reference_no ? '(' + pay.reference_no + ')' : ''}`,
+        reference: p.receipt_no,
+        particulars: `Payment Made (${p.payment_mode}) ${refDetail}`,
         credit: 0,
-        debit: pay.amount, // Payment reduces our debt (Debit)
-        rawTimestamp: new Date(`${pay.date} ${pay.time}`).getTime() || 0
+        debit: p.amount
       });
     });
 
-    entries.sort((a, b) => a.rawTimestamp - b.rawTimestamp);
+    entries.sort((a, b) => {
+      const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
+      const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
+      return dateA - dateB;
+    });
 
-    let runningBalance = 0;
-    const ledger = entries.map((entry) => {
-      runningBalance = runningBalance + entry.credit - entry.debit;
+    let running = 0;
+    const computedEntries = entries.map((entry) => {
+      running = running + (entry.credit || 0) - (entry.debit || 0);
       return {
         ...entry,
-        balance: runningBalance
+        balance: Math.max(0, running)
       };
     });
 
-    const totalPurchases = suppPurchases.reduce((acc, p) => acc + (p.total_amount || 0), 0);
-    const totalPaid = suppPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const pendingBalance = totalPurchases - totalPaid;
-
     return {
-      entries: ledger,
       totalPurchases,
       totalPaid,
-      pendingBalance
+      pendingBalance,
+      entries: computedEntries
     };
   }
 
-  // --- DAILY TRANSACTIONS / DAY BOOK (Roznamcha) ---
-  getDayBook(dateStr) {
-    const targetDate = dateStr || getTodayDateString();
+  getDailyTransactions(filterDate = getTodayDateString()) {
+    const daySales = this.sales.filter((s) => s.date === filterDate);
+    const dayPurchases = this.purchases.filter((p) => p.date === filterDate);
+    const dayPayments = this.payments.filter((p) => p.date === filterDate);
+    const dayAdjustments = this.adjustments.filter((a) => a.date === filterDate);
 
-    const salesToday = this.sales.filter((s) => s.date === targetDate);
-    const purchasesToday = this.purchases.filter((p) => p.date === targetDate);
-    const paymentsReceivedToday = this.payments.filter((p) => p.date === targetDate && p.type === 'customer_payment');
-    const paymentsMadeToday = this.payments.filter((p) => p.date === targetDate && p.type === 'supplier_payment');
-    const adjustmentsToday = this.adjustments.filter((a) => a.date === targetDate);
+    const transactions = [];
 
-    const totalSalesAmount = salesToday.reduce((acc, s) => acc + (s.total_amount || 0), 0);
-    const totalPurchasesAmount = purchasesToday.reduce((acc, p) => acc + (p.total_amount || 0), 0);
-    const cashInflow = paymentsReceivedToday.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const cashOutflow = paymentsMadeToday.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const netCashMovement = cashInflow - cashOutflow;
+    daySales.forEach((s) => {
+      const cust = this.getCustomerById(s.customer_id);
+      transactions.push({
+        id: s.id,
+        time: s.time,
+        type: 'SALE',
+        reference: s.invoice_no,
+        party: cust ? cust.name : 'Unknown Customer',
+        details: `${s.items.length} items billed`,
+        inflow: s.paid_amount,
+        outflow: 0,
+        netTotal: s.total_amount,
+        status: s.payment_status
+      });
+    });
 
-    const allEvents = [
-      ...salesToday.map((s) => {
-        const cust = this.getCustomerById(s.customer_id);
-        return {
-          id: s.id,
-          time: s.time,
-          type: 'Customer Sale',
-          badgeClass: 'badge-active',
+    dayPurchases.forEach((p) => {
+      const supp = this.getSupplierById(p.supplier_id);
+      transactions.push({
+        id: p.id,
+        time: p.time,
+        type: 'PURCHASE',
+        reference: p.purchase_no,
+        party: supp ? supp.company_name : 'Unknown Supplier',
+        details: `${p.items.length} items inward`,
+        inflow: 0,
+        outflow: p.paid_amount,
+        netTotal: p.total_amount,
+        status: p.payment_status
+      });
+    });
+
+    dayPayments.forEach((pay) => {
+      if (pay.type === 'customer_payment') {
+        const cust = this.getCustomerById(pay.customer_id);
+        transactions.push({
+          id: pay.id,
+          time: pay.time,
+          type: 'PAYMENT_RECEIVED',
+          reference: pay.receipt_no,
           party: cust ? cust.name : 'Customer',
-          details: s.items.map((i) => `${i.product_name} (${i.quantity})`).join(', '),
-          amount: s.total_amount,
-          amountType: 'receivable',
-          reference: s.invoice_no,
-          status: s.payment_status
-        };
-      }),
-      ...purchasesToday.map((p) => {
-        const supp = this.getSupplierById(p.supplier_id);
-        return {
-          id: p.id,
-          time: p.time,
-          type: 'Supplier Purchase',
-          badgeClass: 'badge-partial',
+          details: `Via ${pay.payment_mode} ${pay.reference_no ? `(${pay.reference_no})` : ''}`,
+          inflow: pay.amount,
+          outflow: 0,
+          netTotal: pay.amount,
+          status: 'Settled'
+        });
+      } else {
+        const supp = this.getSupplierById(pay.supplier_id);
+        transactions.push({
+          id: pay.id,
+          time: pay.time,
+          type: 'PAYMENT_MADE',
+          reference: pay.receipt_no,
           party: supp ? supp.company_name : 'Supplier',
-          details: p.items.map((i) => `${i.product_name} (${i.quantity})`).join(', '),
-          amount: p.total_amount,
-          amountType: 'payable',
-          reference: p.purchase_no,
-          status: p.payment_status
-        };
-      }),
-      ...paymentsReceivedToday.map((p) => {
-        const cust = this.getCustomerById(p.customer_id);
-        return {
-          id: p.id,
-          time: p.time,
-          type: 'Customer Payment Inward',
-          badgeClass: 'badge-paid',
-          party: cust ? cust.name : 'Customer',
-          details: `Mode: ${p.payment_mode} ${p.notes ? '• ' + p.notes : ''}`,
-          amount: p.amount,
-          amountType: 'inflow',
-          reference: p.receipt_no,
-          status: 'Received'
-        };
-      }),
-      ...paymentsMadeToday.map((p) => {
-        const supp = this.getSupplierById(p.supplier_id);
-        return {
-          id: p.id,
-          time: p.time,
-          type: 'Supplier Payment Outward',
-          badgeClass: 'badge-pending',
-          party: supp ? supp.company_name : 'Supplier',
-          details: `Mode: ${p.payment_mode} ${p.notes ? '• ' + p.notes : ''}`,
-          amount: p.amount,
-          amountType: 'outflow',
-          reference: p.receipt_no,
-          status: 'Paid Out'
-        };
-      }),
-      ...adjustmentsToday.map((a) => ({
-        id: a.id,
-        time: a.time,
-        type: `Stock ${a.adjustment_type === 'increase' ? 'Addition' : 'Deduction'}`,
-        badgeClass: 'badge-partial',
-        party: 'Inventory Audit',
-        details: `${a.product_name} (${a.adjustment_type === 'increase' ? '+' : '-'}${a.quantity}) - ${a.reason}`,
-        amount: null,
-        amountType: 'stock',
-        reference: 'Stock Adj',
-        status: 'Audited'
-      }))
-    ];
+          details: `Via ${pay.payment_mode} ${pay.reference_no ? `(${pay.reference_no})` : ''}`,
+          inflow: 0,
+          outflow: pay.amount,
+          netTotal: pay.amount,
+          status: 'Settled'
+        });
+      }
+    });
 
-    allEvents.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    dayAdjustments.forEach((adj) => {
+      const prod = this.getProductById(adj.product_id);
+      transactions.push({
+        id: adj.id,
+        time: adj.time,
+        type: 'ADJUSTMENT',
+        reference: 'ADJ',
+        party: prod ? prod.name : 'Product',
+        details: `${adj.adjustment_type.toUpperCase()}: ${adj.quantity} units (${adj.reason})`,
+        inflow: 0,
+        outflow: 0,
+        netTotal: 0,
+        status: 'Audit'
+      });
+    });
+
+    transactions.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+
+    const totalCashInflow = transactions.reduce((acc, t) => acc + (t.inflow || 0), 0);
+    const totalCashOutflow = transactions.reduce((acc, t) => acc + (t.outflow || 0), 0);
+    const netCashPosition = totalCashInflow - totalCashOutflow;
 
     return {
-      date: targetDate,
-      totalSalesAmount,
-      totalPurchasesAmount,
-      cashInflow,
-      cashOutflow,
-      netCashMovement,
-      events: allEvents
+      date: filterDate,
+      transactions,
+      totalCashInflow,
+      totalCashOutflow,
+      netCashPosition
     };
   }
 
-  // --- REVENUE & PROFIT REPORT ---
-  getProfitReport() {
+  getRevenueProfitReport() {
     let totalRevenue = 0;
     let totalEstimatedCost = 0;
     let totalUnitsSold = 0;
@@ -1063,44 +1403,41 @@ class DataService {
     const productSalesMap = {};
     const customerSalesMap = {};
 
-    this.sales.forEach((s) => {
-      totalRevenue += s.total_amount || 0;
+    this.sales.forEach((sale) => {
+      totalRevenue += sale.total_amount || 0;
 
-      s.items.forEach((item) => {
-        totalUnitsSold += item.quantity;
-        const prod = this.getProductById(item.product_id);
-        const costPrice = prod ? prod.purchase_price : 0;
-        const itemCost = costPrice * item.quantity;
-        totalEstimatedCost += itemCost;
-
-        if (!productSalesMap[item.product_id]) {
-          productSalesMap[item.product_id] = {
-            id: item.product_id,
-            name: item.product_name,
-            units: 0,
-            revenue: 0,
-            cost: 0,
-            profit: 0
-          };
-        }
-        productSalesMap[item.product_id].units += item.quantity;
-        productSalesMap[item.product_id].revenue += item.total;
-        productSalesMap[item.product_id].cost += itemCost;
-        productSalesMap[item.product_id].profit += (item.total - itemCost);
-      });
-
-      if (!customerSalesMap[s.customer_id]) {
-        const cust = this.getCustomerById(s.customer_id);
-        customerSalesMap[s.customer_id] = {
-          id: s.customer_id,
-          name: cust ? cust.name : 'Unknown',
-          area: cust ? cust.area : '',
+      const cust = this.getCustomerById(sale.customer_id);
+      const custKey = sale.customer_id;
+      if (!customerSalesMap[custKey]) {
+        customerSalesMap[custKey] = {
+          name: cust ? cust.name : 'Unknown Customer',
           totalRevenue: 0,
-          ordersCount: 0
+          invoicesCount: 0
         };
       }
-      customerSalesMap[s.customer_id].totalRevenue += s.total_amount;
-      customerSalesMap[s.customer_id].ordersCount += 1;
+      customerSalesMap[custKey].totalRevenue += sale.total_amount || 0;
+      customerSalesMap[custKey].invoicesCount += 1;
+
+      sale.items.forEach((item) => {
+        totalUnitsSold += item.quantity || 0;
+        const prod = this.getProductById(item.product_id);
+        const purchaseCost = prod ? prod.purchase_price : 0;
+        const costOfGoods = (item.quantity || 0) * purchaseCost;
+        totalEstimatedCost += costOfGoods;
+
+        const prodKey = item.product_id;
+        if (!productSalesMap[prodKey]) {
+          productSalesMap[prodKey] = {
+            name: item.product_name,
+            quantity: 0,
+            revenue: 0,
+            cost: 0
+          };
+        }
+        productSalesMap[prodKey].quantity += item.quantity || 0;
+        productSalesMap[prodKey].revenue += item.total || 0;
+        productSalesMap[prodKey].cost += costOfGoods;
+      });
     });
 
     const grossProfit = totalRevenue - totalEstimatedCost;
@@ -1143,15 +1480,6 @@ class DataService {
     this.purchases = JSON.parse(JSON.stringify(initialPurchases));
     this.payments = JSON.parse(JSON.stringify(initialPayments));
     this.adjustments = JSON.parse(JSON.stringify(initialAdjustments));
-
-    setStored(STORAGE_KEYS.PRODUCTS, this.products);
-    setStored(STORAGE_KEYS.CUSTOMERS, this.customers);
-    setStored(STORAGE_KEYS.SUPPLIERS, this.suppliers);
-    setStored(STORAGE_KEYS.SALES, this.sales);
-    setStored(STORAGE_KEYS.PURCHASES, this.purchases);
-    setStored(STORAGE_KEYS.PAYMENTS, this.payments);
-    setStored(STORAGE_KEYS.ADJUSTMENTS, this.adjustments);
-
     this.notify();
   }
 }
