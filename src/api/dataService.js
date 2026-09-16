@@ -1,7 +1,7 @@
 // Centralized Live Supabase Data Engine & Business Logic for Anusha Enterprises CRM
 // Zero localStorage reliance - powered directly by PostgreSQL via Supabase
 
-import { supabase } from './supabaseClient.js';
+import { supabase, isSupabaseConfigured } from './supabaseClient.js';
 import {
   initialProducts,
   initialCustomers,
@@ -15,16 +15,17 @@ import { generateId, getTodayDateString, getCurrentTimeString } from '../utils/f
 
 class DataService {
   constructor() {
-    this.products = [];
-    this.customers = [];
-    this.suppliers = [];
-    this.sales = [];
-    this.purchases = [];
-    this.payments = [];
-    this.adjustments = [];
+    // Initialize in-memory records so UI is immediately fully interactive and never blank
+    this.products = JSON.parse(JSON.stringify(initialProducts));
+    this.customers = JSON.parse(JSON.stringify(initialCustomers));
+    this.suppliers = JSON.parse(JSON.stringify(initialSuppliers));
+    this.sales = JSON.parse(JSON.stringify(initialSales));
+    this.purchases = JSON.parse(JSON.stringify(initialPurchases));
+    this.payments = JSON.parse(JSON.stringify(initialPayments));
+    this.adjustments = JSON.parse(JSON.stringify(initialAdjustments));
 
     this.isLiveConnected = false;
-    this.isLoading = true;
+    this.isLoading = false;
     this.connectionError = null;
     this.listeners = new Set();
     this.realtimeChannel = null;
@@ -47,6 +48,13 @@ class DataService {
    */
   async init() {
     try {
+      if (!isSupabaseConfigured) {
+        this.isLiveConnected = false;
+        this.connectionError = 'Configure Supabase environment variables in Vercel settings';
+        this.notify();
+        return;
+      }
+
       this.isLoading = true;
       this.notify();
 
@@ -58,17 +66,6 @@ class DataService {
       console.warn('Supabase initialization warning:', err.message);
       this.isLiveConnected = false;
       this.connectionError = err.message || 'Connecting to Supabase...';
-
-      // If tables are missing or not yet run in Supabase SQL editor, populate in-memory so UI works
-      if (this.products.length === 0) {
-        this.products = JSON.parse(JSON.stringify(initialProducts));
-        this.customers = JSON.parse(JSON.stringify(initialCustomers));
-        this.suppliers = JSON.parse(JSON.stringify(initialSuppliers));
-        this.sales = JSON.parse(JSON.stringify(initialSales));
-        this.purchases = JSON.parse(JSON.stringify(initialPurchases));
-        this.payments = JSON.parse(JSON.stringify(initialPayments));
-        this.adjustments = JSON.parse(JSON.stringify(initialAdjustments));
-      }
     } finally {
       this.isLoading = false;
       this.notify();
@@ -258,17 +255,22 @@ class DataService {
    * Establishes real-time subscriptions for multi-device sync
    */
   setupRealtimeSubscription() {
-    if (this.realtimeChannel) {
-      supabase.removeChannel(this.realtimeChannel);
-    }
+    if (!isSupabaseConfigured) return;
+    try {
+      if (this.realtimeChannel) {
+        supabase.removeChannel(this.realtimeChannel);
+      }
 
-    this.realtimeChannel = supabase
-      .channel('anusha-crm-live')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        // Silently sync state from live database when another tab/user updates
-        this.fetchAll().catch((e) => console.warn('Realtime refresh error:', e));
-      })
-      .subscribe();
+      this.realtimeChannel = supabase
+        .channel('anusha-crm-live')
+        .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+          // Silently sync state from live database when another tab/user updates
+          this.fetchAll().catch((e) => console.warn('Realtime refresh error:', e));
+        })
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime subscription error:', e);
+    }
   }
 
   // --- PRODUCTS ---
