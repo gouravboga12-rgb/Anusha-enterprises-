@@ -41,7 +41,13 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave }) => {
       alert('Please enter product name');
       return;
     }
-    onSave(formData);
+    onSave({
+      ...formData,
+      current_stock: formData.current_stock !== '' && formData.current_stock !== undefined ? Number(formData.current_stock) : 0,
+      min_stock_alert: formData.min_stock_alert !== '' && formData.min_stock_alert !== undefined ? Number(formData.min_stock_alert) : 0,
+      purchase_price: formData.purchase_price !== '' && formData.purchase_price !== undefined ? Number(formData.purchase_price) : 0,
+      selling_price: formData.selling_price !== '' && formData.selling_price !== undefined ? Number(formData.selling_price) : 0
+    });
     onClose();
   };
 
@@ -128,26 +134,24 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave }) => {
         </div>
 
         <div className="form-row">
-          {!product && (
-            <div className="form-group">
-              <label className="form-label">Initial Opening Stock</label>
-              <input
-                type="number"
-                className="form-input"
-                min="0"
-                placeholder="0"
-                value={formData.current_stock}
-                onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
-              />
-            </div>
-          )}
+          <div className="form-group">
+            <label className="form-label">{product ? 'Current Stock Quantity' : 'Initial Opening Stock'}</label>
+            <input
+              type="number"
+              className="form-input"
+              min="0"
+              placeholder="0"
+              value={formData.current_stock === 0 ? '0' : (formData.current_stock ?? '')}
+              onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
+            />
+          </div>
           <div className="form-group">
             <label className="form-label">Low Stock Alert Quantity</label>
             <input
               type="number"
               className="form-input"
-              min="1"
-              value={formData.min_stock_alert}
+              min="0"
+              value={formData.min_stock_alert === 0 ? '0' : (formData.min_stock_alert ?? '')}
               onChange={(e) => setFormData({ ...formData, min_stock_alert: e.target.value })}
             />
           </div>

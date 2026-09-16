@@ -290,11 +290,15 @@ class DataService {
       id: prodId,
       sku: productData.sku || `SKU-${Math.floor(100 + Math.random() * 900)}`,
       name: productData.name,
-      current_stock: Number(productData.current_stock) || 0,
+      current_stock: productData.current_stock !== undefined && productData.current_stock !== ''
+        ? Number(productData.current_stock)
+        : 0,
       unit: productData.unit || 'boxes',
       purchase_price: Number(productData.purchase_price) || 0,
       selling_price: Number(productData.selling_price) || 0,
-      min_stock_alert: Number(productData.low_stock_threshold || productData.min_stock_alert) || 20,
+      min_stock_alert: productData.min_stock_alert !== undefined && productData.min_stock_alert !== ''
+        ? Number(productData.min_stock_alert)
+        : (productData.low_stock_threshold !== undefined ? Number(productData.low_stock_threshold) : 0),
       image_url: productData.image_url || null,
       cloudinary_public_id: productData.cloudinary_public_id || null,
       is_active: productData.is_active !== undefined ? productData.is_active : true,
