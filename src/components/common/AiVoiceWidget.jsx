@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Sparkles, X, Volume2, VolumeX, ArrowRight, Send, Search, CheckCircle2, TrendingUp, AlertTriangle } from 'lucide-react';
 import { formatCurrency, getTodayDateString, formatDate } from '../../utils/formatters';
 import { dataService } from '../../api/dataService';
@@ -195,10 +196,11 @@ export const AiVoiceWidget = () => {
           <span className="soundwave-bar"></span>
         </div>
         <Sparkles size={14} />
-        <span>Ask Day Summary</span>
+        <span className="ai-widget-label-desktop">Ask Day Summary</span>
+        <span className="ai-widget-label-mobile">AI Summary</span>
       </button>
 
-      {isOpen && (
+      {isOpen && typeof document !== 'undefined' && createPortal(
         <div className="modal-backdrop" onClick={() => setIsOpen(false)}>
           <div
             className="modal-card"
@@ -383,7 +385,8 @@ export const AiVoiceWidget = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -130,7 +130,7 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
           </button>
           {currentUser && (
             <button
-              className="btn btn-secondary btn-sm"
+              className="btn btn-secondary btn-sm header-logout-btn"
               onClick={onLogout}
               style={{
                 background: '#fef2f2',
