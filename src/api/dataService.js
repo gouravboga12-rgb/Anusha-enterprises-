@@ -1294,73 +1294,84 @@ class DataService {
     };
   }
 
-  getDailyTransactions(filterDate = getTodayDateString()) {
+  getDayBook(filterDate = getTodayDateString()) {
     const daySales = this.sales.filter((s) => s.date === filterDate);
     const dayPurchases = this.purchases.filter((p) => p.date === filterDate);
     const dayPayments = this.payments.filter((p) => p.date === filterDate);
     const dayAdjustments = this.adjustments.filter((a) => a.date === filterDate);
 
-    const transactions = [];
+    const events = [];
+
+    let totalSalesAmount = 0;
+    let totalPurchasesAmount = 0;
+    let cashInflow = 0;
+    let cashOutflow = 0;
 
     daySales.forEach((s) => {
+      totalSalesAmount += s.total_amount || 0;
       const cust = this.getCustomerById(s.customer_id);
-      transactions.push({
+      const itemsStr = s.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
+      events.push({
         id: s.id,
         time: s.time,
-        type: 'SALE',
+        type: 'Customer Sale',
+        badgeClass: 'badge-active',
+        party: cust ? cust.name : 'Customer',
+        details: itemsStr || `${s.items.length} items`,
+        amount: s.total_amount,
+        amountType: 'neutral',
         reference: s.invoice_no,
-        party: cust ? cust.name : 'Unknown Customer',
-        details: `${s.items.length} items billed`,
-        inflow: s.paid_amount,
-        outflow: 0,
-        netTotal: s.total_amount,
         status: s.payment_status
       });
     });
 
     dayPurchases.forEach((p) => {
+      totalPurchasesAmount += p.total_amount || 0;
       const supp = this.getSupplierById(p.supplier_id);
-      transactions.push({
+      const itemsStr = p.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
+      events.push({
         id: p.id,
         time: p.time,
-        type: 'PURCHASE',
+        type: 'Supplier Purchase',
+        badgeClass: 'badge-warning',
+        party: supp ? supp.company_name : 'Supplier',
+        details: itemsStr || `${p.items.length} items`,
+        amount: p.total_amount,
+        amountType: 'neutral',
         reference: p.purchase_no,
-        party: supp ? supp.company_name : 'Unknown Supplier',
-        details: `${p.items.length} items inward`,
-        inflow: 0,
-        outflow: p.paid_amount,
-        netTotal: p.total_amount,
         status: p.payment_status
       });
     });
 
     dayPayments.forEach((pay) => {
       if (pay.type === 'customer_payment') {
+        cashInflow += pay.amount || 0;
         const cust = this.getCustomerById(pay.customer_id);
-        transactions.push({
+        events.push({
           id: pay.id,
           time: pay.time,
-          type: 'PAYMENT_RECEIVED',
-          reference: pay.receipt_no,
+          type: 'Customer Payment Inward',
+          badgeClass: 'badge-paid',
           party: cust ? cust.name : 'Customer',
-          details: `Via ${pay.payment_mode} ${pay.reference_no ? `(${pay.reference_no})` : ''}`,
-          inflow: pay.amount,
-          outflow: 0,
-          netTotal: pay.amount,
+          details: `Via ${pay.payment_mode}${pay.notes ? ` - ${pay.notes}` : ''}`,
+          amount: pay.amount,
+          amountType: 'inflow',
+          reference: pay.receipt_no,
           status: 'Settled'
         });
       } else {
+        cashOutflow += pay.amount || 0;
         const supp = this.getSupplierById(pay.supplier_id);
-        transactions.push({
+        events.push({
           id: pay.id,
           time: pay.time,
-          type: 'PAYMENT_MADE',
-          reference: pay.receipt_no,
+          type: 'Supplier Payment Outward',
+          badgeClass: 'badge-danger',
           party: supp ? supp.company_name : 'Supplier',
-          details: `Via ${pay.payment_mode} ${pay.reference_no ? `(${pay.reference_no})` : ''}`,
-          inflow: 0,
-          outflow: pay.amount,
-          netTotal: pay.amount,
+          details: `Via ${pay.payment_mode}${pay.notes ? ` - ${pay.notes}` : ''}`,
+          amount: pay.amount,
+          amountType: 'outflow',
+          reference: pay.receipt_no,
           status: 'Settled'
         });
       }
@@ -1368,33 +1379,42 @@ class DataService {
 
     dayAdjustments.forEach((adj) => {
       const prod = this.getProductById(adj.product_id);
-      transactions.push({
+      events.push({
         id: adj.id,
         time: adj.time,
-        type: 'ADJUSTMENT',
-        reference: 'ADJ',
+        type: `Stock ${adj.adjustment_type === 'increase' ? 'Addition' : 'Reduction'}`,
+        badgeClass: 'badge-neutral',
         party: prod ? prod.name : 'Product',
-        details: `${adj.adjustment_type.toUpperCase()}: ${adj.quantity} units (${adj.reason})`,
-        inflow: 0,
-        outflow: 0,
-        netTotal: 0,
-        status: 'Audit'
+        details: `${adj.adjustment_type.toUpperCase()}: ${adj.quantity} ${prod?.unit || 'units'} (${adj.reason})`,
+        amount: null,
+        amountType: 'none',
+        reference: 'ADJ',
+        status: 'Audit Log'
       });
     });
 
-    transactions.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+    events.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
 
-    const totalCashInflow = transactions.reduce((acc, t) => acc + (t.inflow || 0), 0);
-    const totalCashOutflow = transactions.reduce((acc, t) => acc + (t.outflow || 0), 0);
-    const netCashPosition = totalCashInflow - totalCashOutflow;
+    const netCashMovement = cashInflow - cashOutflow;
 
     return {
       date: filterDate,
-      transactions,
-      totalCashInflow,
-      totalCashOutflow,
-      netCashPosition
+      totalSalesAmount,
+      totalPurchasesAmount,
+      cashInflow,
+      cashOutflow,
+      netCashMovement,
+      events,
+      transactions: events
     };
+  }
+
+  getDailyTransactions(filterDate) {
+    return this.getDayBook(filterDate);
+  }
+
+  getProfitReport() {
+    return this.getRevenueProfitReport();
   }
 
   getRevenueProfitReport() {
