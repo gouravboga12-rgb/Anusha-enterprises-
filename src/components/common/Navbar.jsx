@@ -8,7 +8,7 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
 
   return (
     <header className="top-navbar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="top-nav-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button
           onClick={onToggleSidebar}
           style={{
@@ -19,7 +19,8 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
             borderRadius: '6px',
             display: 'flex',
             alignItems: 'center',
-            color: '#0f172a'
+            color: '#0f172a',
+            flexShrink: 0
           }}
           title="Toggle Navigation Menu"
         >
@@ -27,27 +28,29 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
         </button>
 
         {/* Brand Logo & Name in Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="nav-brand-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <img
             src="/logo.png"
             alt="Anusha Enterprises"
             style={{
-              height: '32px',
+              height: '30px',
               width: 'auto',
               objectFit: 'contain',
-              borderRadius: '4px'
+              borderRadius: '4px',
+              flexShrink: 0
             }}
           />
-          <span style={{
+          <span className="nav-brand-name" style={{
             fontWeight: 800,
             fontSize: '14px',
             color: '#0f172a',
             letterSpacing: '-0.01em',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: '4px',
+            whiteSpace: 'nowrap'
           }}>
-            ANUSHA <span style={{ color: '#0284c7', fontWeight: 600 }}>ENTERPRISES</span>
+            ANUSHA <span className="nav-brand-suffix" style={{ color: '#0284c7', fontWeight: 600 }}>ENTERPRISES</span>
           </span>
         </div>
 
@@ -71,7 +74,7 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
         </div>
 
         {/* Live Supabase Connection Badge */}
-        <div style={{
+        <div className="header-cloud-badge" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
@@ -81,7 +84,9 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
           fontWeight: 600,
           background: isLiveConnected ? '#ecfdf5' : '#fef3c7',
           color: isLiveConnected ? '#059669' : '#d97706',
-          border: `1px solid ${isLiveConnected ? '#a7f3d0' : '#fde68a'}`
+          border: `1px solid ${isLiveConnected ? '#a7f3d0' : '#fde68a'}`,
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}
         title={isLiveConnected ? 'Connected to live Supabase PostgreSQL database' : 'Connecting to Supabase (run supabase_schema.sql in dashboard)'}
         >
@@ -90,14 +95,15 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
             height: '7px',
             borderRadius: '50%',
             background: isLiveConnected ? '#10b981' : '#f59e0b',
-            boxShadow: isLiveConnected ? '0 0 6px #10b981' : 'none'
+            boxShadow: isLiveConnected ? '0 0 6px #10b981' : 'none',
+            flexShrink: 0
           }} />
-          <Cloud size={12} />
-          <span>{isLiveConnected ? 'Supabase Live' : 'Cloud Sync Ready'}</span>
+          <Cloud size={12} style={{ flexShrink: 0 }} />
+          <span className="cloud-badge-text">{isLiveConnected ? 'Supabase Live' : 'Cloud Sync'}</span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div className="top-nav-right" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
         <div className="header-date-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#475569', background: '#f8fafc', padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
           <Calendar size={14} color="#0284c7" />
           <span style={{ fontWeight: 600 }}>{todayStr}</span>

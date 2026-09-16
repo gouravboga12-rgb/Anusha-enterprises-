@@ -71,7 +71,7 @@ export const Dashboard = ({
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="banner-action-btns" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
             className="btn"
             style={{ background: '#ffffff', color: '#0284c7', fontWeight: 700 }}

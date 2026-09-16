@@ -222,7 +222,7 @@ export const CustomerProfile = ({
       </div>
 
       {/* Tabs navigation */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+      <div className="profile-tabs-nav" style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
         <button
           className={`btn btn-sm ${activeTab === 'ledger' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveTab('ledger')}
