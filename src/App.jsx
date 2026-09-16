@@ -1,0 +1,461 @@
+import React, { useState, useEffect } from 'react';
+import { Navbar } from './components/common/Navbar';
+import { Sidebar } from './components/common/Sidebar';
+import { Dashboard } from './components/dashboard/Dashboard';
+import { CustomerList } from './components/customers/CustomerList';
+import { CustomerProfile } from './components/customers/CustomerProfile';
+import { CustomerFormModal } from './components/customers/CustomerFormModal';
+import { SupplierList } from './components/suppliers/SupplierList';
+import { SupplierProfile } from './components/suppliers/SupplierProfile';
+import { SupplierFormModal } from './components/suppliers/SupplierFormModal';
+import { ProductList } from './components/products/ProductList';
+import { ProductFormModal } from './components/products/ProductFormModal';
+import { StockMovementModal } from './components/products/StockMovementModal';
+import { SalesList } from './components/sales/SalesList';
+import { NewSaleModal } from './components/sales/NewSaleModal';
+import { BillDetailsModal } from './components/sales/BillDetailsModal';
+import { EditSaleModal } from './components/sales/EditSaleModal';
+import { PurchasesList } from './components/purchases/PurchasesList';
+import { NewPurchaseModal } from './components/purchases/NewPurchaseModal';
+import { PurchaseDetailsModal } from './components/purchases/PurchaseDetailsModal';
+import { EditPurchaseModal } from './components/purchases/EditPurchaseModal';
+import { PaymentList } from './components/payments/PaymentList';
+import { RecordPaymentModal } from './components/payments/RecordPaymentModal';
+import { CustomerLedgerView } from './components/ledger/CustomerLedgerView';
+import { SupplierLedgerView } from './components/ledger/SupplierLedgerView';
+import { DailyTransactions } from './components/daybook/DailyTransactions';
+import { ManualAdjustmentModal } from './components/inventory/ManualAdjustmentModal';
+import { RevenueProfitReport } from './components/reports/RevenueProfitReport';
+import { BottomNav } from './components/common/BottomNav';
+
+import { dataService } from './api/dataService';
+
+export const App = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [, setTick] = useState(0); // For re-rendering when dataService changes
+
+  // Selection states
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [selectedSupplierId, setSelectedSupplierId] = useState(null);
+
+  // Modal open states
+  const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
+  const [saleInitialCustId, setSaleInitialCustId] = useState('');
+
+  const [isNewPurchaseOpen, setIsNewPurchaseOpen] = useState(false);
+  const [purInitialSuppId, setPurInitialSuppId] = useState('');
+
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentInitialPartyId, setPaymentInitialPartyId] = useState('');
+  const [paymentInitialPartyType, setPaymentInitialPartyType] = useState('customer');
+  const [paymentInitialDocId, setPaymentInitialDocId] = useState('');
+
+  const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
+
+  const [isCustomerFormOpen, setIsCustomerFormOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+
+  const [isSupplierFormOpen, setIsSupplierFormOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState(null);
+
+  const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+
+  const [stockHistoryProduct, setStockHistoryProduct] = useState(null);
+
+  // New Separate Bill & Purchase Management Modals
+  const [selectedBillSale, setSelectedBillSale] = useState(null);
+  const [isBillDetailsOpen, setIsBillDetailsOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState(null);
+  const [isEditSaleOpen, setIsEditSaleOpen] = useState(false);
+
+  const [selectedPurchaseDoc, setSelectedPurchaseDoc] = useState(null);
+  const [isPurchaseDetailsOpen, setIsPurchaseDetailsOpen] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState(null);
+  const [isEditPurchaseOpen, setIsEditPurchaseOpen] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = dataService.subscribe(() => {
+      setTick((t) => t + 1);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Quick action openers
+  const openNewSale = (customerId = '') => {
+    setSaleInitialCustId(customerId || '');
+    setIsNewSaleOpen(true);
+  };
+
+  const openNewPurchase = (supplierId = '') => {
+    setPurInitialSuppId(supplierId || '');
+    setIsNewPurchaseOpen(true);
+  };
+
+  const openPayment = (partyId = '', partyType = 'customer', docId = '') => {
+    setPaymentInitialPartyId(partyId || '');
+    setPaymentInitialPartyType(partyType || 'customer');
+    setPaymentInitialDocId(docId || '');
+    setIsPaymentOpen(true);
+  };
+
+  const openBillDetails = (sale) => {
+    setSelectedBillSale(sale);
+    setIsBillDetailsOpen(true);
+  };
+
+  const openEditSale = (sale) => {
+    setEditingSale(sale);
+    setIsEditSaleOpen(true);
+  };
+
+  const openPurchaseDetails = (pur) => {
+    setSelectedPurchaseDoc(pur);
+    setIsPurchaseDetailsOpen(true);
+  };
+
+  const openEditPurchase = (pur) => {
+    setEditingPurchase(pur);
+    setIsEditPurchaseOpen(true);
+  };
+
+  return (
+    <div className="app-container">
+      {/* Responsive Sidebar Drawer */}
+      <Sidebar
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setSelectedCustomerId(null);
+          setSelectedSupplierId(null);
+        }}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
+
+      {/* Main Content Area */}
+      <div className="main-content">
+        <Navbar
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          onOpenNewSale={() => openNewSale()}
+          onOpenPayment={() => openPayment()}
+        />
+
+        <main className="page-content">
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              dataService={dataService}
+              onNavigate={(tab) => setActiveTab(tab)}
+              onOpenNewSale={() => openNewSale()}
+              onOpenNewPurchase={() => openNewPurchase()}
+              onOpenPayment={() => openPayment()}
+              onOpenAdjustment={() => setIsAdjustmentOpen(true)}
+            />
+          )}
+
+          {activeTab === 'customers' && (
+            selectedCustomerId ? (
+              <CustomerProfile
+                customerId={selectedCustomerId}
+                dataService={dataService}
+                onBack={() => setSelectedCustomerId(null)}
+                onOpenNewSale={(cId) => openNewSale(cId)}
+                onOpenPayment={(cId, type, docId) => openPayment(cId, type, docId)}
+                onEditCustomer={(c) => {
+                  setEditingCustomer(c);
+                  setIsCustomerFormOpen(true);
+                }}
+                onViewBillDetails={(sale) => openBillDetails(sale)}
+                onEditSale={(sale) => openEditSale(sale)}
+              />
+            ) : (
+              <CustomerList
+                customers={dataService.getCustomers()}
+                dataService={dataService}
+                onSelectCustomer={(id) => setSelectedCustomerId(id)}
+                onEditCustomer={(c) => {
+                  setEditingCustomer(c);
+                  setIsCustomerFormOpen(true);
+                }}
+                onAddCustomer={() => {
+                  setEditingCustomer(null);
+                  setIsCustomerFormOpen(true);
+                }}
+                onOpenNewSale={(cId) => openNewSale(cId)}
+                onOpenPayment={(cId, type) => openPayment(cId, type)}
+              />
+            )
+          )}
+
+          {activeTab === 'suppliers' && (
+            selectedSupplierId ? (
+              <SupplierProfile
+                supplierId={selectedSupplierId}
+                dataService={dataService}
+                onBack={() => setSelectedSupplierId(null)}
+                onOpenNewPurchase={(sId) => openNewPurchase(sId)}
+                onOpenPayment={(sId, type, docId) => openPayment(sId, type, docId)}
+                onEditSupplier={(s) => {
+                  setEditingSupplier(s);
+                  setIsSupplierFormOpen(true);
+                }}
+                onViewPurchaseDetails={(pur) => openPurchaseDetails(pur)}
+                onEditPurchase={(pur) => openEditPurchase(pur)}
+              />
+            ) : (
+              <SupplierList
+                suppliers={dataService.getSuppliers()}
+                dataService={dataService}
+                onSelectSupplier={(id) => setSelectedSupplierId(id)}
+                onEditSupplier={(s) => {
+                  setEditingSupplier(s);
+                  setIsSupplierFormOpen(true);
+                }}
+                onAddSupplier={() => {
+                  setEditingSupplier(null);
+                  setIsSupplierFormOpen(true);
+                }}
+                onOpenNewPurchase={(sId) => openNewPurchase(sId)}
+                onOpenPayment={(sId, type) => openPayment(sId, type)}
+              />
+            )
+          )}
+
+          {activeTab === 'products' && (
+            <ProductList
+              products={dataService.getProducts()}
+              dataService={dataService}
+              onAddProduct={() => {
+                setEditingProduct(null);
+                setIsProductFormOpen(true);
+              }}
+              onEditProduct={(p) => {
+                setEditingProduct(p);
+                setIsProductFormOpen(true);
+              }}
+              onViewStockHistory={(p) => setStockHistoryProduct(p)}
+              onAdjustStock={() => setIsAdjustmentOpen(true)}
+            />
+          )}
+
+          {activeTab === 'sales' && (
+            <SalesList
+              sales={dataService.getSales()}
+              dataService={dataService}
+              onOpenNewSale={() => openNewSale()}
+              onOpenPayment={(cId, type, saleId) => openPayment(cId, type, saleId)}
+              onSelectCustomer={(cId) => {
+                setSelectedCustomerId(cId);
+                setActiveTab('customers');
+              }}
+              onViewBillDetails={(sale) => openBillDetails(sale)}
+            />
+          )}
+
+          {activeTab === 'purchases' && (
+            <PurchasesList
+              purchases={dataService.getPurchases()}
+              dataService={dataService}
+              onOpenNewPurchase={() => openNewPurchase()}
+              onOpenPayment={(sId, type, purId) => openPayment(sId, type, purId)}
+              onSelectSupplier={(sId) => {
+                setSelectedSupplierId(sId);
+                setActiveTab('suppliers');
+              }}
+              onViewPurchaseDetails={(pur) => openPurchaseDetails(pur)}
+            />
+          )}
+
+          {activeTab === 'payments' && (
+            <PaymentList
+              payments={dataService.getPayments()}
+              dataService={dataService}
+              onOpenRecordPayment={() => openPayment()}
+              onSelectCustomer={(cId) => {
+                setSelectedCustomerId(cId);
+                setActiveTab('customers');
+              }}
+              onSelectSupplier={(sId) => {
+                setSelectedSupplierId(sId);
+                setActiveTab('suppliers');
+              }}
+            />
+          )}
+
+          {activeTab === 'customer-ledger' && (
+            <CustomerLedgerView
+              dataService={dataService}
+              onSelectCustomer={(cId) => {
+                setSelectedCustomerId(cId);
+                setActiveTab('customers');
+              }}
+              onOpenPayment={(cId, type) => openPayment(cId, type)}
+            />
+          )}
+
+          {activeTab === 'supplier-ledger' && (
+            <SupplierLedgerView
+              dataService={dataService}
+              onSelectSupplier={(sId) => {
+                setSelectedSupplierId(sId);
+                setActiveTab('suppliers');
+              }}
+              onOpenPayment={(sId, type) => openPayment(sId, type)}
+            />
+          )}
+
+          {(activeTab === 'daybook' || activeTab === 'day-book' || activeTab === 'reports') && (
+            <DailyTransactions dataService={dataService} />
+          )}
+        </main>
+      </div>
+
+      {/* Global Modals */}
+      <NewSaleModal
+        isOpen={isNewSaleOpen}
+        onClose={() => setIsNewSaleOpen(false)}
+        dataService={dataService}
+        initialCustomerId={saleInitialCustId}
+        onOpenPayment={(cId, type) => openPayment(cId, type)}
+      />
+
+      <NewPurchaseModal
+        isOpen={isNewPurchaseOpen}
+        onClose={() => setIsNewPurchaseOpen(false)}
+        dataService={dataService}
+        initialSupplierId={purInitialSuppId}
+        onOpenPayment={(sId, type) => openPayment(sId, type)}
+      />
+
+      <RecordPaymentModal
+        isOpen={isPaymentOpen}
+        onClose={() => setIsPaymentOpen(false)}
+        dataService={dataService}
+        initialPartyId={paymentInitialPartyId}
+        initialPartyType={paymentInitialPartyType}
+        initialDocId={paymentInitialDocId}
+      />
+
+      <ManualAdjustmentModal
+        isOpen={isAdjustmentOpen}
+        onClose={() => setIsAdjustmentOpen(false)}
+        dataService={dataService}
+      />
+
+      <CustomerFormModal
+        isOpen={isCustomerFormOpen}
+        onClose={() => {
+          setIsCustomerFormOpen(false);
+          setEditingCustomer(null);
+        }}
+        customer={editingCustomer}
+        onSave={(cData) => dataService.saveCustomer(cData)}
+      />
+
+      <SupplierFormModal
+        isOpen={isSupplierFormOpen}
+        onClose={() => {
+          setIsSupplierFormOpen(false);
+          setEditingSupplier(null);
+        }}
+        supplier={editingSupplier}
+        onSave={(sData) => dataService.saveSupplier(sData)}
+      />
+
+      <ProductFormModal
+        isOpen={isProductFormOpen}
+        onClose={() => {
+          setIsProductFormOpen(false);
+          setEditingProduct(null);
+        }}
+        product={editingProduct}
+        onSave={(pData) => dataService.saveProduct(pData)}
+      />
+
+      <StockMovementModal
+        isOpen={!!stockHistoryProduct}
+        onClose={() => setStockHistoryProduct(null)}
+        product={stockHistoryProduct}
+        dataService={dataService}
+      />
+
+      {/* Bill & Purchase Inspection and Editing Modals */}
+      <BillDetailsModal
+        isOpen={isBillDetailsOpen}
+        onClose={() => {
+          setIsBillDetailsOpen(false);
+          setSelectedBillSale(null);
+        }}
+        sale={selectedBillSale}
+        dataService={dataService}
+        onAddPayment={(sale) => {
+          setIsBillDetailsOpen(false);
+          openPayment(sale.customer_id, 'customer', sale.id);
+        }}
+        onEditBill={(sale) => {
+          setIsBillDetailsOpen(false);
+          openEditSale(sale);
+        }}
+      />
+
+      <EditSaleModal
+        isOpen={isEditSaleOpen}
+        onClose={() => {
+          setIsEditSaleOpen(false);
+          setEditingSale(null);
+        }}
+        sale={editingSale}
+        dataService={dataService}
+        onSave={() => {
+          setIsEditSaleOpen(false);
+          setEditingSale(null);
+        }}
+      />
+
+      <PurchaseDetailsModal
+        isOpen={isPurchaseDetailsOpen}
+        onClose={() => {
+          setIsPurchaseDetailsOpen(false);
+          setSelectedPurchaseDoc(null);
+        }}
+        purchase={selectedPurchaseDoc}
+        dataService={dataService}
+        onAddPayment={(pur) => {
+          setIsPurchaseDetailsOpen(false);
+          openPayment(pur.supplier_id, 'supplier', pur.id);
+        }}
+        onEditPurchase={(pur) => {
+          setIsPurchaseDetailsOpen(false);
+          openEditPurchase(pur);
+        }}
+      />
+
+      <EditPurchaseModal
+        isOpen={isEditPurchaseOpen}
+        onClose={() => {
+          setIsEditPurchaseOpen(false);
+          setEditingPurchase(null);
+        }}
+        purchase={editingPurchase}
+        dataService={dataService}
+        onSave={() => {
+          setIsEditPurchaseOpen(false);
+          setEditingPurchase(null);
+        }}
+      />
+
+      {/* Touch-Friendly Mobile Bottom Navigation Bar */}
+      <BottomNav
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setSelectedCustomerId(null);
+          setSelectedSupplierId(null);
+        }}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        dataService={dataService}
+      />
+    </div>
+  );
+};
