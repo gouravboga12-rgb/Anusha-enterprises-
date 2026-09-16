@@ -48,18 +48,6 @@ export const Footer = () => {
           </div>
         </div>
 
-        {/* Business Specialties */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ background: '#f1f5f9', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, color: '#334155' }}>
-            Agricultural Pipes & Fittings
-          </span>
-          <span style={{ background: '#f1f5f9', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, color: '#334155' }}>
-            Electrical Equipment
-          </span>
-          <span style={{ background: '#f1f5f9', padding: '4px 10px', borderRadius: '6px', fontWeight: 600, color: '#334155' }}>
-            Power Tools & Hardware
-          </span>
-        </div>
 
         {/* Copyright & Security */}
         <div style={{ textAlign: 'right' }}>
