@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer, Download } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
+import { exportElementToPdf } from '../../utils/pdfExport';
 
 export const SupplierProfile = ({
   supplierId,
@@ -14,6 +15,7 @@ export const SupplierProfile = ({
   onEditPurchase
 }) => {
   const [activeTab, setActiveTab] = useState('ledger');
+  const [isSavingPdf, setIsSavingPdf] = useState(false);
 
   const supplier = dataService.getSupplierById(supplierId);
   if (!supplier) {
@@ -35,6 +37,18 @@ export const SupplierProfile = ({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSavePdf = async () => {
+    setIsSavingPdf(true);
+    const element = document.getElementById('supplier-profile-ledger-document');
+    const cleanName = (supplier.company_name || 'Supplier').replace(/[^a-zA-Z0-9_-]/g, '_');
+    await exportElementToPdf({
+      element,
+      filename: `${cleanName}_Ledger_${supplier.supplier_id || 'Statement'}.pdf`,
+      title: `${supplier.company_name} - Supplier Ledger`
+    });
+    setIsSavingPdf(false);
   };
 
   const handleDeleteSupplier = async () => {
@@ -220,6 +234,28 @@ export const SupplierProfile = ({
               )}
             </div>
           </div>
+
+          <div style={{
+            background: ledgerData.advanceBalance > 0 ? '#f0fdf4' : '#f8fafc',
+            padding: '12px 16px',
+            borderRadius: '10px',
+            border: `1px solid ${ledgerData.advanceBalance > 0 ? '#86efac' : '#e2e8f0'}`
+          }}>
+            <span style={{ fontSize: '11px', color: ledgerData.advanceBalance > 0 ? '#15803d' : '#64748b', fontWeight: 600 }}>
+              ADVANCE PAID (SURPLUS)
+            </span>
+            <div style={{
+              fontSize: '18px',
+              fontWeight: 800,
+              color: ledgerData.advanceBalance > 0 ? '#16a34a' : '#64748b',
+              marginTop: '2px'
+            }}>
+              {formatCurrency(ledgerData.advanceBalance || 0)}
+            </div>
+            <span style={{ fontSize: '11px', color: ledgerData.advanceBalance > 0 ? '#15803d' : '#94a3b8' }}>
+              {ledgerData.advanceBalance > 0 ? 'Prepaid credit with supplier' : 'No advance recorded'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -249,7 +285,7 @@ export const SupplierProfile = ({
       {activeTab === 'ledger' && (
         <>
           {/* Desktop Supplier Ledger Table */}
-          <div className="card print-document desktop-table-view" style={{ padding: '16px' }}>
+          <div id="supplier-profile-ledger-document" className="card print-document desktop-table-view" style={{ padding: '16px' }}>
             {/* Printable Statement Document Header (visible only on print) */}
             <div className="print-header" style={{ display: 'none', borderBottom: '2px solid #0f172a', paddingBottom: '14px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -275,7 +311,7 @@ export const SupplierProfile = ({
               {/* Financial Summary Strip on Print */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
+                gridTemplateColumns: ledgerData.advanceBalance > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
                 gap: '10px',
                 marginTop: '12px',
                 paddingTop: '10px',
@@ -299,6 +335,12 @@ export const SupplierProfile = ({
                   <span style={{ color: ledgerData.pendingBalance > 0 ? '#b45309' : '#64748b', fontSize: '10px', fontWeight: 600 }}>BALANCE TO PAY: </span>
                   <strong style={{ fontSize: '13px', color: ledgerData.pendingBalance > 0 ? '#d97706' : '#10b981' }}>{formatCurrency(ledgerData.pendingBalance)}</strong>
                 </div>
+                {ledgerData.advanceBalance > 0 && (
+                  <div style={{ background: '#f0fdf4', padding: '6px 10px', borderRadius: '4px', border: '1px solid #86efac' }}>
+                    <span style={{ color: '#15803d', fontSize: '10px', fontWeight: 600 }}>ADVANCE PAID: </span>
+                    <strong style={{ fontSize: '13px', color: '#16a34a' }}>{formatCurrency(ledgerData.advanceBalance)}</strong>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -309,23 +351,46 @@ export const SupplierProfile = ({
                   Chronological purchases (credit) and payment vouchers (debit) with automatic running balance.
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={handlePrint}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontWeight: 600,
-                  fontSize: '13px',
-                  padding: '6px 14px',
-                  cursor: 'pointer'
-                }}
-                title="Print or Save PDF Statement"
-              >
-                <Printer size={15} /> PDF Print
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleSavePdf}
+                  disabled={isSavingPdf}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    padding: '6px 14px',
+                    cursor: isSavingPdf ? 'wait' : 'pointer',
+                    background: '#f0fdf4',
+                    color: '#16a34a',
+                    border: '1px solid #bbf7d0'
+                  }}
+                  title="Download Ledger Statement as PDF File"
+                >
+                  <Download size={15} /> {isSavingPdf ? 'Generating PDF...' : 'Save PDF'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handlePrint}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    padding: '6px 14px',
+                    cursor: 'pointer'
+                  }}
+                  title="Print or Save PDF Statement"
+                >
+                  <Printer size={15} /> PDF Print
+                </button>
+              </div>
             </div>
 
             <div className="table-responsive" style={{ border: 'none' }}>
@@ -338,7 +403,7 @@ export const SupplierProfile = ({
                     <th>Particulars</th>
                     <th style={{ textAlign: 'right', color: '#d97706' }}>Credit (Purchase ₹)</th>
                     <th style={{ textAlign: 'right', color: '#15803d' }}>Debit (Paid ₹)</th>
-                    <th style={{ textAlign: 'right', color: '#0284c7' }}>Running Payable</th>
+                    <th style={{ textAlign: 'right', color: '#0284c7' }}>Running Balance</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -368,8 +433,18 @@ export const SupplierProfile = ({
                         <td style={{ textAlign: 'right', fontWeight: 600, color: '#15803d' }}>
                           {entry.debit > 0 ? formatCurrency(entry.debit) : '—'}
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '14px', color: entry.balance > 0 ? '#d97706' : '#15803d' }}>
-                          {formatCurrency(entry.balance)}
+                        <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '13px' }}>
+                          {entry.balanceStatus === 'ADVANCE' ? (
+                            <span style={{ color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                              +{formatCurrency(entry.advance || Math.abs(entry.runningRaw))} Adv
+                            </span>
+                          ) : entry.balanceStatus === 'SETTLED' || entry.balance === 0 ? (
+                            <span style={{ color: '#10b981' }}>₹0</span>
+                          ) : (
+                            <span style={{ color: '#d97706' }}>
+                              {formatCurrency(entry.balance)} Due
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -397,14 +472,25 @@ export const SupplierProfile = ({
           <div className="mobile-cards-view no-print">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Ledger Records</span>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={handlePrint}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', padding: '4px 10px' }}
-              >
-                <Printer size={14} /> PDF Print
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleSavePdf}
+                  disabled={isSavingPdf}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' }}
+                >
+                  <Download size={13} /> {isSavingPdf ? '...' : 'PDF'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handlePrint}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', padding: '4px 8px' }}
+                >
+                  <Printer size={13} /> Print
+                </button>
+              </div>
             </div>
             {ledgerData.entries.length === 0 ? (
               <div className="card" style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
@@ -426,9 +512,15 @@ export const SupplierProfile = ({
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 600 }}>Payable Due</span>
-                      <div style={{ fontSize: '15px', fontWeight: 800, color: entry.balance > 0 ? '#d97706' : '#10b981' }}>
-                        {formatCurrency(entry.balance)}
+                      <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 600 }}>
+                        {entry.balanceStatus === 'ADVANCE' ? 'Advance Balance' : 'Payable Due'}
+                      </span>
+                      <div style={{
+                        fontSize: '15px',
+                        fontWeight: 800,
+                        color: entry.balanceStatus === 'ADVANCE' ? '#16a34a' : (entry.balance > 0 ? '#d97706' : '#10b981')
+                      }}>
+                        {entry.balanceStatus === 'ADVANCE' ? `+${formatCurrency(entry.advance || Math.abs(entry.runningRaw))}` : formatCurrency(entry.balance)}
                       </div>
                     </div>
                   </div>

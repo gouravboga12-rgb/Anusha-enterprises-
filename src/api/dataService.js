@@ -1499,7 +1499,8 @@ class DataService {
       acc + (Number(item.quantity) || 0) * (Number(item.selling_price) || 0), 0);
 
     const pendingAmount = Math.max(0, totalAmount - initialPay);
-    const paymentStatus = pendingAmount === 0 ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
+    const advanceAmount = Math.max(0, initialPay - totalAmount);
+    const paymentStatus = initialPay >= totalAmount ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
 
     const cleanItems = saleData.items.map((i, idx) => ({
       id: `item-${Date.now()}-${idx}`,
@@ -1522,6 +1523,7 @@ class DataService {
       total_amount: totalAmount,
       paid_amount: initialPay,
       pending_amount: pendingAmount,
+      advance_amount: advanceAmount,
       payment_status: paymentStatus,
       notes: saleData.notes || '',
       recorded_by: currentUser?.name || 'Admin',
@@ -1543,6 +1545,7 @@ class DataService {
 
     let newPayment = null;
     if (initialPay > 0) {
+      const advTag = advanceAmount > 0 ? ` (includes ₹${Number(advanceAmount).toLocaleString('en-IN')} Advance Payment)` : '';
       newPayment = {
         id: 'pay-' + Date.now(),
         receipt_no: `REC-${Math.floor(100 + Math.random() * 900)}`,
@@ -1554,7 +1557,7 @@ class DataService {
         reference_no: saleData.reference_no || '',
         date: saleData.date || getTodayDateString(),
         time: saleData.time || getCurrentTimeString(),
-        notes: `Initial down payment for ${invoiceNo}`,
+        notes: saleData.notes ? `${saleData.notes}${advTag}` : `Payment for ${invoiceNo}${advTag}`,
         recorded_by: currentUser?.name || 'Admin',
         created_at: new Date().toISOString()
       };
@@ -1566,8 +1569,9 @@ class DataService {
       const g = i.godown_id ? this.getGodownById(i.godown_id) : null;
       return `${i.product_name}: ${i.quantity} × ₹${i.selling_price} = ₹${i.total}${g ? ' (from ' + g.name + ')' : ''}`;
     }).join(' | ');
+    const advLog = advanceAmount > 0 ? ` [Advance Received: ₹${Number(advanceAmount).toLocaleString('en-IN')}]` : '';
     this.logActivity(currentUser, 'CREATE', 'Sales', saleId, invoiceNo,
-      `Sale to ${cust?.name || 'Customer'} — ${itemsSummary} — Total: ₹${totalAmount}`
+      `Sale to ${cust?.name || 'Customer'} — ${itemsSummary} — Total: ₹${totalAmount} | Paid: ₹${initialPay}${advLog}`
     );
 
     this.notify();
@@ -1757,7 +1761,8 @@ class DataService {
       acc + (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0), 0);
 
     const pendingAmount = Math.max(0, totalAmount - initialPay);
-    const paymentStatus = pendingAmount === 0 ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
+    const advanceAmount = Math.max(0, initialPay - totalAmount);
+    const paymentStatus = initialPay >= totalAmount ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
 
     const cleanItems = purData.items.map((i, idx) => ({
       id: `pitem-${Date.now()}-${idx}`,
@@ -1780,6 +1785,7 @@ class DataService {
       total_amount: totalAmount,
       paid_amount: initialPay,
       pending_amount: pendingAmount,
+      advance_amount: advanceAmount,
       payment_status: paymentStatus,
       notes: purData.notes || '',
       recorded_by: currentUser?.name || 'Admin',
@@ -1799,6 +1805,7 @@ class DataService {
 
     let newPayment = null;
     if (initialPay > 0) {
+      const advTag = advanceAmount > 0 ? ` (includes ₹${Number(advanceAmount).toLocaleString('en-IN')} Advance Payment)` : '';
       newPayment = {
         id: 'pay-' + Date.now(),
         receipt_no: `VOUCH-${Math.floor(100 + Math.random() * 900)}`,
@@ -1810,7 +1817,7 @@ class DataService {
         reference_no: purData.reference_no || '',
         date: purData.date || getTodayDateString(),
         time: purData.time || getCurrentTimeString(),
-        notes: `Initial advance payout for ${purchaseNo}`,
+        notes: purData.notes ? `${purData.notes}${advTag}` : `Payment for ${purchaseNo}${advTag}`,
         recorded_by: currentUser?.name || 'Admin',
         created_at: new Date().toISOString()
       };
@@ -1823,8 +1830,9 @@ class DataService {
       const g = i.godown_id ? this.getGodownById(i.godown_id) : godown;
       return `${i.product_name}: ${i.quantity} × ₹${i.purchase_price} = ₹${i.total}${g ? ' → ' + g.name : ''}`;
     }).join(' | ');
+    const advLog = advanceAmount > 0 ? ` [Advance Paid: ₹${Number(advanceAmount).toLocaleString('en-IN')}]` : '';
     this.logActivity(currentUser, 'CREATE', 'Purchases', purId, purchaseNo,
-      `Purchase from ${supp?.company_name || 'Supplier'} → ${godown?.name || 'Main Godown'} — ${itemsSummary} — Total: ₹${totalAmount}`
+      `Purchase from ${supp?.company_name || 'Supplier'} → ${godown?.name || 'Main Godown'} — ${itemsSummary} — Total: ₹${totalAmount} | Paid: ₹${initialPay}${advLog}`
     );
 
     this.notify();
@@ -2042,8 +2050,12 @@ class DataService {
     const linked = this.getSalePayments(saleId);
     const totalPaid = linked.reduce((acc, p) => acc + (p.amount || 0), 0);
     const pendingAmount = Math.max(0, sale.total_amount - totalPaid);
+    const advanceAmount = Math.max(0, totalPaid - sale.total_amount);
     const paymentStatus = pendingAmount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
-    sale.paid_amount = totalPaid; sale.pending_amount = pendingAmount; sale.payment_status = paymentStatus;
+    sale.paid_amount = totalPaid;
+    sale.pending_amount = pendingAmount;
+    sale.advance_amount = advanceAmount;
+    sale.payment_status = paymentStatus;
     try {
       supabase.from('customer_sales').update({ paid_amount: totalPaid, pending_amount: pendingAmount, payment_status: paymentStatus }).eq('id', saleId).then();
     } catch { }
@@ -2055,8 +2067,12 @@ class DataService {
     const linked = this.getPurchasePayments(purchaseId);
     const totalPaid = linked.reduce((acc, p) => acc + (p.amount || 0), 0);
     const pendingAmount = Math.max(0, pur.total_amount - totalPaid);
+    const advanceAmount = Math.max(0, totalPaid - pur.total_amount);
     const paymentStatus = pendingAmount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
-    pur.paid_amount = totalPaid; pur.pending_amount = pendingAmount; pur.payment_status = paymentStatus;
+    pur.paid_amount = totalPaid;
+    pur.pending_amount = pendingAmount;
+    pur.advance_amount = advanceAmount;
+    pur.payment_status = paymentStatus;
     try {
       supabase.from('supplier_purchases').update({ paid_amount: totalPaid, pending_amount: pendingAmount, payment_status: paymentStatus }).eq('id', purchaseId).then();
     } catch { }
@@ -2430,7 +2446,9 @@ class DataService {
 
     const totalSales = custSales.reduce((acc, s) => acc + (s.total_amount || 0), 0);
     const totalPaid = custPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const pendingBalance = Math.max(0, totalSales - totalPaid);
+    const netBalance = totalSales - totalPaid; // positive = customer owes us (due), negative = advance with us
+    const pendingBalance = Math.max(0, netBalance);
+    const advanceBalance = Math.max(0, -netBalance);
 
     const entries = [];
 
@@ -2456,9 +2474,10 @@ class DataService {
     custPayments.forEach((p) => {
       const linkedSale = p.sale_id ? this.getSaleById(p.sale_id) : null;
       const refDetail = linkedSale ? `for ${linkedSale.invoice_no}` : (p.reference_no ? `Ref: ${p.reference_no}` : '');
+      const notesDetail = p.notes ? ` (${p.notes})` : '';
       entries.push({
         id: p.id, date: p.date, time: p.time, type: 'PAYMENT',
-        reference: p.receipt_no, particulars: `Payment Received (${p.payment_mode}) ${refDetail}`,
+        reference: p.receipt_no, particulars: `Payment Received (${p.payment_mode}) ${refDetail}${notesDetail}`,
         items_detail: [], debit: 0, credit: p.amount
       });
     });
@@ -2468,10 +2487,16 @@ class DataService {
     let running = 0;
     const computedEntries = entries.map((entry) => {
       running = running + (entry.debit || 0) - (entry.credit || 0);
-      return { ...entry, balance: Math.max(0, running) };
+      return {
+        ...entry,
+        runningRaw: running,
+        balance: Math.max(0, running),
+        advance: Math.max(0, -running),
+        balanceStatus: running > 0 ? 'DUE' : (running < 0 ? 'ADVANCE' : 'SETTLED')
+      };
     });
 
-    return { totalSales, totalPaid, pendingBalance, entries: computedEntries };
+    return { totalSales, totalPaid, pendingBalance, advanceBalance, netBalance, entries: computedEntries };
   }
 
   getSupplierLedger(supplierId) {
@@ -2480,7 +2505,9 @@ class DataService {
 
     const totalPurchases = suppPurchases.reduce((acc, p) => acc + (p.total_amount || 0), 0);
     const totalPaid = suppPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const pendingBalance = Math.max(0, totalPurchases - totalPaid);
+    const netBalance = totalPurchases - totalPaid; // positive = payable to supplier, negative = advance paid to supplier
+    const pendingBalance = Math.max(0, netBalance);
+    const advanceBalance = Math.max(0, -netBalance);
 
     const entries = [];
 
@@ -2504,9 +2531,10 @@ class DataService {
     suppPayments.forEach((p) => {
       const linkedPur = p.purchase_id ? this.getPurchaseById(p.purchase_id) : null;
       const refDetail = linkedPur ? `for ${linkedPur.purchase_no}` : (p.reference_no ? `Ref: ${p.reference_no}` : '');
+      const notesDetail = p.notes ? ` (${p.notes})` : '';
       entries.push({
         id: p.id, date: p.date, time: p.time, type: 'PAYMENT',
-        reference: p.receipt_no, particulars: `Payment Made (${p.payment_mode}) ${refDetail}`,
+        reference: p.receipt_no, particulars: `Payment Made (${p.payment_mode}) ${refDetail}${notesDetail}`,
         items_detail: [], credit: 0, debit: p.amount
       });
     });
@@ -2516,10 +2544,16 @@ class DataService {
     let running = 0;
     const computedEntries = entries.map((entry) => {
       running = running + (entry.credit || 0) - (entry.debit || 0);
-      return { ...entry, balance: Math.max(0, running) };
+      return {
+        ...entry,
+        runningRaw: running,
+        balance: Math.max(0, running),
+        advance: Math.max(0, -running),
+        balanceStatus: running > 0 ? 'DUE' : (running < 0 ? 'ADVANCE' : 'SETTLED')
+      };
     });
 
-    return { totalPurchases, totalPaid, pendingBalance, entries: computedEntries };
+    return { totalPurchases, totalPaid, pendingBalance, advanceBalance, netBalance, entries: computedEntries };
   }
 
   // ==============================================================================

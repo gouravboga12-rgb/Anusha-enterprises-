@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { BookOpen, Printer, Download, User, Calendar, Filter, Warehouse } from 'lucide-react';
+import { BookOpen, Printer, Download, User, Calendar, Filter, Warehouse, CheckCircle2 } from 'lucide-react';
 import { formatCurrency, formatDate, getTodayDateString } from '../../utils/formatters';
+import { exportElementToPdf } from '../../utils/pdfExport';
 
 export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPayment }) => {
   const customers = dataService.getCustomers();
@@ -8,6 +9,7 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
   const [dateRangeFilter, setDateRangeFilter] = useState('all'); // 'all' | 'this_month' | 'custom'
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState(getTodayDateString());
+  const [isSavingPdf, setIsSavingPdf] = useState(false);
 
   const selectedCustomer = dataService.getCustomerById(selectedCustomerId);
   const rawLedgerData = selectedCustomerId ? dataService.getCustomerLedger(selectedCustomerId) : null;
@@ -33,6 +35,19 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
     window.print();
   };
 
+  const handleSavePdf = async () => {
+    setIsSavingPdf(true);
+    try {
+      await exportElementToPdf({
+        element: '#customer-ledger-document',
+        filename: `Customer_Ledger_${selectedCustomer?.name || 'Account'}_${getTodayDateString()}.pdf`,
+        title: `Customer Ledger - ${selectedCustomer?.name}`
+      });
+    } finally {
+      setIsSavingPdf(false);
+    }
+  };
+
   return (
     <div>
       {/* Non-Printable Header Actions */}
@@ -44,8 +59,11 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-secondary" onClick={handlePrint}>
-            <Printer size={15} /> Print / Save PDF Statement
+          <button className="btn btn-secondary" onClick={handlePrint} title="Print ledger statement">
+            <Printer size={15} /> Print
+          </button>
+          <button className="btn btn-primary" onClick={handleSavePdf} disabled={isSavingPdf} title="Download Statement PDF">
+            <Download size={15} /> {isSavingPdf ? 'Saving PDF...' : 'Save PDF'}
           </button>
         </div>
       </div>
@@ -62,10 +80,13 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
               style={{ fontWeight: 600, fontSize: '14px' }}
             >
               {customers.map((c) => {
-                const bal = dataService.getCustomerLedger(c.id).pendingBalance;
+                const cLedger = dataService.getCustomerLedger(c.id);
+                const bal = cLedger.pendingBalance;
+                const adv = cLedger.advanceBalance;
+                const tag = adv > 0 ? `Advance: ${formatCurrency(adv)}` : `Balance: ${formatCurrency(bal)}`;
                 return (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.customer_id}) — Balance: {formatCurrency(bal)}
+                    {c.name} ({c.customer_id}) — {tag}
                   </option>
                 );
               })}
@@ -73,14 +94,14 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
           </div>
 
           {selectedCustomer && (
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <div style={{ background: '#f8fafc', padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ background: '#f8fafc', padding: '8px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>TOTAL BILLED</span>
                 <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
                   {formatCurrency(rawLedgerData?.totalSales || 0)}
                 </div>
               </div>
-              <div style={{ background: '#ecfdf5', padding: '8px 16px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+              <div style={{ background: '#ecfdf5', padding: '8px 14px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
                 <span style={{ fontSize: '11px', color: '#047857', fontWeight: 600 }}>TOTAL PAID</span>
                 <div style={{ fontSize: '16px', fontWeight: 800, color: '#065f46' }}>
                   {formatCurrency(rawLedgerData?.totalPaid || 0)}
@@ -88,7 +109,7 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
               </div>
               <div style={{
                 background: (rawLedgerData?.pendingBalance || 0) > 0 ? '#fff1f2' : '#f8fafc',
-                padding: '8px 16px',
+                padding: '8px 14px',
                 borderRadius: '8px',
                 border: `1px solid ${(rawLedgerData?.pendingBalance || 0) > 0 ? '#fecdd3' : '#e2e8f0'}`
               }}>
@@ -118,6 +139,30 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
                   >
                     Collect Due
                   </button>
+                )}
+              </div>
+
+              {/* ADVANCE PAYMENT SECTION */}
+              <div style={{
+                background: (rawLedgerData?.advanceBalance || 0) > 0 ? '#ecfdf5' : '#f8fafc',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                border: `1px solid ${(rawLedgerData?.advanceBalance || 0) > 0 ? '#6ee7b7' : '#e2e8f0'}`
+              }}>
+                <span style={{ fontSize: '11px', color: (rawLedgerData?.advanceBalance || 0) > 0 ? '#047857' : '#64748b', fontWeight: 600 }}>
+                  ADVANCE CREDIT
+                </span>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 800,
+                  color: (rawLedgerData?.advanceBalance || 0) > 0 ? '#059669' : '#94a3b8'
+                }}>
+                  {formatCurrency(rawLedgerData?.advanceBalance || 0)}
+                </div>
+                {(rawLedgerData?.advanceBalance || 0) > 0 && (
+                  <div style={{ fontSize: '10px', color: '#065f46', fontWeight: 600, marginTop: '2px' }}>
+                    Customer surplus credit
+                  </div>
                 )}
               </div>
             </div>
@@ -171,7 +216,8 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
       </div>
 
       {/* Printable Statement Document Header (visible on print & in statement card) */}
-      <div className="card print-document">
+      {/* Printable Statement Document Header (visible on print & in statement card) */}
+      <div className="card print-document" id="customer-ledger-document">
         <div className="print-header" style={{ display: 'none', borderBottom: '2px solid #0f172a', paddingBottom: '16px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -190,6 +236,24 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
               <div><strong>Statement Date:</strong> {formatDate(getTodayDateString())}</div>
             </div>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '11px' }}>
+            <div style={{ background: '#f8fafc', padding: '6px', borderRadius: '4px' }}>
+              <span style={{ color: '#64748b' }}>Total Billed:</span><br />
+              <strong style={{ color: '#0f172a' }}>{formatCurrency(rawLedgerData?.totalSales || 0)}</strong>
+            </div>
+            <div style={{ background: '#f8fafc', padding: '6px', borderRadius: '4px' }}>
+              <span style={{ color: '#64748b' }}>Total Paid:</span><br />
+              <strong style={{ color: '#065f46' }}>{formatCurrency(rawLedgerData?.totalPaid || 0)}</strong>
+            </div>
+            <div style={{ background: '#f8fafc', padding: '6px', borderRadius: '4px' }}>
+              <span style={{ color: '#64748b' }}>Current Pending:</span><br />
+              <strong style={{ color: (rawLedgerData?.pendingBalance || 0) > 0 ? '#e11d48' : '#10b981' }}>{formatCurrency(rawLedgerData?.pendingBalance || 0)}</strong>
+            </div>
+            <div style={{ background: (rawLedgerData?.advanceBalance || 0) > 0 ? '#ecfdf5' : '#f8fafc', padding: '6px', borderRadius: '4px' }}>
+              <span style={{ color: '#047857' }}>Advance Credit:</span><br />
+              <strong style={{ color: (rawLedgerData?.advanceBalance || 0) > 0 ? '#059669' : '#94a3b8' }}>{formatCurrency(rawLedgerData?.advanceBalance || 0)}</strong>
+            </div>
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -202,7 +266,7 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
                 <th>Particulars & Line Items</th>
                 <th style={{ textAlign: 'right', color: '#b91c1c' }}>Debit (Billed ₹)</th>
                 <th style={{ textAlign: 'right', color: '#15803d' }}>Credit (Paid ₹)</th>
-                <th style={{ textAlign: 'right', color: '#0284c7' }}>Running Balance</th>
+                <th style={{ textAlign: 'right', color: '#0284c7' }}>Running Balance / Status</th>
               </tr>
             </thead>
             <tbody>
@@ -251,10 +315,24 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
                     <td style={{
                       textAlign: 'right',
                       fontWeight: 800,
-                      fontSize: '14px',
-                      color: entry.balance > 0 ? '#b91c1c' : '#15803d'
+                      fontSize: '13.5px'
                     }}>
-                      {formatCurrency(entry.balance)}
+                      {entry.balanceStatus === 'ADVANCE' ? (
+                        <span style={{ color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          +{formatCurrency(entry.advance)}
+                          <span style={{ fontSize: '10px', background: '#dcfce7', color: '#15803d', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                            Advance
+                          </span>
+                        </span>
+                      ) : entry.balanceStatus === 'DUE' ? (
+                        <span style={{ color: '#e11d48' }}>
+                          {formatCurrency(entry.balance)}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#10b981' }}>
+                          ₹0 (Settled)
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))

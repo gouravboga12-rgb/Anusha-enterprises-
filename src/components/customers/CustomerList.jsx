@@ -150,10 +150,17 @@ export const CustomerList = ({
                       </td>
                       <td style={{
                         textAlign: 'right',
-                        fontWeight: 800,
-                        color: ledger.pendingBalance > 0 ? '#e11d48' : '#10b981'
+                        fontWeight: 800
                       }}>
-                        {formatCurrency(ledger.pendingBalance)}
+                        {ledger.advanceBalance > 0 ? (
+                          <span style={{ color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: '4px', display: 'inline-block', fontSize: '12px' }}>
+                            +{formatCurrency(ledger.advanceBalance)} Adv
+                          </span>
+                        ) : (
+                          <span style={{ color: ledger.pendingBalance > 0 ? '#e11d48' : '#10b981' }}>
+                            {formatCurrency(ledger.pendingBalance)}
+                          </span>
+                        )}
                       </td>
                       <td>
                         <span className={`badge ${cust.status === 'active' ? 'badge-paid' : 'badge-pending'}`}>
@@ -254,15 +261,15 @@ export const CustomerList = ({
                   </div>
 
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <span style={{ fontSize: '10px', color: isDue ? '#be123c' : '#047857', fontWeight: 700, textTransform: 'uppercase' }}>
-                      {isDue ? 'To Collect' : 'Settled'}
+                    <span style={{ fontSize: '10px', color: ledger.advanceBalance > 0 ? '#15803d' : (isDue ? '#be123c' : '#047857'), fontWeight: 700, textTransform: 'uppercase' }}>
+                      {ledger.advanceBalance > 0 ? 'Advance Credit' : (isDue ? 'To Collect' : 'Settled')}
                     </span>
                     <div style={{
                       fontSize: '17px',
                       fontWeight: 800,
-                      color: isDue ? '#e11d48' : '#10b981'
+                      color: ledger.advanceBalance > 0 ? '#16a34a' : (isDue ? '#e11d48' : '#10b981')
                     }}>
-                      {formatCurrency(ledger.pendingBalance)}
+                      {ledger.advanceBalance > 0 ? `+${formatCurrency(ledger.advanceBalance)}` : formatCurrency(ledger.pendingBalance)}
                     </div>
                   </div>
                 </div>

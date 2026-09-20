@@ -105,8 +105,16 @@ export const NewSaleModal = ({
 
   const customerLedger = customerId ? dataService.getCustomerLedger(customerId) : null;
   const previousBalance = customerLedger ? (customerLedger.pendingBalance || 0) : 0;
-  const thisBillPending = Math.max(0, totalBillAmount - (Number(initialPayment) || 0));
-  const totalCustomerBalanceAfterSale = previousBalance + thisBillPending;
+  const existingAdvance = customerLedger ? (customerLedger.advanceBalance || 0) : 0;
+
+  const numPayment = Number(initialPayment) || 0;
+  const thisBillPending = Math.max(0, totalBillAmount - numPayment);
+  const thisBillAdvance = Math.max(0, numPayment - totalBillAmount);
+
+  // Net calculation accounting for existing advance and current payment
+  const netBalanceAfter = (previousBalance - existingAdvance) + (totalBillAmount - numPayment);
+  const finalDueAfter = Math.max(0, netBalanceAfter);
+  const finalAdvanceAfter = Math.max(0, -netBalanceAfter);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -225,6 +233,28 @@ export const NewSaleModal = ({
                     Collect Previous Due
                   </button>
                 )}
+              </div>
+            )}
+            {existingAdvance > 0 && (
+              <div style={{
+                marginTop: '6px',
+                padding: '6px 12px',
+                background: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                borderRadius: '6px',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '6px'
+              }}>
+                <span style={{ color: '#047857', fontWeight: 600 }}>
+                  ✨ Customer has Advance Credit Balance: <strong>{formatCurrency(existingAdvance)}</strong>
+                </span>
+                <span style={{ fontSize: '11px', color: '#065f46' }}>
+                  (This sale will auto-deduct from advance credit if not paid)
+                </span>
               </div>
             )}
           </div>
@@ -386,8 +416,7 @@ export const NewSaleModal = ({
                 type="number"
                 className="form-input"
                 min="0"
-                max={totalBillAmount}
-                placeholder="e.g. Full or Partial payment"
+                placeholder="0 if credit or enter amount (supports advance)"
                 value={initialPayment}
                 onChange={(e) => setInitialPayment(e.target.value)}
               />
@@ -409,6 +438,20 @@ export const NewSaleModal = ({
                   Credit (₹0)
                 </button>
               </div>
+              {thisBillAdvance > 0 && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '6px 10px',
+                  background: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  ✓ Bill fully covered! Surplus <strong>+{formatCurrency(thisBillAdvance)}</strong> will be credited as Customer Advance.
+                </div>
+              )}
             </div>
 
             {Number(initialPayment) > 0 && (
@@ -452,9 +495,27 @@ export const NewSaleModal = ({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px' }}>
               <span style={{ color: '#475569', fontWeight: 500 }}>This Bill Pending Due:</span>
               <span style={{ fontSize: '15px', fontWeight: 700, color: thisBillPending > 0 ? '#e11d48' : '#10b981' }}>
-                {formatCurrency(thisBillPending)}
+                {thisBillPending > 0 ? formatCurrency(thisBillPending) : '₹0 (Settled)'}
               </span>
             </div>
+
+            {thisBillAdvance > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px' }}>
+                <span style={{ color: '#047857', fontWeight: 600 }}>Advance Received on This Bill:</span>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#059669' }}>
+                  +{formatCurrency(thisBillAdvance)}
+                </span>
+              </div>
+            )}
+
+            {existingAdvance > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px' }}>
+                <span style={{ color: '#047857' }}>Previous Advance Credit Available:</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#059669' }}>
+                  {formatCurrency(existingAdvance)}
+                </span>
+              </div>
+            )}
 
             {previousBalance > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px' }}>
@@ -474,16 +535,20 @@ export const NewSaleModal = ({
             }}>
               <div>
                 <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                  Total Customer Due (After this Bill):
+                  {finalAdvanceAfter > 0 ? 'Net Advance Credit (After this Bill):' : 'Total Customer Due (After this Bill):'}
                 </span>
                 <div style={{ fontSize: '11px', color: '#64748b' }}>
-                  {previousBalance > 0
-                    ? `Previous (${formatCurrency(previousBalance)}) + This Bill (${formatCurrency(thisBillPending)})`
-                    : 'Net receivable on customer khata'}
+                  {finalAdvanceAfter > 0
+                    ? 'Customer has surplus credit balance with us for future purchases'
+                    : (finalDueAfter > 0 ? 'Net receivable balance on customer khata' : 'Account fully balanced')}
                 </div>
               </div>
-              <span style={{ fontSize: '18px', fontWeight: 800, color: totalCustomerBalanceAfterSale > 0 ? '#e11d48' : '#10b981' }}>
-                {formatCurrency(totalCustomerBalanceAfterSale)}
+              <span style={{
+                fontSize: '18px',
+                fontWeight: 800,
+                color: finalAdvanceAfter > 0 ? '#059669' : (finalDueAfter > 0 ? '#e11d48' : '#10b981')
+              }}>
+                {finalAdvanceAfter > 0 ? `${formatCurrency(finalAdvanceAfter)} Advance` : formatCurrency(finalDueAfter)}
               </span>
             </div>
           </div>
