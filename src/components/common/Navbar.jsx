@@ -69,25 +69,6 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, onRefres
           </span>
         </div>
 
-        <div className="header-trust-badges" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="badge-trust" style={{
-            fontSize: '11px',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            padding: '2px 8px',
-            borderRadius: '9999px',
-            background: '#e0f2fe',
-            color: '#0284c7'
-          }}>
-            12 Yrs
-          </span>
-          <div className="header-location" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b' }}>
-            <MapPin size={13} color="#0284c7" />
-            <span>Nandipet</span>
-          </div>
-        </div>
-
         {/* Live Supabase Connection Badge */}
         <div className="header-cloud-badge" style={{
           display: 'flex',
