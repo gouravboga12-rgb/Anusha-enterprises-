@@ -402,9 +402,9 @@ export const WalletPage = ({ dataService, currentUser }) => {
 
       {/* Add Funds / Record Expense Modal */}
       {activeModal && (
-        <div className="modal-backdrop" onClick={() => setActiveModal(null)}>
+        <div className="modal-backdrop">
           <div
-            className="modal-content"
+            className="modal-card modal-content"
             style={{ maxWidth: '480px', width: '92%' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -511,7 +511,11 @@ export const WalletPage = ({ dataService, currentUser }) => {
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setActiveModal(null)}
+                  onClick={() => {
+                    setActiveModal(null);
+                    setEditingTxn(null);
+                    setError('');
+                  }}
                 >
                   Cancel
                 </button>

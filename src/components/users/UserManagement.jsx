@@ -308,9 +308,9 @@ export const UserManagement = ({ dataService, currentUser }) => {
 
       {/* Add / Edit Staff Modal */}
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
+        <div className="modal-backdrop">
           <div
-            className="modal-content"
+            className="modal-card modal-content"
             style={{ maxWidth: '500px', width: '92%' }}
             onClick={(e) => e.stopPropagation()}
           >

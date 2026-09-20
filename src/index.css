@@ -742,7 +742,8 @@ h1, h2, h3, h4, h5, h6 {
   animation: fadeIn 0.2s ease-out;
 }
 
-.modal-card {
+.modal-card,
+.modal-content {
   background: #ffffff;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
