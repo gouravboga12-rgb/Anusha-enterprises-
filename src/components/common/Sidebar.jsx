@@ -171,13 +171,13 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
           )}
         </div>
 
-        <div style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+        <div style={{ padding: currentUser ? '14px 16px' : '0', borderTop: currentUser ? '1px solid #e2e8f0' : 'none', background: '#f8fafc' }}>
           {currentUser && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '12px',
+              marginBottom: '0',
               padding: '8px 10px',
               background: '#ffffff',
               borderRadius: '10px',
@@ -228,9 +228,6 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
               </button>
             </div>
           )}
-          <p style={{ fontSize: '10.5px', color: '#94a3b8', margin: 0, textAlign: 'center' }}>
-            Nandipet, Nizamabad • Est. 2014
-          </p>
         </div>
       </aside>
     </>

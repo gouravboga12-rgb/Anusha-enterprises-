@@ -16,15 +16,6 @@ export const Footer = () => {
             <div className="footer-title">
               ANUSHA ENTERPRISES
             </div>
-            <div className="footer-location-row">
-              <span className="footer-meta-item">
-                <MapPin size={12} color="#0284c7" /> Nandipet, Nizamabad, Telangana
-              </span>
-              <span className="footer-meta-dot">•</span>
-              <span className="footer-trust-badge">
-                <Award size={12} /> 12+ Years of Trust
-              </span>
-            </div>
           </div>
         </div>
 
