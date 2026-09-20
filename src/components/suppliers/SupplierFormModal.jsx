@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../common/Modal';
-import { Package, Search, CheckSquare, Square, Info } from 'lucide-react';
+import { Package, Search, CheckSquare, Square, Info, Plus, X } from 'lucide-react';
 
 export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataService, currentUser }) => {
   const [formData, setFormData] = useState({
@@ -15,6 +15,7 @@ export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataServi
 
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [productSearch, setProductSearch] = useState('');
+  const [dropdownSelectedId, setDropdownSelectedId] = useState('');
 
   const allProducts = useMemo(() => {
     if (!dataService) return [];
@@ -49,6 +50,18 @@ export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataServi
     setSelectedProductIds((prev) =>
       prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
     );
+  };
+
+  const handleAddFromDropdown = (prodId) => {
+    if (!prodId) return;
+    if (!selectedProductIds.includes(prodId)) {
+      setSelectedProductIds((prev) => [...prev, prodId]);
+    }
+    setDropdownSelectedId('');
+  };
+
+  const removeSelectedProduct = (prodId) => {
+    setSelectedProductIds((prev) => prev.filter((id) => id !== prodId));
   };
 
   const filteredProducts = useMemo(() => {
@@ -161,20 +174,119 @@ export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataServi
         <div style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <label className="form-label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Package size={15} color="#0284c7" /> Products Supplied by this Vendor ({selectedProductIds.length} selected)
+              <Package size={16} color="#0284c7" /> Products Supplied by this Vendor ({selectedProductIds.length} selected)
             </label>
-            <span style={{ fontSize: '11px', color: '#64748b' }}>
-              Used to suggest this supplier during inward purchase
-            </span>
+            {selectedProductIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedProductIds([])}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#ef4444',
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Clear All ({selectedProductIds.length})
+              </button>
+            )}
           </div>
 
+          {/* 1. Dropdown option to add products one after another */}
+          <div style={{ marginBottom: '10px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <select
+                className="form-select"
+                value={dropdownSelectedId}
+                onChange={(e) => {
+                  setDropdownSelectedId(e.target.value);
+                  handleAddFromDropdown(e.target.value);
+                }}
+                style={{ flex: 1, fontSize: '13px' }}
+              >
+                <option value="">-- Choose product from dropdown to add --</option>
+                {allProducts.map((p) => {
+                  const alreadyAdded = selectedProductIds.includes(p.id);
+                  return (
+                    <option key={p.id} value={p.id} disabled={alreadyAdded}>
+                      {alreadyAdded ? '✓ ' : '+ '} {p.name} ({p.sku || 'SKU'}) • Stock: {p.current_stock} {p.unit}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+              Select a product from the list above to link it to this supplier one after another.
+            </div>
+          </div>
+
+          {/* 2. Selected Products Badges / Chips */}
+          {selectedProductIds.length > 0 && (
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '6px',
+              marginBottom: '12px',
+              padding: '8px 10px',
+              background: '#f0f9ff',
+              borderRadius: '8px',
+              border: '1px solid #bae6fd'
+            }}>
+              {selectedProductIds.map((pid) => {
+                const prod = allProducts.find((p) => p.id === pid);
+                if (!prod) return null;
+                return (
+                  <span
+                    key={pid}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      padding: '3px 9px',
+                      borderRadius: '16px',
+                      fontSize: '12px',
+                      fontWeight: 500
+                    }}
+                  >
+                    <span>{prod.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSelectedProduct(pid)}
+                      style={{
+                        background: 'rgba(255,255,255,0.25)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '15px',
+                        height: '15px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#fff',
+                        padding: 0
+                      }}
+                      title="Remove product"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 3. Search Filter */}
           <div style={{ position: 'relative', marginBottom: '8px' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input
               type="text"
               className="form-input"
               style={{ paddingLeft: '32px', fontSize: '12px' }}
-              placeholder="Filter catalog products..."
+              placeholder="Or type to search & check from catalog list below..."
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
             />
