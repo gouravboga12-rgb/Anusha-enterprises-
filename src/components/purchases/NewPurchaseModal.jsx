@@ -21,7 +21,7 @@ export const NewPurchaseModal = ({
   const [date, setDate] = useState(getTodayDateString());
   const [time, setTime] = useState(getCurrentTimeString());
   const [items, setItems] = useState([
-    { product_id: products[0]?.id || '', quantity: 10, purchase_price: products[0]?.purchase_price || 0 }
+    { product_id: products[0]?.id || '', godown_id: godowns[0]?.id || '', quantity: 10, purchase_price: products[0]?.purchase_price || 0 }
   ]);
   const [initialPayment, setInitialPayment] = useState('');
   const [paymentMode, setPaymentMode] = useState('Bank Transfer');
@@ -45,7 +45,7 @@ export const NewPurchaseModal = ({
       setTime(getCurrentTimeString());
       setItems(
         products.length > 0
-          ? [{ product_id: products[0].id, quantity: 10, purchase_price: products[0].purchase_price || 0 }]
+          ? [{ product_id: products[0].id, godown_id: godowns[0]?.id || '', quantity: 10, purchase_price: products[0].purchase_price || 0 }]
           : []
       );
       setInitialPayment('');
@@ -77,7 +77,7 @@ export const NewPurchaseModal = ({
     if (products.length === 0) return;
     setItems([
       ...items,
-      { product_id: products[0].id, quantity: 10, purchase_price: products[0].purchase_price || 0 }
+      { product_id: products[0].id, godown_id: godownId || godowns[0]?.id || '', quantity: 10, purchase_price: products[0].purchase_price || 0 }
     ]);
   };
 
@@ -227,7 +227,11 @@ export const NewPurchaseModal = ({
               className="form-select"
               required
               value={godownId}
-              onChange={(e) => setGodownId(e.target.value)}
+              onChange={(e) => {
+                const newGId = e.target.value;
+                setGodownId(newGId);
+                setItems((prev) => prev.map((item) => ({ ...item, godown_id: newGId })));
+              }}
             >
               {godowns.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -281,10 +285,11 @@ export const NewPurchaseModal = ({
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: '45%' }}>Product</th>
-                  <th style={{ width: '18%' }}>Quantity</th>
-                  <th style={{ width: '22%' }}>Purchase Price (₹)</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: '32%' }}>Product</th>
+                  <th style={{ width: '26%' }}>Destination Godown</th>
+                  <th style={{ width: '13%' }}>Quantity</th>
+                  <th style={{ width: '15%' }}>Purchase Price (₹)</th>
+                  <th style={{ width: '14%', textAlign: 'right' }}>Total</th>
                   <th></th>
                 </tr>
               </thead>
@@ -300,11 +305,25 @@ export const NewPurchaseModal = ({
                           value={item.product_id}
                           onChange={(e) => handleProductChange(idx, e.target.value)}
                         >
-                          {products.map((p) => {
-                            const inG = dataService.getProductStockInGodown(p.id, godownId);
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} (Total: {p.current_stock} {p.unit})
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          className="form-select"
+                          value={item.godown_id || godownId}
+                          onChange={(e) => handleItemChange(idx, 'godown_id', e.target.value)}
+                          style={{ fontSize: '12px' }}
+                        >
+                          {godowns.map((g) => {
+                            const inG = dataService.getProductStockInGodown(item.product_id, g.id);
                             return (
-                              <option key={p.id} value={p.id}>
-                                {p.name} (Godown Stock: {inG} | Total: {p.current_stock} {p.unit})
+                              <option key={g.id} value={g.id}>
+                                {g.name} ({inG} in stock)
                               </option>
                             );
                           })}

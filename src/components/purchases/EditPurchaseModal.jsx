@@ -33,6 +33,7 @@ export const EditPurchaseModal = ({
       setItems(
         purchase.items.map((i) => ({
           product_id: i.product_id,
+          godown_id: i.godown_id || purchase.godown_id || godowns[0]?.id || '',
           quantity: i.quantity,
           purchase_price: i.purchase_price
         }))
@@ -66,7 +67,7 @@ export const EditPurchaseModal = ({
     if (products.length === 0) return;
     setItems([
       ...items,
-      { product_id: products[0].id, quantity: 10, purchase_price: products[0].purchase_price || 0 }
+      { product_id: products[0].id, godown_id: godownId || godowns[0]?.id || '', quantity: 10, purchase_price: products[0].purchase_price || 0 }
     ]);
   };
 
@@ -235,10 +236,11 @@ export const EditPurchaseModal = ({
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: '45%' }}>Product</th>
-                  <th style={{ width: '18%' }}>Quantity</th>
-                  <th style={{ width: '22%' }}>Cost (₹)</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: '32%' }}>Product</th>
+                  <th style={{ width: '26%' }}>Destination Godown</th>
+                  <th style={{ width: '13%' }}>Quantity</th>
+                  <th style={{ width: '15%' }}>Cost (₹)</th>
+                  <th style={{ width: '14%', textAlign: 'right' }}>Total</th>
                   <th></th>
                 </tr>
               </thead>
@@ -262,6 +264,23 @@ export const EditPurchaseModal = ({
                               {p.name} ({p.sku})
                             </option>
                           ))}
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          className="form-select"
+                          value={item.godown_id || godownId}
+                          onChange={(e) => handleItemChange(idx, 'godown_id', e.target.value)}
+                          style={{ fontSize: '12px' }}
+                        >
+                          {godowns.map((g) => {
+                            const inG = dataService.getProductStockInGodown(item.product_id, g.id);
+                            return (
+                              <option key={g.id} value={g.id}>
+                                {g.name} ({inG} in stock)
+                              </option>
+                            );
+                          })}
                         </select>
                       </td>
                       <td>

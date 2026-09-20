@@ -1304,7 +1304,7 @@ class DataService {
       quantity: Number(i.quantity) || 0,
       purchase_price: Number(i.purchase_price) || 0,
       total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0),
-      godown_id: godownId
+      godown_id: i.godown_id || godownId
     }));
 
     const newPur = {
@@ -1324,9 +1324,12 @@ class DataService {
       created_at: new Date().toISOString()
     };
 
-    // Increase godown stock per item
+    // Increase godown stock per item into its selected destination godown
     for (const item of cleanItems) {
-      this._updateGodownStock(godownId, item.product_id, item.quantity);
+      const targetG = item.godown_id || godownId;
+      if (targetG) {
+        this._updateGodownStock(targetG, item.product_id, item.quantity);
+      }
     }
 
     this.purchases = [newPur, ...this.purchases];
@@ -1416,26 +1419,10 @@ class DataService {
       this.recordAuditEntry('supplier_purchases', purId, existingPur.purchase_no, changes, reason, currentUser?.name || 'Admin');
     }
 
-    // Old quantities per product (using old godown)
-    const oldItemMap = {};
-    existingPur.items.forEach((i) => {
-      oldItemMap[i.product_id] = (oldItemMap[i.product_id] || 0) + i.quantity;
-    });
-
-    const newItemMap = {};
-    newItems.forEach((i) => {
-      newItemMap[i.product_id] = (newItemMap[i.product_id] || 0) + Number(i.quantity);
-    });
-
     // Reverse old godown stock
-    const oldGodownId = existingPur.godown_id || this.getDefaultGodown()?.id;
-    for (const prodId of Object.keys(oldItemMap)) {
-      if (oldGodownId) this._updateGodownStock(oldGodownId, prodId, -oldItemMap[prodId]);
-    }
-
-    // Apply new godown stock
-    for (const prodId of Object.keys(newItemMap)) {
-      if (newGodownId) this._updateGodownStock(newGodownId, prodId, newItemMap[prodId]);
+    for (const item of (existingPur.items || [])) {
+      const gId = item.godown_id || existingPur.godown_id || this.getDefaultGodown()?.id;
+      if (gId) this._updateGodownStock(gId, item.product_id, -Number(item.quantity));
     }
 
     const cleanItems = newItems.map((i, idx) => ({
@@ -1446,8 +1433,14 @@ class DataService {
       quantity: Number(i.quantity) || 0,
       purchase_price: Number(i.purchase_price) || 0,
       total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0),
-      godown_id: newGodownId
+      godown_id: i.godown_id || newGodownId
     }));
+
+    // Apply new godown stock per item
+    for (const item of cleanItems) {
+      const gId = item.godown_id || newGodownId;
+      if (gId) this._updateGodownStock(gId, item.product_id, Number(item.quantity));
+    }
 
     const totalAmount = cleanItems.reduce((acc, i) => acc + i.total, 0);
     const linkedPayments = this.getPurchasePayments(purId);
