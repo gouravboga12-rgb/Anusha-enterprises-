@@ -203,10 +203,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Sidebar Nav */
+.sidebar-nav-container,
 .nav-section {
-  padding: 14px 12px;
+  padding: 12px;
   flex: 1;
   overflow-y: auto;
+}
+
+.nav-group {
+  margin-bottom: 12px;
 }
 
 .nav-label {

@@ -95,60 +95,39 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
           )}
         </div>
 
-        {/* Section 1: Main Business Modules */}
-        <div className="nav-section">
-          <div className="nav-label">Main Business Modules</div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <div
-                key={item.id}
-                className={`nav-link ${isActive ? 'active' : ''}`}
-                onClick={() => {
-                  onSelectTab(item.id);
-                  if (window.innerWidth <= 1024) onClose();
-                }}
-              >
-                <Icon size={18} />
-                <span>{item.label}</span>
-                {item.badge && (
-                  <span className={`nav-badge ${item.alert ? 'alert' : ''}`}>
-                    {item.badge}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {/* Scrollable Navigation Area */}
+        <div className="sidebar-nav-container" style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+          {/* Section 1: Main Business Modules */}
+          <div className="nav-group" style={{ marginBottom: '16px' }}>
+            <div className="nav-label">Main Business Modules</div>
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <div
+                  key={item.id}
+                  className={`nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectTab(item.id);
+                    if (window.innerWidth <= 1024) onClose();
+                  }}
+                >
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                  {item.badge && (
+                    <span className={`nav-badge ${item.alert ? 'alert' : ''}`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-        {/* Section 2: Operations */}
-        <div className="nav-section" style={{ marginTop: '10px' }}>
-          <div className="nav-label">Operations</div>
-          {operationsItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <div
-                key={item.id}
-                className={`nav-link ${isActive ? 'active' : ''}`}
-                onClick={() => {
-                  onSelectTab(item.id);
-                  if (window.innerWidth <= 1024) onClose();
-                }}
-              >
-                <Icon size={18} />
-                <span>{item.label}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Section 3: Administration (Owner Only) */}
-        {adminItems.length > 0 && (
-          <div className="nav-section" style={{ marginTop: '10px' }}>
-            <div className="nav-label">Administration</div>
-            {adminItems.map((item) => {
+          {/* Section 2: Operations */}
+          <div className="nav-group" style={{ marginBottom: '16px' }}>
+            <div className="nav-label">Operations</div>
+            {operationsItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
@@ -166,7 +145,31 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
               );
             })}
           </div>
-        )}
+
+          {/* Section 3: Administration (Owner Only) */}
+          {adminItems.length > 0 && (
+            <div className="nav-group" style={{ marginBottom: '16px' }}>
+              <div className="nav-label">Administration</div>
+              {adminItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={`nav-link ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      onSelectTab(item.id);
+                      if (window.innerWidth <= 1024) onClose();
+                    }}
+                  >
+                    <Icon size={18} />
+                    <span>{item.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         <div style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
           {currentUser && (
