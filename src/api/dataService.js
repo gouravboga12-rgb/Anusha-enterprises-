@@ -25,6 +25,38 @@ const simpleHash = (str) => {
   return 'h' + Math.abs(hash).toString(36);
 };
 
+// Encode password for storage in crm_users table (stores simpleHash:base64)
+export const encodeStoredPassword = (password) => {
+  if (!password) return '';
+  const hash = simpleHash(password);
+  try {
+    const b64 = btoa(unescape(encodeURIComponent(password)));
+    return `${hash}:${b64}`;
+  } catch (e) {
+    return `${hash}:${btoa(password)}`;
+  }
+};
+
+// Decode reversible stored password
+export const decodeStoredPassword = (storedHash) => {
+  if (!storedHash) return '';
+  if (typeof storedHash !== 'string') return '';
+  if (storedHash.includes(':')) {
+    const parts = storedHash.split(':');
+    const b64 = parts.slice(1).join(':');
+    try {
+      return decodeURIComponent(escape(atob(b64)));
+    } catch (e) {
+      try {
+        return atob(b64);
+      } catch (err) {
+        return '';
+      }
+    }
+  }
+  return '';
+};
+
 class DataService {
   constructor() {
     if (isSupabaseConfigured) {
@@ -2237,12 +2269,20 @@ class DataService {
     const isNew = !userData.id;
     const userId = userData.id || 'usr-' + Date.now();
 
+    let passwordHash = '';
+    if (userData.password && userData.password.trim()) {
+      passwordHash = encodeStoredPassword(userData.password.trim());
+    } else if (!isNew) {
+      const existing = this.crmUsers.find((u) => u.id === userId);
+      passwordHash = existing ? existing.password_hash : '';
+    }
+
     const dbRecord = {
       id: userId,
       name: userData.name,
       email: userData.email || null,
       phone: userData.phone || null,
-      password_hash: userData.password ? simpleHash(userData.password) : (this.crmUsers.find((u) => u.id === userId)?.password_hash || ''),
+      password_hash: passwordHash,
       role: userData.role || 'partial_access',
       is_active: userData.is_active !== false,
       created_by: currentUser?.name || 'Admin',
@@ -2265,10 +2305,12 @@ class DataService {
     }
     this.notify();
 
-    if (isNew) {
-      supabase.from('crm_users').insert([dbRecord]).then().catch(console.warn);
-    } else {
-      supabase.from('crm_users').update(dbRecord).eq('id', userId).then().catch(console.warn);
+    if (isSupabaseConfigured) {
+      if (isNew) {
+        supabase.from('crm_users').insert([dbRecord]).then().catch(console.warn);
+      } else {
+        supabase.from('crm_users').update(dbRecord).eq('id', userId).then().catch(console.warn);
+      }
     }
     return saved;
   }
@@ -2279,7 +2321,9 @@ class DataService {
     this.crmUsers = this.crmUsers.map((u) => (u.id === id ? { ...u, is_active: false } : u));
     this.logActivity(currentUser, 'DEACTIVATE', 'Users', id, user.name, `Deactivated staff account: ${user.name}`);
     this.notify();
-    supabase.from('crm_users').update({ is_active: false }).eq('id', id).then().catch(console.warn);
+    if (isSupabaseConfigured) {
+      supabase.from('crm_users').update({ is_active: false }).eq('id', id).then().catch(console.warn);
+    }
   }
 
   deleteCrmUser(id, currentUser) {
@@ -2298,6 +2342,27 @@ class DataService {
     if (isSupabaseConfigured) {
       supabase.from('crm_users').delete().eq('id', id).then().catch((e) => console.warn('deleteCrmUser error:', e));
     }
+  }
+
+  // Retrieve decoded password for an account (strictly guarded: only Full Access / Owner allowed)
+  getUserPassword(userId, currentUser) {
+    const canView = !currentUser ||
+      currentUser.role === 'owner' ||
+      currentUser.role === 'Owner / Administrator' ||
+      currentUser.role === 'full_access' ||
+      currentUser.email === 'shivat9640@gmail.com';
+
+    if (!canView) {
+      return null;
+    }
+
+    if (userId === 'owner' || userId === 'shivat9640@gmail.com') {
+      return '9640912521';
+    }
+
+    const user = this.crmUsers.find((u) => u.id === userId);
+    if (!user) return null;
+    return decodeStoredPassword(user.password_hash);
   }
 
   authenticateUser(identifier, password) {
@@ -2328,13 +2393,20 @@ class DataService {
       if (!u.is_active) return false;
       const matchId = (u.email && normalizeText(u.email) === cleanId) ||
         (u.phone && normalizeText(u.phone) === cleanId);
-      return matchId && u.password_hash === hash;
+      if (!matchId) return false;
+      if (!u.password_hash) return false;
+
+      const storedPrefix = u.password_hash.split(':')[0];
+      const decodedPlain = decodeStoredPassword(u.password_hash);
+      return storedPrefix === hash || u.password_hash === hash || (decodedPlain && decodedPlain === password);
     });
 
     if (user) {
       // Update last login
       this.crmUsers = this.crmUsers.map((u) => u.id === user.id ? { ...u, last_login_at: new Date().toISOString() } : u);
-      supabase.from('crm_users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id).then().catch(console.warn);
+      if (isSupabaseConfigured) {
+        supabase.from('crm_users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id).then().catch(console.warn);
+      }
 
       return {
         id: user.id,

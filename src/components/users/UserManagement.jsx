@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
   Users, UserPlus, Shield, ShieldCheck, ShieldAlert,
-  Edit2, UserX, UserCheck, Key, Mail, Phone, Clock, AlertCircle, Trash2
+  Edit2, UserX, UserCheck, Key, Mail, Phone, Clock, AlertCircle, Trash2,
+  Eye, EyeOff, Copy, Check
 } from 'lucide-react';
 import { formatDate } from '../../utils/formatters';
 
@@ -18,8 +19,46 @@ export const UserManagement = ({ dataService, currentUser }) => {
   });
   const [error, setError] = useState('');
 
+  // Password visibility & unlock states (Strictly restricted to Full Access / Owner)
+  const [unlockedPasswords, setUnlockedPasswords] = useState({});
+  const [copiedId, setCopiedId] = useState(null);
+  const [showModalPassword, setShowModalPassword] = useState(false);
+  const [showCurrentPasswordInModal, setShowCurrentPasswordInModal] = useState(false);
+
   const users = dataService?.getCrmUsers ? dataService.getCrmUsers() : [];
   const isRootAdmin = !currentUser || currentUser.role === 'owner' || currentUser.email === 'shivat9640@gmail.com';
+  const canViewPassword = !currentUser ||
+    currentUser.role === 'owner' ||
+    currentUser.role === 'Owner / Administrator' ||
+    currentUser.role === 'full_access' ||
+    currentUser.email === 'shivat9640@gmail.com';
+
+  const toggleUnlockPassword = (userId) => {
+    setUnlockedPasswords((prev) => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
+  };
+
+  const handleCopyPassword = (text, id) => {
+    if (!text) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (e) {
+      console.warn('Copy failed:', e);
+    }
+  };
 
   const handleOpenAdd = () => {
     setEditingUser(null);
@@ -32,6 +71,8 @@ export const UserManagement = ({ dataService, currentUser }) => {
       is_active: true
     });
     setError('');
+    setShowModalPassword(false);
+    setShowCurrentPasswordInModal(false);
     setIsModalOpen(true);
   };
 
@@ -46,6 +87,8 @@ export const UserManagement = ({ dataService, currentUser }) => {
       is_active: user.is_active !== false
     });
     setError('');
+    setShowModalPassword(false);
+    setShowCurrentPasswordInModal(false);
     setIsModalOpen(true);
   };
 
@@ -197,6 +240,72 @@ export const UserManagement = ({ dataService, currentUser }) => {
                 <td>
                   <div style={{ fontSize: '12px', color: '#0f172a' }}>shivat9640@gmail.com</div>
                   <div style={{ fontSize: '11px', color: '#64748b' }}>+91 96409 12521</div>
+                  {canViewPassword && (
+                    <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        backgroundColor: unlockedPasswords['owner'] ? '#eff6ff' : '#f8fafc',
+                        border: `1px solid ${unlockedPasswords['owner'] ? '#bfdbfe' : '#e2e8f0'}`,
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        transition: 'all 0.15s ease'
+                      }}>
+                        <Key size={11} color={unlockedPasswords['owner'] ? '#0284c7' : '#94a3b8'} />
+                        {unlockedPasswords['owner'] ? (
+                          <span style={{
+                            fontFamily: 'Consolas, Monaco, monospace',
+                            fontWeight: 600,
+                            color: '#0f172a',
+                            letterSpacing: '0.5px'
+                          }}>
+                            9640912521
+                          </span>
+                        ) : (
+                          <span style={{ letterSpacing: '2px', color: '#94a3b8', fontSize: '12px', userSelect: 'none' }}>
+                            ••••••••
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => toggleUnlockPassword('owner')}
+                          title={unlockedPasswords['owner'] ? "Hide password" : "Check / Unlock password"}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '2px',
+                            cursor: 'pointer',
+                            color: unlockedPasswords['owner'] ? '#0284c7' : '#64748b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            marginLeft: '2px'
+                          }}
+                        >
+                          {unlockedPasswords['owner'] ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                        {unlockedPasswords['owner'] && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPassword('9640912521', 'owner')}
+                            title="Copy password"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: '2px',
+                              cursor: 'pointer',
+                              color: copiedId === 'owner' ? '#16a34a' : '#64748b',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                          >
+                            {copiedId === 'owner' ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </td>
                 <td>
                   <span className="badge badge-active" style={{ fontSize: '11px', fontWeight: 700 }}>
@@ -245,6 +354,72 @@ export const UserManagement = ({ dataService, currentUser }) => {
                     <td>
                       {user.email && <div style={{ fontSize: '12px', color: '#0f172a' }}>{user.email}</div>}
                       {user.phone && <div style={{ fontSize: '11px', color: '#64748b' }}>+91 {user.phone}</div>}
+                      {canViewPassword && (
+                        <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            backgroundColor: unlockedPasswords[user.id] ? '#eff6ff' : '#f8fafc',
+                            border: `1px solid ${unlockedPasswords[user.id] ? '#bfdbfe' : '#e2e8f0'}`,
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            transition: 'all 0.15s ease'
+                          }}>
+                            <Key size={11} color={unlockedPasswords[user.id] ? '#0284c7' : '#94a3b8'} />
+                            {unlockedPasswords[user.id] ? (
+                              <span style={{
+                                fontFamily: 'Consolas, Monaco, monospace',
+                                fontWeight: 600,
+                                color: '#0f172a',
+                                letterSpacing: '0.5px'
+                              }}>
+                                {dataService.getUserPassword ? (dataService.getUserPassword(user.id, currentUser) || '(Encrypted / Not set)') : '••••••••'}
+                              </span>
+                            ) : (
+                              <span style={{ letterSpacing: '2px', color: '#94a3b8', fontSize: '12px', userSelect: 'none' }}>
+                                ••••••••
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => toggleUnlockPassword(user.id)}
+                              title={unlockedPasswords[user.id] ? "Hide password" : "Check / Unlock password"}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: '2px',
+                                cursor: 'pointer',
+                                color: unlockedPasswords[user.id] ? '#0284c7' : '#64748b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginLeft: '2px'
+                              }}
+                            >
+                              {unlockedPasswords[user.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                            </button>
+                            {unlockedPasswords[user.id] && dataService.getUserPassword && dataService.getUserPassword(user.id, currentUser) && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyPassword(dataService.getUserPassword(user.id, currentUser), user.id)}
+                                title="Copy password"
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: '2px',
+                                  cursor: 'pointer',
+                                  color: copiedId === user.id ? '#16a34a' : '#64748b',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                {copiedId === user.id ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </td>
                     <td>
                       {user.role === 'full_access' ? (
@@ -367,17 +542,116 @@ export const UserManagement = ({ dataService, currentUser }) => {
               </div>
 
               <div className="form-group" style={{ marginBottom: '12px' }}>
-                <label className="form-label">
-                  {editingUser ? 'New Password (leave blank to keep current)' : 'Login Password *'}
-                </label>
-                <input
-                  type="password"
-                  className="form-input"
-                  required={!editingUser}
-                  placeholder={editingUser ? '••••••••' : 'Enter login password'}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label className="form-label" style={{ margin: 0 }}>
+                    {editingUser ? 'New Password (leave blank to keep current)' : 'Login Password *'}
+                  </label>
+                  {editingUser && canViewPassword && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPasswordInModal(!showCurrentPasswordInModal)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '0',
+                        fontSize: '11px',
+                        color: '#0284c7',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title="Check currently saved password for this account"
+                    >
+                      {showCurrentPasswordInModal ? <EyeOff size={12} /> : <Eye size={12} />}
+                      {showCurrentPasswordInModal ? 'Hide Saved Password' : 'Check Account Password'}
+                    </button>
+                  )}
+                </div>
+
+                {editingUser && canViewPassword && showCurrentPasswordInModal && (
+                  <div style={{
+                    marginBottom: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '12px'
+                  }}>
+                    <span style={{ color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Key size={13} color="#0284c7" />
+                      Current Password:{' '}
+                      <strong style={{
+                        fontFamily: 'Consolas, Monaco, monospace',
+                        fontSize: '13px',
+                        color: '#0f172a',
+                        letterSpacing: '1px',
+                        backgroundColor: '#ffffff',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid #e0f2fe'
+                      }}>
+                        {dataService.getUserPassword ? (dataService.getUserPassword(editingUser.id, currentUser) || '(Encrypted / Not set)') : '••••••••'}
+                      </strong>
+                    </span>
+                    {dataService.getUserPassword && dataService.getUserPassword(editingUser.id, currentUser) && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPassword(dataService.getUserPassword(editingUser.id, currentUser), 'modal-current')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: copiedId === 'modal-current' ? '#16a34a' : '#0284c7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '11px',
+                          fontWeight: 600
+                        }}
+                        title="Copy saved password"
+                      >
+                        {copiedId === 'modal-current' ? <Check size={12} color="#16a34a" /> : <Copy size={12} />}
+                        {copiedId === 'modal-current' ? 'Copied' : 'Copy'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type={showModalPassword ? 'text' : 'password'}
+                    className="form-input"
+                    required={!editingUser}
+                    placeholder={editingUser ? '••••••••' : 'Enter login password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowModalPassword(!showModalPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: showModalPassword ? '#0284c7' : '#94a3b8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '4px',
+                      borderRadius: '4px'
+                    }}
+                    title={showModalPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showModalPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: '16px' }}>

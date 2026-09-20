@@ -25,7 +25,11 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
   const products = dataService.getProducts();
   const lowStockCount = products.filter((p) => p.current_stock <= (p.min_stock_alert || 20)).length;
 
-  const isOwner = !currentUser || currentUser.role === 'owner' || currentUser.role === 'Owner / Administrator';
+  const isOwner = !currentUser || 
+    currentUser.role === 'owner' || 
+    currentUser.role === 'Owner / Administrator' || 
+    currentUser.role === 'full_access' || 
+    currentUser.email === 'shivat9640@gmail.com';
 
   const navItems = [
     { id: 'dashboard', label: 'Home / Day Summary', icon: LayoutDashboard },
