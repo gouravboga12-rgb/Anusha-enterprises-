@@ -1721,6 +1721,74 @@ class DataService {
     return newTxn;
   }
 
+  updateWalletTransaction(id, updatedData, currentUser) {
+    const existing = this.walletTransactions.find((t) => t.id === id);
+    if (!existing) throw new Error('Wallet transaction not found');
+
+    const updated = {
+      ...existing,
+      amount: Number(updatedData.amount) || existing.amount,
+      category: updatedData.category || existing.category,
+      reason: updatedData.reason !== undefined ? updatedData.reason : existing.reason,
+      date: updatedData.date || existing.date,
+      time: updatedData.time || existing.time,
+      notes: updatedData.notes !== undefined ? updatedData.notes : existing.notes
+    };
+
+    this.walletTransactions = this.walletTransactions.map((t) => (t.id === id ? updated : t));
+    this.logActivity(
+      currentUser,
+      'UPDATE',
+      'Wallet',
+      id,
+      existing.txn_no,
+      `Updated wallet ${existing.type}: ₹${updated.amount} — ${updated.reason}`
+    );
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      supabase
+        .from('wallet_transactions')
+        .update({
+          amount: updated.amount,
+          category: updated.category,
+          reason: updated.reason,
+          date: updated.date,
+          time: updated.time,
+          notes: updated.notes
+        })
+        .eq('id', id)
+        .then()
+        .catch(console.warn);
+    }
+
+    return updated;
+  }
+
+  deleteWalletTransaction(id, currentUser) {
+    if (!this.canDelete(currentUser)) {
+      throw new Error('Permission denied: You do not have authority to delete wallet transactions.');
+    }
+
+    const existing = this.walletTransactions.find((t) => t.id === id);
+    if (!existing) throw new Error('Wallet transaction not found');
+
+    this.walletTransactions = this.walletTransactions.filter((t) => t.id !== id);
+    this.logActivity(
+      currentUser,
+      'DELETE',
+      'Wallet',
+      id,
+      existing.txn_no,
+      `Deleted wallet ${existing.type}: ₹${existing.amount} — ${existing.reason}`
+    );
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      supabase.from('wallet_transactions').delete().eq('id', id).then().catch(console.warn);
+    }
+  }
+
   // ==============================================================================
   // CRM USERS (MULTI-USER)
   // ==============================================================================

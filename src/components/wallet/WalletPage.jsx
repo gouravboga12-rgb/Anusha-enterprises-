@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Wallet, PlusCircle, ArrowUpRight, ArrowDownLeft,
-  TrendingDown, TrendingUp, Calendar, Filter, Search, Tag, FileText, CheckCircle2
+  TrendingDown, TrendingUp, Calendar, Filter, Search, Tag, FileText, CheckCircle2,
+  Edit2, Trash2
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 
 export const WalletPage = ({ dataService, currentUser }) => {
   const [activeModal, setActiveModal] = useState(null); // 'budget' | 'expense' | null
+  const [editingTxn, setEditingTxn] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,15 +22,19 @@ export const WalletPage = ({ dataService, currentUser }) => {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
-  const summary = useMemo(() => {
-    if (!dataService?.getWalletSummary) return { balance: 0, totalBudget: 0, totalExpenses: 0 };
-    return dataService.getWalletSummary();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!dataService) return;
+    return dataService.subscribe(() => setTick((t) => t + 1));
   }, [dataService]);
 
-  const transactions = useMemo(() => {
-    if (!dataService?.getWalletTransactions) return [];
-    return dataService.getWalletTransactions();
-  }, [dataService]);
+  const summary = dataService?.getWalletSummary
+    ? dataService.getWalletSummary()
+    : { balance: 0, totalBudget: 0, totalExpenses: 0 };
+
+  const transactions = dataService?.getWalletTransactions
+    ? dataService.getWalletTransactions()
+    : [];
 
   const filteredTransactions = useMemo(() => {
     let list = transactions;
@@ -55,6 +61,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
   }, [transactions, filterType, filterCategory, searchTerm]);
 
   const handleOpenBudgetModal = () => {
+    setEditingTxn(null);
     setAmount('');
     setReason('');
     setDate(getTodayDateString());
@@ -65,6 +72,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
   };
 
   const handleOpenExpenseModal = () => {
+    setEditingTxn(null);
     setAmount('');
     setCategory('Diesel');
     setReason('');
@@ -73,6 +81,33 @@ export const WalletPage = ({ dataService, currentUser }) => {
     setNotes('');
     setError('');
     setActiveModal('expense');
+  };
+
+  const handleOpenEdit = (txn) => {
+    setEditingTxn(txn);
+    setAmount(String(txn.amount));
+    setCategory(txn.category || 'Diesel');
+    setReason(txn.reason || '');
+    setDate(txn.date || getTodayDateString());
+    setTime(txn.time || getCurrentTimeString());
+    setNotes(txn.notes || '');
+    setError('');
+    setActiveModal(txn.type);
+  };
+
+  const handleDelete = (txn) => {
+    if (!dataService.canDelete(currentUser)) {
+      alert('Permission denied: You do not have authority to delete transactions.');
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete this wallet transaction?\n\nVoucher: ${txn.txn_no}\nReason: ${txn.reason}\nAmount: ₹${txn.amount}\n\nThis will immediately adjust your Available Wallet Balance.`)) {
+      try {
+        dataService.deleteWalletTransaction(txn.id, currentUser);
+      } catch (err) {
+        alert(err.message || 'Failed to delete wallet transaction');
+      }
+    }
   };
 
   const handleSubmit = (e) => {
@@ -91,6 +126,24 @@ export const WalletPage = ({ dataService, currentUser }) => {
     }
 
     try {
+      if (editingTxn) {
+        dataService.updateWalletTransaction(
+          editingTxn.id,
+          {
+            amount: numAmount,
+            category: activeModal === 'expense' ? category : 'Fund',
+            reason: reason.trim(),
+            date,
+            time,
+            notes: notes.trim()
+          },
+          currentUser
+        );
+        setEditingTxn(null);
+        setActiveModal(null);
+        return;
+      }
+
       if (activeModal === 'budget') {
         dataService.addWalletBudget(
           { amount: numAmount, reason: reason.trim(), date, time, notes: notes.trim() },
@@ -256,6 +309,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
                 <th>Reason / Description</th>
                 <th style={{ textAlign: 'right' }}>Amount</th>
                 <th>Recorded By</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -309,6 +363,34 @@ export const WalletPage = ({ dataService, currentUser }) => {
                       <td>
                         <span style={{ fontSize: '12px', color: '#64748b' }}>{txn.recorded_by || 'Admin'}</span>
                       </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ fontSize: '11px', padding: '3px 8px' }}
+                            onClick={() => handleOpenEdit(txn)}
+                            title="Edit Transaction"
+                          >
+                            <Edit2 size={12} /> Edit
+                          </button>
+                          {dataService?.canDelete && dataService.canDelete(currentUser) && (
+                            <button
+                              className="btn btn-danger btn-sm"
+                              style={{
+                                fontSize: '11px',
+                                padding: '3px 8px',
+                                backgroundColor: '#ef4444',
+                                color: '#ffffff',
+                                border: '1px solid #dc2626'
+                              }}
+                              onClick={() => handleDelete(txn)}
+                              title="Delete Transaction"
+                            >
+                              <Trash2 size={12} /> Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -328,7 +410,9 @@ export const WalletPage = ({ dataService, currentUser }) => {
           >
             <div className="modal-header">
               <h2 style={{ fontSize: '17px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {activeModal === 'budget' ? (
+                {editingTxn ? (
+                  <><Edit2 size={18} color="#0284c7" /> Edit Wallet Transaction — {editingTxn.txn_no}</>
+                ) : activeModal === 'budget' ? (
                   <><ArrowDownLeft size={18} color="#16a34a" /> Add Operating Funds to Wallet</>
                 ) : (
                   <><ArrowUpRight size={18} color="#ef4444" /> Record Operations Expense</>
@@ -435,7 +519,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
                   type="submit"
                   className={activeModal === 'budget' ? 'btn btn-primary' : 'btn btn-danger'}
                 >
-                  {activeModal === 'budget' ? 'Add Funds to Wallet' : 'Record Expense'}
+                  {editingTxn ? 'Save Changes' : activeModal === 'budget' ? 'Add Funds to Wallet' : 'Record Expense'}
                 </button>
               </div>
             </form>
