@@ -17,10 +17,14 @@ export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataServi
   const [productSearch, setProductSearch] = useState('');
   const [dropdownSelectedId, setDropdownSelectedId] = useState('');
 
-  const allProducts = useMemo(() => {
-    if (!dataService) return [];
-    return dataService.getProducts().filter((p) => p.is_active !== false);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!dataService) return;
+    return dataService.subscribe(() => setTick((t) => t + 1));
   }, [dataService]);
+
+  const allProducts = (dataService ? dataService.getProducts() : []).filter((p) => p && p.is_active !== false);
 
   useEffect(() => {
     if (supplier) {
