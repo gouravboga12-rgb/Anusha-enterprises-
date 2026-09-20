@@ -1019,6 +1019,38 @@ h1, h2, h3, h4, h5, h6 {
     overflow-x: hidden;
   }
 
+  /* Universal mobile overflow guard — every element stays within screen */
+  .page-content * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Prevent wide table from causing horizontal scroll — hide on mobile, show cards instead */
+  .mobile-hide {
+    display: none !important;
+  }
+  .mobile-show {
+    display: flex !important;
+  }
+
+  /* Table responsive stays scroll within its own box, never pushes body */
+  .table-responsive {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Date quick buttons must wrap on mobile */
+  .date-quick-row {
+    flex-wrap: wrap !important;
+  }
+
+  /* Stat grids: min 2 cols on mobile */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
   /* Top Navbar on Mobile - Fixed to top */
   .top-navbar {
     left: 0 !important;

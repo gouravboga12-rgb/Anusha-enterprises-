@@ -254,102 +254,56 @@ export const DailyTransactions = ({ dataService }) => {
           </div>
 
           {/* Date Selector Banner */}
-          <div className="card no-print" style={{ padding: '16px 20px', marginBottom: '18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Calendar size={18} color="#0284c7" />
-                  <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>Period:</span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    className={`btn btn-sm ${dateMode === 'single' && selectedDate === getTodayDateString() ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={handleSetToday}
-                  >
-                    Today
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleSetYesterday}
-                  >
-                    Yesterday
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleSetThisWeek}
-                  >
-                    This Week
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleSetThisMonth}
-                  >
-                    This Month
-                  </button>
-                  <button
-                    className={`btn btn-sm ${dateMode === 'all' ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={handleSetAll}
-                  >
-                    All Records
-                  </button>
-                </div>
-
-                {dateMode === 'single' ? (
-                  <input
-                    type="date"
-                    className="form-input"
-                    style={{ width: 'auto', fontWeight: 600, fontSize: '12px', padding: '4px 8px' }}
-                    value={selectedDate}
-                    onChange={(e) => {
-                      setDateMode('single');
-                      setSelectedDate(e.target.value);
-                    }}
-                  />
-                ) : dateMode === 'range' ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <input
-                      type="date"
-                      className="form-input"
-                      style={{ width: 'auto', fontSize: '12px', padding: '4px 8px' }}
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                    />
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>to</span>
-                    <input
-                      type="date"
-                      className="form-input"
-                      style={{ width: 'auto', fontSize: '12px', padding: '4px 8px' }}
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                    />
-                  </div>
-                ) : (
-                  <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, background: '#ecfdf5', padding: '3px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
-                    All Records Included
-                  </span>
-                )}
+          <div className="card no-print" style={{ padding: '14px 16px', marginBottom: '16px' }}>
+            {/* Period label + date chips */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <Calendar size={16} color="#0284c7" />
+                <span style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>Period:</span>
               </div>
-
-              {/* Quick Type Filter */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>Filter:</span>
-                <select
-                  className="form-select"
-                  style={{ width: 'auto', padding: '5px 10px', fontSize: '12.5px' }}
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                >
-                  <option value="all">All Events ({events.length})</option>
-                  <option value="sales">Sales Only</option>
-                  <option value="purchases">Purchases Only</option>
-                  <option value="inflow">Cash Inward Receipts</option>
-                  <option value="outflow">Cash Outward Payments</option>
-                  <option value="stock">Stock Transfers & Adjustments</option>
-                </select>
+              {/* Date quick chips — wrap on mobile */}
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                <button className={`btn btn-sm ${dateMode === 'single' && selectedDate === getTodayDateString() ? 'btn-primary' : 'btn-secondary'}`} onClick={handleSetToday} style={{ fontSize: '11px', padding: '4px 8px' }}>Today</button>
+                <button className="btn btn-secondary btn-sm" onClick={handleSetYesterday} style={{ fontSize: '11px', padding: '4px 8px' }}>Yesterday</button>
+                <button className="btn btn-secondary btn-sm" onClick={handleSetThisWeek} style={{ fontSize: '11px', padding: '4px 8px' }}>This Week</button>
+                <button className="btn btn-secondary btn-sm" onClick={handleSetThisMonth} style={{ fontSize: '11px', padding: '4px 8px' }}>This Month</button>
+                <button className={`btn btn-sm ${dateMode === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={handleSetAll} style={{ fontSize: '11px', padding: '4px 8px' }}>All</button>
               </div>
             </div>
+
+            {/* Date input(s) */}
+            <div style={{ marginBottom: '10px' }}>
+              {dateMode === 'single' ? (
+                <input type="date" className="form-input" style={{ fontWeight: 600, fontSize: '12px', padding: '5px 10px', width: '100%', maxWidth: '200px' }}
+                  value={selectedDate} onChange={(e) => { setDateMode('single'); setSelectedDate(e.target.value); }} />
+              ) : dateMode === 'range' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <input type="date" className="form-input" style={{ fontSize: '12px', padding: '5px 10px', flex: 1, minWidth: '130px' }}
+                    value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>to</span>
+                  <input type="date" className="form-input" style={{ fontSize: '12px', padding: '5px 10px', flex: 1, minWidth: '130px' }}
+                    value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                </div>
+              ) : (
+                <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>All Records Included</span>
+              )}
+            </div>
+
+            {/* Quick Type Filter — full width on mobile */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>Filter:</span>
+              <select className="form-select" style={{ flex: 1, padding: '5px 10px', fontSize: '12px' }}
+                value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <option value="all">All Events ({events.length})</option>
+                <option value="sales">Sales Only</option>
+                <option value="purchases">Purchases Only</option>
+                <option value="inflow">Cash Inward Receipts</option>
+                <option value="outflow">Cash Outward Payments</option>
+                <option value="stock">Stock Transfers &amp; Adjustments</option>
+              </select>
+            </div>
           </div>
+
 
           {/* Daily Summary Cards Strip */}
           <div style={{
@@ -432,89 +386,74 @@ export const DailyTransactions = ({ dataService }) => {
               </div>
             </div>
 
-            <div className="table-responsive" style={{ border: 'none' }}>
-              <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
-                <colgroup>
-                  {dateMode === 'range' && <col style={{ width: '7%' }} />}
-                  <col style={{ width: '7%' }} />
-                  <col style={{ width: '16%' }} />
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: dateMode === 'range' ? '36%' : '40%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '8%' }} />
-                  <col style={{ width: '8%' }} />
-                </colgroup>
-                <thead>
-                  <tr>
-                    {dateMode === 'range' && <th>Date</th>}
-                    <th>Time</th>
-                    <th>Transaction Type</th>
-                    <th>Party / Counterpart</th>
-                    <th>Items &amp; Transaction Breakdown</th>
-                    <th style={{ textAlign: 'right' }}>Amount (₹)</th>
-                    <th>Reference</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEvents.length === 0 ? (
-                    <tr>
-                      <td colSpan={dateMode === 'range' ? 8 : 7} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                        No transactions recorded in this period.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredEvents.map((evt) => (
-                      <tr key={evt.id}>
-                        {dateMode === 'range' && (
-                          <td style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {formatDate(evt.date)}
-                          </td>
-                        )}
-                        <td style={{ fontWeight: 600, color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                          {evt.time || '—'}
-                        </td>
-                        <td>
-                          <span className={`badge ${evt.badgeClass}`}>{evt.type}</span>
-                        </td>
-                        <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                          {evt.party}
-                          {evt.godown && (
-                            <div style={{ fontSize: '11px', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              <Warehouse size={11} /> {evt.godown}
-                            </div>
+            {/* Mobile Transaction Cards */}
+            {filteredEvents.length === 0 ? (
+              <div style={{ padding: '48px 20px', textAlign: 'center', color: '#64748b' }}>
+                <BookOpen size={40} color="#cbd5e1" style={{ marginBottom: '10px' }} />
+                <div style={{ fontWeight: 600, fontSize: '14px' }}>No transactions in this period.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {filteredEvents.map((evt, idx) => {
+                  const amountColor =
+                    evt.amountType === 'inflow' ? '#10b981' :
+                    evt.amountType === 'outflow' ? '#e11d48' : '#0f172a';
+                  const amountPrefix =
+                    evt.amountType === 'inflow' ? '+' :
+                    evt.amountType === 'outflow' ? '-' : '';
+                  return (
+                    <div key={evt.id || idx} style={{
+                      padding: '12px 14px',
+                      borderBottom: idx < filteredEvents.length - 1 ? '1px solid #f1f5f9' : 'none',
+                      display: 'flex', flexDirection: 'column', gap: '5px'
+                    }}>
+                      {/* Row 1: Type Badge + Amount */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span className={`badge ${evt.badgeClass}`} style={{ fontSize: '10px' }}>{evt.type}</span>
+                          {dateMode === 'range' && evt.date && (
+                            <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 600 }}>{formatDate(evt.date)}</span>
                           )}
-                        </td>
-                        <td style={{ fontSize: '12px', wordBreak: 'break-word' }}>
-                          <div style={{ whiteSpace: 'pre-line', lineHeight: 1.4 }}>
-                            {evt.details}
-                          </div>
-                        </td>
-                        <td style={{
-                          textAlign: 'right',
-                          fontWeight: 800,
-                          fontSize: '12.5px',
-                          whiteSpace: 'nowrap',
-                          color:
-                            evt.amountType === 'inflow' ? '#10b981' :
-                            evt.amountType === 'outflow' ? '#e11d48' : '#0f172a'
-                        }}>
-                          {evt.amount !== null && evt.amount !== undefined ? (
-                            `${evt.amountType === 'inflow' ? '+' : evt.amountType === 'outflow' ? '-' : ''}${formatCurrency(evt.amount)}`
-                          ) : '—'}
-                        </td>
-                        <td style={{ fontWeight: 600, fontSize: '12px', color: '#0284c7' }}>
-                          {evt.reference || '—'}
-                        </td>
-                        <td>
-                          <span className="badge badge-paid">{evt.status}</span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                        <span style={{ fontSize: '15px', fontWeight: 800, color: amountColor, whiteSpace: 'nowrap' }}>
+                          {evt.amount !== null && evt.amount !== undefined
+                            ? `${amountPrefix}${formatCurrency(evt.amount)}`
+                            : <span style={{ color: '#94a3b8', fontSize: '13px' }}>—</span>}
+                        </span>
+                      </div>
+
+                      {/* Row 2: Party + Godown */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{evt.party}</span>
+                        {evt.godown && (
+                          <span style={{ fontSize: '11px', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Warehouse size={11} /> {evt.godown}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Row 3: Details */}
+                      {evt.details && (
+                        <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.45, whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
+                          {evt.details}
+                        </div>
+                      )}
+
+                      {/* Row 4: Time + Ref + Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>{evt.time || '—'}</span>
+                        {evt.reference && (
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#0284c7', background: '#eff6ff', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>{evt.reference}</span>
+                        )}
+                        {evt.status && (
+                          <span className="badge badge-paid" style={{ fontSize: '10px' }}>{evt.status}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}
