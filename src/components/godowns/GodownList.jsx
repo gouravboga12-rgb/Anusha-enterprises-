@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Warehouse, Plus, MapPin, Package, AlertTriangle, ChevronRight,
-  Edit2, Archive, ArrowLeftRight, History, BarChart2
+  Edit2, Archive, ArrowLeftRight, History, BarChart2, Clock, Activity,
+  TrendingDown, TrendingUp, RefreshCw
 } from 'lucide-react';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatDate } from '../../utils/formatters';
 import { GodownFormModal } from './GodownFormModal';
 import { GodownDetail } from './GodownDetail';
 import { StockTransferModal } from './StockTransferModal';
@@ -25,6 +26,14 @@ export const GodownList = ({ dataService, currentUser }) => {
   const totalStock = products.reduce((acc, p) => acc + (p.current_stock || 0), 0);
   const lowStockCount = products.filter((p) => p.current_stock <= (p.min_stock_alert || 20) && p.current_stock > 0).length;
   const outOfStockCount = products.filter((p) => p.current_stock === 0).length;
+
+  // Recent godown-related activities (last 10)
+  const recentActivities = useMemo(() => {
+    if (!dataService?.getActivityLog) return [];
+    return dataService.getActivityLog()
+      .filter((l) => l.module === 'Godowns' || l.module === 'Stock' || l.module === 'Products')
+      .slice(0, 10);
+  }, [dataService]);
 
   const getGodownStats = (godownId) => {
     const stock = dataService.getGodownStock(godownId);
@@ -224,6 +233,118 @@ export const GodownList = ({ dataService, currentUser }) => {
           onOpenTransfer={() => setIsTransferOpen(true)}
           embedded
         />
+      )}
+
+      {/* Recent Activities Panel */}
+      {recentActivities.length > 0 && (
+        <div className="card" style={{ marginTop: '28px', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Activity size={16} color="#fff" />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Recent Activity</h3>
+                <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>Last 10 godown, stock & product events</p>
+              </div>
+            </div>
+            <span style={{ fontSize: '11px', background: '#eff6ff', color: '#0284c7', fontWeight: 700, padding: '3px 10px', borderRadius: '999px', border: '1px solid #bfdbfe' }}>
+              {recentActivities.length} events
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+            {recentActivities.map((log, idx) => {
+              const actionColors = {
+                CREATE:   { bg: '#f0fdf4', border: '#bbf7d0', dot: '#16a34a', text: '#15803d', label: 'Created' },
+                UPDATE:   { bg: '#fffbeb', border: '#fde68a', dot: '#d97706', text: '#b45309', label: 'Updated' },
+                DELETE:   { bg: '#fff1f2', border: '#fecdd3', dot: '#e11d48', text: '#be123c', label: 'Deleted' },
+                TRANSFER: { bg: '#eff6ff', border: '#bfdbfe', dot: '#0284c7', text: '#0369a1', label: 'Transfer' },
+                ARCHIVE:  { bg: '#f8fafc', border: '#cbd5e1', dot: '#64748b', text: '#475569', label: 'Archived' },
+                ADJUST:   { bg: '#f5f3ff', border: '#ddd6fe', dot: '#7c3aed', text: '#6d28d9', label: 'Adjusted' },
+              };
+              const colors = actionColors[log.action] || { bg: '#f8fafc', border: '#e2e8f0', dot: '#94a3b8', text: '#64748b', label: log.action };
+
+              const moduleIcon = log.module === 'Stock'
+                ? <ArrowLeftRight size={12} />
+                : log.module === 'Products'
+                  ? <Package size={12} />
+                  : <Warehouse size={12} />;
+
+              const ts = log.created_at ? new Date(log.created_at) : null;
+              const timeStr = ts
+                ? ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                : '';
+              const dateStr = ts ? formatDate(ts.toISOString().split('T')[0]) : '';
+
+              return (
+                <div
+                  key={log.id}
+                  style={{
+                    display: 'flex',
+                    gap: '12px',
+                    alignItems: 'flex-start',
+                    padding: '12px 0',
+                    borderBottom: idx < recentActivities.length - 1 ? '1px solid #f1f5f9' : 'none',
+                  }}
+                >
+                  {/* Timeline dot */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, paddingTop: '2px' }}>
+                    <div style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      background: colors.bg,
+                      border: `1.5px solid ${colors.border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: colors.dot, flexShrink: 0
+                    }}>
+                      {moduleIcon}
+                    </div>
+                    {idx < recentActivities.length - 1 && (
+                      <div style={{ width: '1.5px', flex: 1, minHeight: '12px', background: '#e2e8f0', marginTop: '3px' }} />
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '999px',
+                        background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text
+                      }}>
+                        {colors.label}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>
+                        {log.module}
+                      </span>
+                      {log.record_ref && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                          {log.record_ref}
+                        </span>
+                      )}
+                    </div>
+
+                    {log.details && (
+                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#334155', lineHeight: 1.4 }}>
+                        {log.details}
+                      </p>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#64748b' }}>
+                        <Clock size={10} /> {timeStr} &bull; {dateStr}
+                      </span>
+                      {log.user_name && (
+                        <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: 600 }}>
+                          by {log.user_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* Modals */}
