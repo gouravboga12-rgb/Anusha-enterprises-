@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Users, UserPlus, Shield, ShieldCheck, ShieldAlert,
-  Edit2, UserX, UserCheck, Key, Mail, Phone, Clock, AlertCircle
+  Edit2, UserX, UserCheck, Key, Mail, Phone, Clock, AlertCircle, Trash2
 } from 'lucide-react';
 import { formatDate } from '../../utils/formatters';
 
@@ -19,6 +19,7 @@ export const UserManagement = ({ dataService, currentUser }) => {
   const [error, setError] = useState('');
 
   const users = dataService?.getCrmUsers ? dataService.getCrmUsers() : [];
+  const isRootAdmin = !currentUser || currentUser.role === 'owner' || currentUser.email === 'shivat9640@gmail.com';
 
   const handleOpenAdd = () => {
     setEditingUser(null);
@@ -93,6 +94,16 @@ export const UserManagement = ({ dataService, currentUser }) => {
       }
     } else {
       dataService.saveCrmUser({ ...user, is_active: true }, currentUser);
+    }
+  };
+
+  const handleDeleteUser = (user) => {
+    if (window.confirm(`Are you sure you want to permanently delete staff account for "${user.name}"?\n\nThis will completely remove their access and credentials from the system.`)) {
+      try {
+        dataService.deleteCrmUser(user.id, currentUser);
+      } catch (err) {
+        alert(err.message || 'Failed to delete staff account.');
+      }
     }
   };
 
@@ -269,6 +280,22 @@ export const UserManagement = ({ dataService, currentUser }) => {
                         >
                           {user.is_active ? <><UserX size={12} /> Disable</> : <><UserCheck size={12} /> Enable</>}
                         </button>
+                        {isRootAdmin && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            style={{
+                              fontSize: '11px',
+                              padding: '3px 8px',
+                              backgroundColor: '#ef4444',
+                              color: '#ffffff',
+                              border: '1px solid #dc2626'
+                            }}
+                            onClick={() => handleDeleteUser(user)}
+                            title="Permanently Delete Staff Access"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

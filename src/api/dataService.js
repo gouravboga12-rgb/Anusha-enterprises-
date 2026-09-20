@@ -1782,6 +1782,24 @@ class DataService {
     supabase.from('crm_users').update({ is_active: false }).eq('id', id).then().catch(console.warn);
   }
 
+  deleteCrmUser(id, currentUser) {
+    const isOwner = !currentUser || currentUser.role === 'owner' || currentUser.email === 'shivat9640@gmail.com';
+    if (!isOwner) {
+      throw new Error('Permission denied: Only the Root Administrator can delete staff accounts.');
+    }
+
+    const user = this.crmUsers.find((u) => u.id === id);
+    if (!user) throw new Error('Staff account not found.');
+
+    this.crmUsers = this.crmUsers.filter((u) => u.id !== id);
+    this.logActivity(currentUser, 'DELETE', 'Users', id, user.name, `Permanently deleted staff account: ${user.name} (${user.email || user.phone || 'No contact'})`);
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      supabase.from('crm_users').delete().eq('id', id).then().catch((e) => console.warn('deleteCrmUser error:', e));
+    }
+  }
+
   authenticateUser(identifier, password) {
     // Check hardcoded admin first
     const normalizeText = (str) => (str || '').toLowerCase().replace(/\s+/g, '').trim();
