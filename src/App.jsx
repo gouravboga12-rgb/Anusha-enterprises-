@@ -48,7 +48,36 @@ export const App = () => {
   });
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem('anusha_crm_active_tab') || 'dashboard';
+    } catch {
+      return 'dashboard';
+    }
+  });
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    try {
+      localStorage.setItem('anusha_crm_active_tab', tab);
+    } catch (e) {
+      console.warn(e);
+    }
+    setSelectedCustomerId(null);
+    setSelectedSupplierId(null);
+  };
+
+  const handleRefresh = async () => {
+    try {
+      if (dataService?.fetchAll) {
+        await dataService.fetchAll();
+      }
+    } catch (e) {
+      console.warn('Manual refresh error:', e);
+    }
+    setTick((t) => t + 1);
+  };
+
   const [productsSubTab, setProductsSubTab] = useState('catalog'); // 'catalog' | 'godowns'
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [, setTick] = useState(0); // For re-rendering when dataService changes
@@ -192,11 +221,7 @@ export const App = () => {
       {/* Responsive Sidebar Drawer */}
       <Sidebar
         activeTab={activeTab}
-        onSelectTab={(tab) => {
-          setActiveTab(tab);
-          setSelectedCustomerId(null);
-          setSelectedSupplierId(null);
-        }}
+        onSelectTab={handleSelectTab}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         currentUser={currentUser}
@@ -211,6 +236,7 @@ export const App = () => {
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onOpenNewSale={() => openNewSale()}
           onOpenPayment={() => openPayment()}
+          onRefresh={handleRefresh}
           currentUser={currentUser}
           onLogout={handleLogout}
         />
@@ -607,11 +633,7 @@ export const App = () => {
       {/* Touch-Friendly Mobile Bottom Navigation Bar */}
       <BottomNav
         activeTab={activeTab}
-        onSelectTab={(tab) => {
-          setActiveTab(tab);
-          setSelectedCustomerId(null);
-          setSelectedSupplierId(null);
-        }}
+        onSelectTab={handleSelectTab}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         dataService={dataService}
       />

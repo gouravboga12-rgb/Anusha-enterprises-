@@ -37,6 +37,15 @@
   --font-heading: 'Outfit', 'Inter', sans-serif;
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -1070,11 +1079,13 @@ h1, h2, h3, h4, h5, h6 {
     flex-shrink: 0;
   }
 
-  .header-quick-btns .btn-text {
+  .header-quick-btns .btn-text,
+  .header-refresh-btn .btn-text {
     display: none;
   }
 
-  .header-quick-btns .btn {
+  .header-quick-btns .btn,
+  .header-refresh-btn {
     padding: 6px 8px !important;
   }
 

@@ -1,10 +1,25 @@
-import React from 'react';
-import { Menu, Search, PlusCircle, Receipt, MapPin, Calendar, Database, Cloud, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { Menu, Search, PlusCircle, Receipt, MapPin, Calendar, Database, Cloud, LogOut, RefreshCw } from 'lucide-react';
 import { AiVoiceWidget } from './AiVoiceWidget';
 import { formatDate, getTodayDateString } from '../../utils/formatters';
 
-export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveConnected, isLoading, currentUser, onLogout }) => {
+export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, onRefresh, isLiveConnected, isLoading, currentUser, onLogout }) => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const todayStr = formatDate(getTodayDateString());
+
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (e) {
+      console.warn('Refresh error:', e);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   return (
     <header className="top-navbar">
@@ -108,6 +123,40 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, isLiveCo
           <Calendar size={14} color="#0284c7" />
           <span style={{ fontWeight: 600 }}>{todayStr}</span>
         </div>
+
+        {/* Refresh Page Button */}
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="btn btn-secondary btn-sm header-refresh-btn"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 11px',
+            background: isRefreshing ? '#e0f2fe' : '#ffffff',
+            border: `1px solid ${isRefreshing ? '#7dd3fc' : '#e2e8f0'}`,
+            borderRadius: '8px',
+            color: '#0f172a',
+            cursor: isRefreshing ? 'wait' : 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+            flexShrink: 0
+          }}
+          title="Refresh current page data from database"
+        >
+          <RefreshCw
+            size={14}
+            color="#0284c7"
+            style={{
+              animation: isRefreshing ? 'spin 0.8s linear infinite' : 'none',
+              transform: isRefreshing ? 'none' : 'rotate(0deg)'
+            }}
+          />
+          <span className="btn-text" style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </span>
+        </button>
 
         <AiVoiceWidget />
 
