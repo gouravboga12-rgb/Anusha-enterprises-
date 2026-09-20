@@ -16,6 +16,13 @@ export const NewPurchaseModal = ({
   const products = dataService.getProducts();
   const godowns = dataService.getGodowns();
 
+  // Get products assigned to the currently selected supplier, or fall back to all products
+  const getSupplierFilteredProducts = (sId) => {
+    if (!sId) return products;
+    const supplierProds = dataService.getSupplierProducts(sId);
+    return supplierProds.length > 0 ? supplierProds : products;
+  };
+
   const [supplierId, setSupplierId] = useState(initialSupplierId);
   const [godownId, setGodownId] = useState(godowns[0]?.id || '');
   const [date, setDate] = useState(getTodayDateString());
@@ -39,13 +46,15 @@ export const NewPurchaseModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      setSupplierId(initialSupplierId || '');
+      const sid = initialSupplierId || '';
+      setSupplierId(sid);
       setGodownId(godowns[0]?.id || '');
       setDate(getTodayDateString());
       setTime(getCurrentTimeString());
+      const availableProds = getSupplierFilteredProducts(sid);
       setItems(
-        products.length > 0
-          ? [{ product_id: products[0].id, godown_id: godowns[0]?.id || '', quantity: 10, purchase_price: products[0].purchase_price || 0 }]
+        availableProds.length > 0
+          ? [{ product_id: availableProds[0].id, godown_id: godowns[0]?.id || '', quantity: 10, purchase_price: availableProds[0].purchase_price || 0 }]
           : []
       );
       setInitialPayment('');
@@ -74,10 +83,11 @@ export const NewPurchaseModal = ({
   };
 
   const addItemRow = () => {
-    if (products.length === 0) return;
+    const availableProds = getSupplierFilteredProducts(supplierId);
+    if (availableProds.length === 0) return;
     setItems([
       ...items,
-      { product_id: products[0].id, godown_id: godownId || godowns[0]?.id || '', quantity: 10, purchase_price: products[0].purchase_price || 0 }
+      { product_id: availableProds[0].id, godown_id: godownId || godowns[0]?.id || '', quantity: 10, purchase_price: availableProds[0].purchase_price || 0 }
     ]);
   };
 
@@ -305,11 +315,15 @@ export const NewPurchaseModal = ({
                           value={item.product_id}
                           onChange={(e) => handleProductChange(idx, e.target.value)}
                         >
-                          {products.map((p) => (
+                          {getSupplierFilteredProducts(supplierId).map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name} (Total: {p.current_stock} {p.unit})
                             </option>
                           ))}
+                          {/* If supplier has no mapped products, show all as fallback */}
+                          {supplierId && dataService.getSupplierProducts(supplierId).length === 0 && (
+                            <option disabled value="">── All products (none mapped to this supplier) ──</option>
+                          )}
                         </select>
                       </td>
                       <td>
