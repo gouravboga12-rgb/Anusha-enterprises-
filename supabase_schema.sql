@@ -36,10 +36,13 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
     mobile VARCHAR(20),
     area VARCHAR(255),
     address TEXT,
+    status VARCHAR(20) DEFAULT 'active',
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
 
 -- 4. PRODUCTS TABLE
 CREATE TABLE IF NOT EXISTS public.products (

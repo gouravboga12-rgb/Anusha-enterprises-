@@ -18,6 +18,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 export const CustomerProfile = ({
   customerId,
   dataService,
+  currentUser,
   onBack,
   onOpenNewSale,
   onOpenPayment,
@@ -43,25 +44,37 @@ export const CustomerProfile = ({
   const sales = dataService.getSales().filter((s) => s.customer_id === customerId);
   const payments = dataService.getPayments().filter((p) => p.customer_id === customerId && p.type === 'customer_payment');
 
-  const handleDeleteCustomer = () => {
+  const handleDeleteCustomer = async () => {
     const warning = ledgerData.pendingBalance > 0
       ? `\n\nWarning: This customer still has a pending balance of ₹${ledgerData.pendingBalance.toLocaleString()}!`
       : '';
     if (window.confirm(`Are you sure you want to delete customer "${customer.name}"?${warning}\n\nThis will remove their profile and all transactions.`)) {
-      dataService.deleteCustomer(customerId);
-      onBack();
+      try {
+        await dataService.deleteCustomer(customerId, currentUser);
+        onBack();
+      } catch (err) {
+        alert(err.message || 'Failed to delete customer');
+      }
     }
   };
 
-  const handleDeleteSale = (sale) => {
+  const handleDeleteSale = async (sale) => {
     if (window.confirm(`Delete Sale Bill ${sale.invoice_no} (${formatCurrency(sale.total_amount)})?\n\nThis will automatically return the sold items back to your product inventory and remove the bill from the customer ledger.`)) {
-      dataService.deleteSale(sale.id);
+      try {
+        await dataService.deleteSale(sale.id, currentUser);
+      } catch (err) {
+        alert(err.message || 'Failed to delete sale bill');
+      }
     }
   };
 
-  const handleDeletePayment = (payment) => {
+  const handleDeletePayment = async (payment) => {
     if (window.confirm(`Delete Payment Receipt ${payment.receipt_no} (${formatCurrency(payment.amount)})?\n\nThis will recalculate the customer's pending balance.`)) {
-      dataService.deletePayment(payment.id);
+      try {
+        await dataService.deletePayment(payment.id, currentUser);
+      } catch (err) {
+        alert(err.message || 'Failed to delete payment receipt');
+      }
     }
   };
 

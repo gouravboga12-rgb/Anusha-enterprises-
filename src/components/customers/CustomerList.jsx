@@ -5,6 +5,7 @@ import { formatCurrency } from '../../utils/formatters';
 export const CustomerList = ({
   customers,
   dataService,
+  currentUser,
   onSelectCustomer,
   onEditCustomer,
   onAddCustomer,
@@ -14,13 +15,17 @@ export const CustomerList = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPendingOnly, setFilterPendingOnly] = useState(false);
 
-  const handleDeleteCustomer = (cust) => {
+  const handleDeleteCustomer = async (cust) => {
     const ledger = dataService.getCustomerLedger(cust.id);
     const warning = ledger.pendingBalance > 0
       ? `\n\nWarning: This customer still owes ₹${ledger.pendingBalance.toLocaleString()}!`
       : '';
-    if (window.confirm(`Delete customer account "${cust.name}"?${warning}\n\nThis will remove their account and ledger history.`)) {
-      dataService.deleteCustomer(cust.id);
+    if (window.confirm(`Delete customer account "${cust.name}"?${warning}\n\nThis will permanently remove their account and all ledger history.`)) {
+      try {
+        await dataService.deleteCustomer(cust.id, currentUser);
+      } catch (err) {
+        alert(err.message || 'Failed to delete customer');
+      }
     }
   };
 
@@ -201,14 +206,16 @@ export const CustomerList = ({
                           >
                             <Edit size={13} />
                           </button>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            style={{ padding: '4px 7px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                            onClick={() => handleDeleteCustomer(cust)}
-                            title="Delete Customer Account"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                            <button
+                              className="btn btn-danger btn-sm"
+                              style={{ padding: '4px 7px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                              onClick={() => handleDeleteCustomer(cust)}
+                              title="Delete Customer Account"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -324,13 +331,16 @@ export const CustomerList = ({
                   >
                     <Edit size={14} />
                   </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                    onClick={() => handleDeleteCustomer(cust)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                    <button
+                      className="btn btn-danger btn-sm"
+                      style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                      onClick={() => handleDeleteCustomer(cust)}
+                      title="Delete Customer Account"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -5,6 +5,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 export const SupplierProfile = ({
   supplierId,
   dataService,
+  currentUser,
   onBack,
   onOpenNewPurchase,
   onOpenPayment,
@@ -32,25 +33,37 @@ export const SupplierProfile = ({
   const pendingPurchases = purchases.filter((p) => p.pending_amount > 0);
   const firstPurchaseId = pendingPurchases.length > 0 ? pendingPurchases[0].id : '';
 
-  const handleDeleteSupplier = () => {
+  const handleDeleteSupplier = async () => {
     const warning = ledgerData.pendingBalance > 0
       ? `\n\nWarning: We still owe ₹${ledgerData.pendingBalance.toLocaleString()} to this supplier!`
       : '';
-    if (window.confirm(`Delete supplier account "${supplier.company_name}"?${warning}\n\nThis will remove their profile and purchase records.`)) {
-      dataService.deleteSupplier(supplierId);
-      onBack();
+    if (window.confirm(`Delete supplier account "${supplier.company_name}"?${warning}\n\nThis will permanently remove their profile and purchase records.`)) {
+      try {
+        await dataService.deleteSupplier(supplierId, currentUser);
+        onBack();
+      } catch (err) {
+        alert(err.message || 'Failed to delete supplier');
+      }
     }
   };
 
-  const handleDeletePurchase = (pur) => {
+  const handleDeletePurchase = async (pur) => {
     if (window.confirm(`Delete Inward Purchase ${pur.purchase_no} (${formatCurrency(pur.total_amount)})?\n\nThis will automatically remove the inward items from your product inventory and clear the payable on the supplier ledger.`)) {
-      dataService.deletePurchase(pur.id);
+      try {
+        await dataService.deletePurchase(pur.id, currentUser);
+      } catch (err) {
+        alert(err.message || 'Failed to delete purchase');
+      }
     }
   };
 
-  const handleDeletePayment = (payment) => {
+  const handleDeletePayment = async (payment) => {
     if (window.confirm(`Delete Payment Voucher ${payment.receipt_no} (${formatCurrency(payment.amount)})?\n\nThis will recalculate the supplier's balance.`)) {
-      dataService.deletePayment(payment.id);
+      try {
+        await dataService.deletePayment(payment.id, currentUser);
+      } catch (err) {
+        alert(err.message || 'Failed to delete payment');
+      }
     }
   };
 
@@ -74,14 +87,16 @@ export const SupplierProfile = ({
               <Edit size={14} /> Edit Supplier
             </button>
           )}
-          <button
-            className="btn btn-danger btn-sm"
-            style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-            onClick={handleDeleteSupplier}
-            title="Delete this supplier account"
-          >
-            <Trash2 size={14} /> Delete Supplier
-          </button>
+          {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+            <button
+              className="btn btn-danger btn-sm"
+              style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+              onClick={handleDeleteSupplier}
+              title="Delete this supplier account"
+            >
+              <Trash2 size={14} /> Delete Supplier
+            </button>
+          )}
         </div>
       </div>
 
@@ -424,14 +439,16 @@ export const SupplierProfile = ({
                             >
                               <Edit size={13} />
                             </button>
-                            <button
-                              className="btn btn-danger btn-sm"
-                              style={{ padding: '3px 7px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                              onClick={() => handleDeletePurchase(pur)}
-                              title="Delete Purchase (Deducts items from stock)"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                              <button
+                                className="btn btn-danger btn-sm"
+                                style={{ padding: '3px 7px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                                onClick={() => handleDeletePurchase(pur)}
+                                title="Delete Purchase (Deducts items from stock)"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -519,14 +536,16 @@ export const SupplierProfile = ({
                     >
                       <Edit size={13} />
                     </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                      onClick={() => handleDeletePurchase(pur)}
-                      title="Delete Purchase"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                      <button
+                        className="btn btn-danger btn-sm"
+                        style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                        onClick={() => handleDeletePurchase(pur)}
+                        title="Delete Purchase"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -578,14 +597,16 @@ export const SupplierProfile = ({
                         <td style={{ fontSize: '12px' }}>{p.notes || '—'}</td>
                         <td style={{ fontSize: '12px', color: '#64748b' }}>{p.recorded_by}</td>
                         <td style={{ textAlign: 'center' }}>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            style={{ padding: '3px 8px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                            onClick={() => handleDeletePayment(p)}
-                            title="Delete Payment Voucher"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                            <button
+                              className="btn btn-danger btn-sm"
+                              style={{ padding: '3px 8px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                              onClick={() => handleDeletePayment(p)}
+                              title="Delete Payment Voucher"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -634,13 +655,15 @@ export const SupplierProfile = ({
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid #f1f5f9', fontSize: '11px', color: '#64748b' }}>
                     <span>By: {p.recorded_by}</span>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      style={{ padding: '3px 8px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                      onClick={() => handleDeletePayment(p)}
-                    >
-                      <Trash2 size={12} /> Delete
-                    </button>
+                    {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                      <button
+                        className="btn btn-danger btn-sm"
+                        style={{ padding: '3px 8px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                        onClick={() => handleDeletePayment(p)}
+                      >
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

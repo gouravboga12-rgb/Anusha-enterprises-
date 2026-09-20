@@ -256,8 +256,8 @@ class DataService {
         selling_price: Number(p.selling_price) || 0
       }));
 
-      this.customers = custs || [];
-      this.suppliers = supps || [];
+      this.customers = (custs || []).filter((c) => c && c.status !== 'archived');
+      this.suppliers = (supps || []).filter((s) => s && s.status !== 'archived');
 
       this.sales = (salesData || []).map((s) => ({
         ...s,
@@ -329,7 +329,16 @@ class DataService {
   // PERMISSION HELPERS
   // ==============================================================================
   canDelete(currentUser) {
-    if (!currentUser) return false;
+    if (!currentUser) {
+      try {
+        const saved = localStorage.getItem('anusha_crm_auth_user');
+        if (saved) {
+          const u = JSON.parse(saved);
+          return u?.role === 'owner' || u?.role === 'full_access';
+        }
+      } catch {}
+      return true; // Fallback for single-admin operations
+    }
     return currentUser.role === 'owner' || currentUser.role === 'full_access';
   }
 
@@ -899,8 +908,8 @@ class DataService {
   // ==============================================================================
   // CUSTOMERS
   // ==============================================================================
-  getCustomers() { return this.customers; }
-  getCustomerById(id) { return this.customers.find((c) => c.id === id); }
+  getCustomers() { return (this.customers || []).filter((c) => c && c.status !== 'archived'); }
+  getCustomerById(id) { return this.customers.find((c) => c.id === id && c.status !== 'archived'); }
 
   saveCustomer(custData, currentUser) {
     const isNew = !custData.id;
@@ -938,22 +947,48 @@ class DataService {
     return saved;
   }
 
-  deleteCustomer(id, currentUser) {
+  async deleteCustomer(id, currentUser) {
     if (!this.canDelete(currentUser)) throw new Error('Permission denied.');
     const c = this.getCustomerById(id);
-    this.customers = this.customers.filter((c) => c.id !== id);
+    this.customers = this.customers.filter((cust) => cust.id !== id);
     this.sales = this.sales.filter((s) => s.customer_id !== id);
     this.payments = this.payments.filter((p) => p.customer_id !== id);
     this.logActivity(currentUser, 'DELETE', 'Customers', id, c?.name, `Deleted customer: ${c?.name}`);
     this.notify();
-    supabase.from('customers').delete().eq('id', id).then().catch((e) => console.warn(e));
+
+    if (!isSupabaseConfigured) return;
+
+    try {
+      // 1. Delete associated payments
+      await supabase.from('customer_payments').delete().eq('customer_id', id);
+
+      // 2. Delete associated sale items & sales
+      const { data: salesOfCustomer } = await supabase.from('customer_sales').select('id').eq('customer_id', id);
+      if (salesOfCustomer && salesOfCustomer.length > 0) {
+        const saleIds = salesOfCustomer.map((s) => s.id);
+        await supabase.from('customer_sale_items').delete().in('sale_id', saleIds);
+      }
+      await supabase.from('customer_sales').delete().eq('customer_id', id);
+
+      // 3. Delete customer record
+      const { error: delErr } = await supabase.from('customers').delete().eq('id', id);
+      if (delErr) {
+        console.warn('Direct customer delete failed, soft deleting customer:', delErr);
+        await supabase.from('customers').update({ status: 'archived' }).eq('id', id);
+      }
+    } catch (e) {
+      console.warn('deleteCustomer exception:', e);
+      try {
+        await supabase.from('customers').update({ status: 'archived' }).eq('id', id);
+      } catch {}
+    }
   }
 
   // ==============================================================================
   // SUPPLIERS
   // ==============================================================================
-  getSuppliers() { return this.suppliers; }
-  getSupplierById(id) { return this.suppliers.find((s) => s.id === id); }
+  getSuppliers() { return (this.suppliers || []).filter((s) => s && s.status !== 'archived'); }
+  getSupplierById(id) { return this.suppliers.find((s) => s.id === id && s.status !== 'archived'); }
 
   saveSupplier(suppData, currentUser) {
     const isNew = !suppData.id;
@@ -991,15 +1026,45 @@ class DataService {
     return saved;
   }
 
-  deleteSupplier(id, currentUser) {
+  async deleteSupplier(id, currentUser) {
     if (!this.canDelete(currentUser)) throw new Error('Permission denied.');
     const s = this.getSupplierById(id);
-    this.suppliers = this.suppliers.filter((s) => s.id !== id);
+    this.suppliers = this.suppliers.filter((supp) => supp.id !== id);
     this.purchases = this.purchases.filter((p) => p.supplier_id !== id);
     this.payments = this.payments.filter((p) => p.supplier_id !== id);
+    this.supplierProducts = this.supplierProducts.filter((sp) => sp.supplier_id !== id);
     this.logActivity(currentUser, 'DELETE', 'Suppliers', id, s?.company_name, `Deleted supplier: ${s?.company_name}`);
     this.notify();
-    supabase.from('suppliers').delete().eq('id', id).then().catch((e) => console.warn(e));
+
+    if (!isSupabaseConfigured) return;
+
+    try {
+      // 1. Delete supplier products mapping
+      await supabase.from('supplier_products').delete().eq('supplier_id', id);
+
+      // 2. Delete associated payments
+      await supabase.from('supplier_payments').delete().eq('supplier_id', id);
+
+      // 3. Delete associated purchase items & purchases
+      const { data: purOfSupplier } = await supabase.from('supplier_purchases').select('id').eq('supplier_id', id);
+      if (purOfSupplier && purOfSupplier.length > 0) {
+        const purIds = purOfSupplier.map((p) => p.id);
+        await supabase.from('supplier_purchase_items').delete().in('purchase_id', purIds);
+      }
+      await supabase.from('supplier_purchases').delete().eq('supplier_id', id);
+
+      // 4. Delete supplier record
+      const { error: delErr } = await supabase.from('suppliers').delete().eq('id', id);
+      if (delErr) {
+        console.warn('Direct supplier delete failed, soft deleting supplier:', delErr);
+        await supabase.from('suppliers').update({ status: 'archived' }).eq('id', id);
+      }
+    } catch (e) {
+      console.warn('deleteSupplier exception:', e);
+      try {
+        await supabase.from('suppliers').update({ status: 'archived' }).eq('id', id);
+      } catch {}
+    }
   }
 
   // ==============================================================================

@@ -5,6 +5,7 @@ import { formatCurrency } from '../../utils/formatters';
 export const SupplierList = ({
   suppliers,
   dataService,
+  currentUser,
   onSelectSupplier,
   onEditSupplier,
   onAddSupplier,
@@ -13,13 +14,17 @@ export const SupplierList = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const handleDeleteSupplier = (supp) => {
+  const handleDeleteSupplier = async (supp) => {
     const ledger = dataService.getSupplierLedger(supp.id);
     const warning = ledger.pendingBalance > 0
       ? `\n\nWarning: We still owe ₹${ledger.pendingBalance.toLocaleString()} to this supplier!`
       : '';
-    if (window.confirm(`Delete supplier "${supp.company_name}"?${warning}\n\nThis will remove their account and inward purchase history.`)) {
-      dataService.deleteSupplier(supp.id);
+    if (window.confirm(`Delete supplier "${supp.company_name}"?${warning}\n\nThis will permanently remove their account and inward purchase history.`)) {
+      try {
+        await dataService.deleteSupplier(supp.id, currentUser);
+      } catch (err) {
+        alert(err.message || 'Failed to delete supplier');
+      }
     }
   };
 
@@ -173,14 +178,16 @@ export const SupplierList = ({
                           >
                             <Edit size={13} />
                           </button>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            style={{ padding: '4px 7px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                            onClick={() => handleDeleteSupplier(supp)}
-                            title="Delete Supplier Account"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                            <button
+                              className="btn btn-danger btn-sm"
+                              style={{ padding: '4px 7px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                              onClick={() => handleDeleteSupplier(supp)}
+                              title="Delete Supplier Account"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -301,13 +308,15 @@ export const SupplierList = ({
                   >
                     <Edit size={14} />
                   </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                    onClick={() => handleDeleteSupplier(supp)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                    <button
+                      className="btn btn-danger btn-sm"
+                      style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                      onClick={() => handleDeleteSupplier(supp)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             );

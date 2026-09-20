@@ -267,6 +267,7 @@ export const App = () => {
               <CustomerProfile
                 customerId={selectedCustomerId}
                 dataService={dataService}
+                currentUser={currentUser}
                 onBack={() => setSelectedCustomerId(null)}
                 onOpenNewSale={(cId) => openNewSale(cId)}
                 onOpenPayment={(cId, type, docId) => openPayment(cId, type, docId)}
@@ -281,6 +282,7 @@ export const App = () => {
               <CustomerList
                 customers={dataService.getCustomers()}
                 dataService={dataService}
+                currentUser={currentUser}
                 onSelectCustomer={(id) => setSelectedCustomerId(id)}
                 onEditCustomer={(c) => {
                   setEditingCustomer(c);
@@ -301,6 +303,7 @@ export const App = () => {
               <SupplierProfile
                 supplierId={selectedSupplierId}
                 dataService={dataService}
+                currentUser={currentUser}
                 onBack={() => setSelectedSupplierId(null)}
                 onOpenNewPurchase={(sId) => openNewPurchase(sId)}
                 onOpenPayment={(sId, type, docId) => openPayment(sId, type, docId)}
@@ -315,6 +318,7 @@ export const App = () => {
               <SupplierList
                 suppliers={dataService.getSuppliers()}
                 dataService={dataService}
+                currentUser={currentUser}
                 onSelectSupplier={(id) => setSelectedSupplierId(id)}
                 onEditSupplier={(s) => {
                   setEditingSupplier(s);
