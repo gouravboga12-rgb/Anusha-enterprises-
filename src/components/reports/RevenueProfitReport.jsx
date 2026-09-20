@@ -1,22 +1,56 @@
-import React from 'react';
-import { TrendingUp, DollarSign, Package, Users, Truck, Printer, PieChart } from 'lucide-react';
-import { formatCurrency } from '../../utils/formatters';
+import React, { useState } from 'react';
+import { TrendingUp, DollarSign, Package, Users, Truck, Printer, PieChart, Download } from 'lucide-react';
+import { formatCurrency, getTodayDateString } from '../../utils/formatters';
+import { exportElementToPdf } from '../../utils/pdfExport';
 
 export const RevenueProfitReport = ({ dataService }) => {
+  const [isSavingPdf, setIsSavingPdf] = useState(false);
   const report = dataService.getProfitReport();
 
+  const handleSavePdf = async () => {
+    setIsSavingPdf(true);
+    try {
+      await exportElementToPdf({
+        element: document.getElementById('profit-report-document'),
+        filename: `Profit_Loss_Report_${getTodayDateString()}.pdf`,
+        title: `Profit & Loss Report - Anusha Enterprises`
+      });
+    } finally {
+      setIsSavingPdf(false);
+    }
+  };
+
   return (
-    <div>
-      <div className="card-header" style={{ marginBottom: '16px' }}>
+    <div id="profit-report-document">
+      <div className="card-header no-print" style={{ marginBottom: '16px' }}>
         <div>
           <h1 style={{ fontSize: '20px' }}>Revenue & Gross Profit Intelligence</h1>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
             Accurate profit tracking where <strong>Gross Profit = Selling Amount - Purchase Cost</strong>.
           </p>
         </div>
-        <button className="btn btn-secondary" onClick={() => window.print()}>
-          <Printer size={15} /> Print P&L Report
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleSavePdf}
+            disabled={isSavingPdf}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#f0fdf4',
+              color: '#16a34a',
+              border: '1px solid #bbf7d0',
+              cursor: isSavingPdf ? 'wait' : 'pointer'
+            }}
+            title="Download P&L Report as PDF"
+          >
+            <Download size={15} /> {isSavingPdf ? 'Generating PDF...' : 'Save PDF'}
+          </button>
+          <button className="btn btn-secondary" onClick={() => window.print()}>
+            <Printer size={15} /> Print P&L Report
+          </button>
+        </div>
       </div>
 
       {/* Primary Financial Metric Summary */}

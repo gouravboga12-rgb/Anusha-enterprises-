@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer, Download } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer, Download, Calendar } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 import { exportElementToPdf } from '../../utils/pdfExport';
 
@@ -16,6 +16,8 @@ export const SupplierProfile = ({
 }) => {
   const [activeTab, setActiveTab] = useState('ledger');
   const [isSavingPdf, setIsSavingPdf] = useState(false);
+  const [ledgerStartDate, setLedgerStartDate] = useState('');
+  const [ledgerEndDate, setLedgerEndDate] = useState('');
 
   const supplier = dataService.getSupplierById(supplierId);
   if (!supplier) {
@@ -35,6 +37,15 @@ export const SupplierProfile = ({
   const pendingPurchases = purchases.filter((p) => p.pending_amount > 0);
   const firstPurchaseId = pendingPurchases.length > 0 ? pendingPurchases[0].id : '';
 
+  const filteredLedgerEntries = useMemo(() => {
+    if (!ledgerData?.entries) return [];
+    return ledgerData.entries.filter((entry) => {
+      if (ledgerStartDate && entry.date < ledgerStartDate) return false;
+      if (ledgerEndDate && entry.date > ledgerEndDate) return false;
+      return true;
+    });
+  }, [ledgerData?.entries, ledgerStartDate, ledgerEndDate]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -43,9 +54,12 @@ export const SupplierProfile = ({
     setIsSavingPdf(true);
     const element = document.getElementById('supplier-profile-ledger-document');
     const cleanName = (supplier.company_name || 'Supplier').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dateSuffix = (ledgerStartDate || ledgerEndDate)
+      ? `_${ledgerStartDate || 'Start'}_to_${ledgerEndDate || 'Latest'}`
+      : '_All_Records';
     await exportElementToPdf({
       element,
-      filename: `${cleanName}_Ledger_${supplier.supplier_id || 'Statement'}.pdf`,
+      filename: `${cleanName}_Ledger_${supplier.supplier_id || 'Statement'}${dateSuffix}.pdf`,
       title: `${supplier.company_name} - Supplier Ledger`
     });
     setIsSavingPdf(false);
@@ -305,6 +319,12 @@ export const SupplierProfile = ({
                   {supplier.mobile && <div><strong>Phone:</strong> {supplier.mobile}</div>}
                   {supplier.area && <div><strong>Location:</strong> {supplier.area}</div>}
                   <div><strong>Statement Date:</strong> {formatDate(getTodayDateString())}</div>
+                  <div>
+                    <strong>Period:</strong>{' '}
+                    {ledgerStartDate || ledgerEndDate
+                      ? `${ledgerStartDate ? formatDate(ledgerStartDate) : 'Start'} to ${ledgerEndDate ? formatDate(ledgerEndDate) : 'Latest'}`
+                      : 'All Transactions (Complete Statement)'}
+                  </div>
                 </div>
               </div>
 
@@ -393,6 +413,91 @@ export const SupplierProfile = ({
               </div>
             </div>
 
+            {/* Date-wise Filter Strip (Highlighted directly above ledger table) */}
+            <div className="no-print" style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '10px',
+              background: '#f8fafc',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              marginBottom: '14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Calendar size={14} color="#0284c7" /> Date Filter:
+                </span>
+                <input
+                  type="date"
+                  className="form-input"
+                  style={{ width: 'auto', fontSize: '12px', padding: '4px 8px' }}
+                  value={ledgerStartDate}
+                  onChange={(e) => setLedgerStartDate(e.target.value)}
+                  title="From Date"
+                />
+                <span style={{ fontSize: '12px', color: '#64748b' }}>to</span>
+                <input
+                  type="date"
+                  className="form-input"
+                  style={{ width: 'auto', fontSize: '12px', padding: '4px 8px' }}
+                  value={ledgerEndDate}
+                  onChange={(e) => setLedgerEndDate(e.target.value)}
+                  title="To Date"
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '11px', padding: '3px 8px' }}
+                  onClick={() => {
+                    const d = new Date();
+                    const firstDay = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+                    setLedgerStartDate(firstDay);
+                    setLedgerEndDate(getTodayDateString());
+                  }}
+                >
+                  This Month
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '11px', padding: '3px 8px' }}
+                  onClick={() => {
+                    setLedgerStartDate(getTodayDateString());
+                    setLedgerEndDate(getTodayDateString());
+                  }}
+                >
+                  Today
+                </button>
+                {(ledgerStartDate || ledgerEndDate) && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{ fontSize: '11px', padding: '3px 8px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                    onClick={() => {
+                      setLedgerStartDate('');
+                      setLedgerEndDate('');
+                    }}
+                  >
+                    Clear (All Dates)
+                  </button>
+                )}
+              </div>
+
+              <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                Showing <strong>{filteredLedgerEntries.length}</strong> of {ledgerData.entries.length} records
+                {ledgerStartDate || ledgerEndDate ? (
+                  <span style={{ color: '#0284c7', fontWeight: 600, marginLeft: '6px' }}>
+                    ({ledgerStartDate ? formatDate(ledgerStartDate) : 'Start'} to {ledgerEndDate ? formatDate(ledgerEndDate) : 'Latest'})
+                  </span>
+                ) : (
+                  <span style={{ color: '#10b981', fontWeight: 600, marginLeft: '6px' }}>(All Transactions)</span>
+                )}
+              </div>
+            </div>
+
             <div className="table-responsive" style={{ border: 'none' }}>
               <table className="data-table">
                 <thead>
@@ -407,14 +512,14 @@ export const SupplierProfile = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {ledgerData.entries.length === 0 ? (
+                  {filteredLedgerEntries.length === 0 ? (
                     <tr>
                       <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-                        No ledger entries recorded for this supplier.
+                        {ledgerData.entries.length === 0 ? 'No ledger entries recorded for this supplier.' : 'No ledger transactions match the selected date range.'}
                       </td>
                     </tr>
                   ) : (
-                    ledgerData.entries.map((entry) => (
+                    filteredLedgerEntries.map((entry) => (
                       <tr key={entry.id}>
                         <td style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>
                           <div style={{ fontWeight: 600 }}>{formatDate(entry.date)}</div>
@@ -492,12 +597,56 @@ export const SupplierProfile = ({
                 </button>
               </div>
             </div>
-            {ledgerData.entries.length === 0 ? (
+
+            {/* Mobile Date Filter Bar */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              flexWrap: 'wrap',
+              background: '#f8fafc',
+              padding: '8px 10px',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              marginBottom: '10px'
+            }}>
+              <Calendar size={13} color="#0284c7" />
+              <input
+                type="date"
+                className="form-input"
+                style={{ width: 'auto', fontSize: '11px', padding: '2px 6px' }}
+                value={ledgerStartDate}
+                onChange={(e) => setLedgerStartDate(e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: '#64748b' }}>to</span>
+              <input
+                type="date"
+                className="form-input"
+                style={{ width: 'auto', fontSize: '11px', padding: '2px 6px' }}
+                value={ledgerEndDate}
+                onChange={(e) => setLedgerEndDate(e.target.value)}
+              />
+              {(ledgerStartDate || ledgerEndDate) && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ fontSize: '10px', padding: '2px 6px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                  onClick={() => {
+                    setLedgerStartDate('');
+                    setLedgerEndDate('');
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {filteredLedgerEntries.length === 0 ? (
               <div className="card" style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-                No ledger entries recorded for this supplier.
+                {ledgerData.entries.length === 0 ? 'No ledger entries recorded for this supplier.' : 'No ledger entries found for the selected date range.'}
               </div>
             ) : (
-              ledgerData.entries.map((entry) => (
+              filteredLedgerEntries.map((entry) => (
                 <div key={entry.id} className="mobile-record-card">
                   <div className="card-top-row">
                     <div>

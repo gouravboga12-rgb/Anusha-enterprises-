@@ -4,15 +4,17 @@ import {
   CheckCircle2, TrendingUp, BookOpen, Package, Users, Warehouse, Download
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTodayDateString } from '../../utils/formatters';
+import { exportElementToPdf } from '../../utils/pdfExport';
 import { RevenueProfitReport } from '../reports/RevenueProfitReport';
 
 export const DailyTransactions = ({ dataService }) => {
-  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
+  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range' | 'all'
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState(getTodayDateString());
   const [typeFilter, setTypeFilter] = useState('all');
   const [activeSubTab, setActiveSubTab] = useState('daybook'); // 'daybook' or 'profit'
+  const [isSavingPdf, setIsSavingPdf] = useState(false);
 
   const handleSetToday = () => {
     setDateMode('single');
@@ -44,6 +46,26 @@ export const DailyTransactions = ({ dataService }) => {
     setToDate(getTodayDateString());
   };
 
+  const handleSetAll = () => {
+    setDateMode('all');
+  };
+
+  const handleSavePdf = async () => {
+    setIsSavingPdf(true);
+    try {
+      const periodStr = dateMode === 'single'
+        ? selectedDate
+        : (dateMode === 'all' ? 'All_Records' : `${fromDate || 'Start'}_to_${toDate || 'Latest'}`);
+      await exportElementToPdf({
+        element: document.getElementById('daybook-document'),
+        filename: `DayBook_Statement_${periodStr}.pdf`,
+        title: `Day Book Statement - ${periodLabel}`
+      });
+    } finally {
+      setIsSavingPdf(false);
+    }
+  };
+
   // Compile transactions based on date mode
   const { events, totalSalesAmount, totalPurchasesAmount, cashInflow, cashOutflow, netCashMovement } = useMemo(() => {
     if (!dataService?.getDayBook) {
@@ -54,9 +76,9 @@ export const DailyTransactions = ({ dataService }) => {
       return dataService.getDayBook(selectedDate);
     }
 
-    // Date range aggregation
-    const start = fromDate || '2000-01-01';
-    const end = toDate || '2099-12-31';
+    // Date range aggregation or all records
+    const start = dateMode === 'all' ? '2000-01-01' : (fromDate || '2000-01-01');
+    const end = dateMode === 'all' ? '2099-12-31' : (toDate || '2099-12-31');
 
     // Get all dates in range from sales, purchases, payments, adjustments, transfers
     const salesInRange = dataService.sales.filter((s) => s.date >= start && s.date <= end);
@@ -176,7 +198,7 @@ export const DailyTransactions = ({ dataService }) => {
 
   const periodLabel = dateMode === 'single'
     ? formatDate(selectedDate)
-    : `${formatDate(fromDate || 'Start')} to ${formatDate(toDate)}`;
+    : (dateMode === 'all' ? 'All Records (Complete Statement)' : `${formatDate(fromDate || 'Start')} to ${formatDate(toDate)}`);
 
   return (
     <div>
@@ -208,8 +230,25 @@ export const DailyTransactions = ({ dataService }) => {
               </p>
             </div>
             <div className="header-actions-group" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={handleSavePdf}
+                disabled={isSavingPdf}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#f0fdf4',
+                  color: '#16a34a',
+                  border: '1px solid #bbf7d0',
+                  cursor: isSavingPdf ? 'wait' : 'pointer'
+                }}
+                title="Download Day Book Statement as PDF File"
+              >
+                <Download size={15} /> {isSavingPdf ? 'Generating PDF...' : 'Download PDF'}
+              </button>
               <button className="btn btn-secondary" onClick={() => window.print()}>
-                <Printer size={15} /> Print / Save PDF Statement
+                <Printer size={15} /> Print Statement
               </button>
             </div>
           </div>
@@ -248,6 +287,12 @@ export const DailyTransactions = ({ dataService }) => {
                   >
                     This Month
                   </button>
+                  <button
+                    className={`btn btn-sm ${dateMode === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={handleSetAll}
+                  >
+                    All Records
+                  </button>
                 </div>
 
                 {dateMode === 'single' ? (
@@ -261,7 +306,7 @@ export const DailyTransactions = ({ dataService }) => {
                       setSelectedDate(e.target.value);
                     }}
                   />
-                ) : (
+                ) : dateMode === 'range' ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <input
                       type="date"
@@ -279,6 +324,10 @@ export const DailyTransactions = ({ dataService }) => {
                       onChange={(e) => setToDate(e.target.value)}
                     />
                   </div>
+                ) : (
+                  <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, background: '#ecfdf5', padding: '3px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                    All Records Included
+                  </span>
                 )}
               </div>
 
@@ -362,7 +411,7 @@ export const DailyTransactions = ({ dataService }) => {
           </div>
 
           {/* Printable Statement Document */}
-          <div className="card print-document" style={{ padding: '16px' }}>
+          <div id="daybook-document" className="card print-document" style={{ padding: '16px' }}>
             {/* Print Header */}
             <div className="print-header" style={{ display: 'none', borderBottom: '2px solid #0f172a', paddingBottom: '14px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
