@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Wallet, PlusCircle, ArrowUpRight, ArrowDownLeft,
   TrendingDown, TrendingUp, Calendar, Filter, Search, Tag, FileText, CheckCircle2,
-  Edit2, Trash2
+  Edit2, Trash2, X
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 
@@ -11,6 +11,8 @@ export const WalletPage = ({ dataService, currentUser }) => {
   const [editingTxn, setEditingTxn] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterDate, setFilterDate] = useState('');
+  const [quickDate, setQuickDate] = useState('all'); // 'all' | 'today' | 'yesterday' | 'month'
   const [searchTerm, setSearchTerm] = useState('');
 
   // Form states
@@ -47,6 +49,21 @@ export const WalletPage = ({ dataService, currentUser }) => {
       list = list.filter((t) => t.category === filterCategory);
     }
 
+    if (filterDate) {
+      list = list.filter((t) => t.date === filterDate);
+    } else if (quickDate === 'today') {
+      const todayStr = getTodayDateString();
+      list = list.filter((t) => t.date === todayStr);
+    } else if (quickDate === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yStr = yesterday.toISOString().slice(0, 10);
+      list = list.filter((t) => t.date === yStr);
+    } else if (quickDate === 'month') {
+      const currentMonth = getTodayDateString().slice(0, 7);
+      list = list.filter((t) => t.date && t.date.startsWith(currentMonth));
+    }
+
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter((t) =>
@@ -58,7 +75,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
     }
 
     return list;
-  }, [transactions, filterType, filterCategory, searchTerm]);
+  }, [transactions, filterType, filterCategory, filterDate, quickDate, searchTerm]);
 
   const handleOpenBudgetModal = () => {
     setEditingTxn(null);
@@ -255,7 +272,8 @@ export const WalletPage = ({ dataService, currentUser }) => {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="card" style={{ padding: '14px 18px', marginBottom: '18px' }}>
+      <div className="card" style={{ padding: '14px 18px', marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {/* Row 1: Search & Type/Category Dropdowns */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '240px' }}>
             <Search size={16} color="#64748b" />
@@ -292,6 +310,74 @@ export const WalletPage = ({ dataService, currentUser }) => {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* Row 2: Date-wise Filter Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>Timeframe:</span>
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'today', label: 'Today' },
+              { id: 'yesterday', label: 'Yesterday' },
+              { id: 'month', label: 'This Month' }
+            ].map((d) => {
+              const active = !filterDate && quickDate === d.id;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => {
+                    setFilterDate('');
+                    setQuickDate(d.id);
+                  }}
+                  style={{
+                    padding: '3px 10px',
+                    fontSize: '11px',
+                    fontWeight: active ? 700 : 500,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: active ? '#0f172a' : '#f1f5f9',
+                    color: active ? '#ffffff' : '#64748b',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {d.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Specific Date Input */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '4px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+            <Calendar size={13} color="#64748b" />
+            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Filter by Date:</span>
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => {
+                setFilterDate(e.target.value);
+                if (e.target.value) setQuickDate('all');
+              }}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                fontSize: '11px',
+                color: '#0f172a',
+                fontWeight: 700,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            />
+            {filterDate && (
+              <button
+                onClick={() => setFilterDate('')}
+                title="Clear date filter"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '0 2px', display: 'flex' }}
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
       </div>

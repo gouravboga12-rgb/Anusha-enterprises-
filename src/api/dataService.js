@@ -398,6 +398,58 @@ class DataService {
     return logs;
   }
 
+  async clearAllActivityLogs(currentUser) {
+    if (!this.canDelete(currentUser)) {
+      throw new Error('Permission denied: Only administrators can clear activity logs.');
+    }
+
+    this.activityLog = [];
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('activity_log')
+          .delete()
+          .neq('id', 'placeholder-non-existent-id');
+        if (error) console.warn('Supabase clear all activity log error:', error);
+      } catch (e) {
+        console.warn('clearAllActivityLogs error:', e);
+      }
+    }
+    return true;
+  }
+
+  async clearActivityLogsByDate(targetDate, currentUser) {
+    if (!this.canDelete(currentUser)) {
+      throw new Error('Permission denied: Only administrators can clear activity logs.');
+    }
+    if (!targetDate) throw new Error('Target date is required.');
+
+    // Filter out target date logs from in-memory array
+    this.activityLog = this.activityLog.filter((l) => {
+      const d = l.created_at ? l.created_at.slice(0, 10) : '';
+      return d !== targetDate;
+    });
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      try {
+        const startOfDay = `${targetDate}T00:00:00.000Z`;
+        const endOfDay = `${targetDate}T23:59:59.999Z`;
+        const { error } = await supabase
+          .from('activity_log')
+          .delete()
+          .gte('created_at', startOfDay)
+          .lte('created_at', endOfDay);
+        if (error) console.warn('Supabase clear activity log by date error:', error);
+      } catch (e) {
+        console.warn('clearActivityLogsByDate error:', e);
+      }
+    }
+    return true;
+  }
+
   // ==============================================================================
   // GODOWN & STOCK ACTIVITIES
   // ==============================================================================
