@@ -7,15 +7,14 @@ import {
 import { formatCurrency, formatDate, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 
 export const WalletPage = ({ dataService, currentUser }) => {
-  const [activeModal, setActiveModal] = useState(null); // 'budget' | 'expense' | null
+  const [activeModal, setActiveModal] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterDate, setFilterDate] = useState('');
-  const [quickDate, setQuickDate] = useState('all'); // 'all' | 'today' | 'yesterday' | 'month'
+  const [quickDate, setQuickDate] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Form states
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Diesel');
   const [reason, setReason] = useState('');
@@ -40,15 +39,8 @@ export const WalletPage = ({ dataService, currentUser }) => {
 
   const filteredTransactions = useMemo(() => {
     let list = transactions;
-
-    if (filterType !== 'all') {
-      list = list.filter((t) => t.type === filterType);
-    }
-
-    if (filterCategory !== 'all') {
-      list = list.filter((t) => t.category === filterCategory);
-    }
-
+    if (filterType !== 'all') list = list.filter((t) => t.type === filterType);
+    if (filterCategory !== 'all') list = list.filter((t) => t.category === filterCategory);
     if (filterDate) {
       list = list.filter((t) => t.date === filterDate);
     } else if (quickDate === 'today') {
@@ -57,13 +49,11 @@ export const WalletPage = ({ dataService, currentUser }) => {
     } else if (quickDate === 'yesterday') {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yStr = yesterday.toISOString().slice(0, 10);
-      list = list.filter((t) => t.date === yStr);
+      list = list.filter((t) => t.date === yesterday.toISOString().slice(0, 10));
     } else if (quickDate === 'month') {
       const currentMonth = getTodayDateString().slice(0, 7);
       list = list.filter((t) => t.date && t.date.startsWith(currentMonth));
     }
-
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter((t) =>
@@ -73,43 +63,26 @@ export const WalletPage = ({ dataService, currentUser }) => {
         (t.notes && t.notes.toLowerCase().includes(q))
       );
     }
-
     return list;
   }, [transactions, filterType, filterCategory, filterDate, quickDate, searchTerm]);
 
   const handleOpenBudgetModal = () => {
-    setEditingTxn(null);
-    setAmount('');
-    setReason('');
-    setDate(getTodayDateString());
-    setTime(getCurrentTimeString());
-    setNotes('');
-    setError('');
-    setActiveModal('budget');
+    setEditingTxn(null); setAmount(''); setReason('');
+    setDate(getTodayDateString()); setTime(getCurrentTimeString());
+    setNotes(''); setError(''); setActiveModal('budget');
   };
 
   const handleOpenExpenseModal = () => {
-    setEditingTxn(null);
-    setAmount('');
-    setCategory('Diesel');
-    setReason('');
-    setDate(getTodayDateString());
-    setTime(getCurrentTimeString());
-    setNotes('');
-    setError('');
-    setActiveModal('expense');
+    setEditingTxn(null); setAmount(''); setCategory('Diesel'); setReason('');
+    setDate(getTodayDateString()); setTime(getCurrentTimeString());
+    setNotes(''); setError(''); setActiveModal('expense');
   };
 
   const handleOpenEdit = (txn) => {
-    setEditingTxn(txn);
-    setAmount(String(txn.amount));
-    setCategory(txn.category || 'Diesel');
-    setReason(txn.reason || '');
-    setDate(txn.date || getTodayDateString());
-    setTime(txn.time || getCurrentTimeString());
-    setNotes(txn.notes || '');
-    setError('');
-    setActiveModal(txn.type);
+    setEditingTxn(txn); setAmount(String(txn.amount));
+    setCategory(txn.category || 'Diesel'); setReason(txn.reason || '');
+    setDate(txn.date || getTodayDateString()); setTime(txn.time || getCurrentTimeString());
+    setNotes(txn.notes || ''); setError(''); setActiveModal(txn.type);
   };
 
   const handleDelete = (txn) => {
@@ -117,499 +90,296 @@ export const WalletPage = ({ dataService, currentUser }) => {
       alert('Permission denied: You do not have authority to delete transactions.');
       return;
     }
-
-    if (window.confirm(`Are you sure you want to delete this wallet transaction?\n\nVoucher: ${txn.txn_no}\nReason: ${txn.reason}\nAmount: ₹${txn.amount}\n\nThis will immediately adjust your Available Wallet Balance.`)) {
-      try {
-        dataService.deleteWalletTransaction(txn.id, currentUser);
-      } catch (err) {
-        alert(err.message || 'Failed to delete wallet transaction');
-      }
+    if (window.confirm(`Delete wallet transaction?\n\nVoucher: ${txn.txn_no}\nReason: ${txn.reason}\nAmount: ₹${txn.amount}`)) {
+      try { dataService.deleteWalletTransaction(txn.id, currentUser); }
+      catch (err) { alert(err.message || 'Failed to delete wallet transaction'); }
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-
     const numAmount = Number(amount);
-    if (!numAmount || numAmount <= 0) {
-      setError('Please enter a valid amount greater than 0');
-      return;
-    }
-
-    if (!reason.trim()) {
-      setError('Please provide a reason / description');
-      return;
-    }
-
+    if (!numAmount || numAmount <= 0) { setError('Please enter a valid amount greater than 0'); return; }
+    if (!reason.trim()) { setError('Please provide a reason / description'); return; }
     try {
       if (editingTxn) {
-        dataService.updateWalletTransaction(
-          editingTxn.id,
-          {
-            amount: numAmount,
-            category: activeModal === 'expense' ? category : 'Fund',
-            reason: reason.trim(),
-            date,
-            time,
-            notes: notes.trim()
-          },
+        dataService.updateWalletTransaction(editingTxn.id,
+          { amount: numAmount, category: activeModal === 'expense' ? category : 'Fund', reason: reason.trim(), date, time, notes: notes.trim() },
           currentUser
         );
-        setEditingTxn(null);
-        setActiveModal(null);
-        return;
+        setEditingTxn(null); setActiveModal(null); return;
       }
-
       if (activeModal === 'budget') {
-        dataService.addWalletBudget(
-          { amount: numAmount, reason: reason.trim(), date, time, notes: notes.trim() },
-          currentUser
-        );
+        dataService.addWalletBudget({ amount: numAmount, reason: reason.trim(), date, time, notes: notes.trim() }, currentUser);
       } else {
-        // Check if balance is sufficient
         if (numAmount > summary.balance) {
-          if (!window.confirm(`Warning: Expense (₹${numAmount}) exceeds current wallet balance (₹${summary.balance}). Proceed anyway?`)) {
-            return;
-          }
+          if (!window.confirm(`Warning: Expense (₹${numAmount}) exceeds wallet balance (₹${summary.balance}). Proceed anyway?`)) return;
         }
-        dataService.recordWalletExpense(
-          { amount: numAmount, category, reason: reason.trim(), date, time, notes: notes.trim() },
-          currentUser
-        );
+        dataService.recordWalletExpense({ amount: numAmount, category, reason: reason.trim(), date, time, notes: notes.trim() }, currentUser);
       }
-
       setActiveModal(null);
-    } catch (err) {
-      setError(err.message || 'Failed to save wallet transaction');
-    }
+    } catch (err) { setError(err.message || 'Failed to save wallet transaction'); }
   };
 
   const expenseCategories = [
-    'Diesel / Fuel',
-    'Vehicle Maintenance',
-    'Office Expenses',
-    'Labour / Loading',
-    'Travel / Transport',
-    'Refreshment / Meals',
-    'Godown Maintenance',
-    'Utilities / Electricity',
-    'Other Expenses'
+    'Diesel / Fuel', 'Vehicle Maintenance', 'Office Expenses', 'Labour / Loading',
+    'Travel / Transport', 'Refreshment / Meals', 'Godown Maintenance',
+    'Utilities / Electricity', 'Other Expenses'
   ];
 
   return (
     <div>
       {/* Page Header */}
-      <div className="card-header" style={{ marginBottom: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Wallet size={22} color="#0284c7" /> Petty Cash & Operations Wallet
-          </h1>
-          <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-            Track daily operating cash, fuel expenses, vehicle maintenance, and miscellaneous business spending.
-          </p>
-        </div>
-
-        <div className="header-actions-group" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={handleOpenBudgetModal}>
-            <ArrowDownLeft size={15} color="#16a34a" /> Add Funds / Budget
-          </button>
-          <button className="btn btn-primary" onClick={handleOpenExpenseModal}>
-            <ArrowUpRight size={15} /> Record Expense
-          </button>
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ fontSize: '18px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <Wallet size={20} color="#0284c7" /> Petty Cash &amp; Wallet
+            </h1>
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', margin: '3px 0 0' }}>
+              Track daily operating cash, fuel, vehicle maintenance &amp; misc. expenses.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={handleOpenBudgetModal} style={{ fontSize: '12px' }}>
+              <ArrowDownLeft size={14} color="#16a34a" /> Add Funds
+            </button>
+            <button className="btn btn-primary" onClick={handleOpenExpenseModal} style={{ fontSize: '12px' }}>
+              <ArrowUpRight size={14} /> Record Expense
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Summary Stat Cards */}
-      <div className="stats-grid" style={{ marginBottom: '18px' }}>
-        {/* Balance Card */}
-        <div className="stat-card">
-          <div className="stat-top">
-            <span className="stat-label">Available Wallet Balance</span>
-            <div className="stat-icon-wrap" style={{ backgroundColor: 'rgba(2, 132, 199, 0.1)', color: '#0284c7' }}>
-              <Wallet size={18} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+        {[
+          { label: 'Available Balance', value: formatCurrency(summary.balance), color: summary.balance >= 0 ? '#0284c7' : '#ef4444', bg: '#eff6ff', icon: <Wallet size={16} color="#0284c7" /> },
+          { label: 'Total Funds Added', value: formatCurrency(summary.totalBudget), color: '#10b981', bg: '#f0fdf4', icon: <TrendingUp size={16} color="#10b981" /> },
+          { label: 'Total Expenses', value: formatCurrency(summary.totalExpenses ?? summary.totalExpense ?? 0), color: '#ef4444', bg: '#fef2f2', icon: <TrendingDown size={16} color="#ef4444" /> },
+        ].map((s) => (
+          <div key={s.label} className="card" style={{ padding: '14px', background: s.bg }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>{s.label}</span>
+              {s.icon}
             </div>
+            <div style={{ fontSize: '20px', fontWeight: 800, color: s.color }}>{s.value}</div>
           </div>
-          <div className="stat-value" style={{ color: summary.balance >= 0 ? '#0284c7' : '#ef4444' }}>
-            {formatCurrency(summary.balance)}
-          </div>
-          <div className="stat-subtext" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#64748b' }}>
-            Ready for day-to-day operations
-          </div>
-        </div>
-
-        {/* Total Budget Added */}
-        <div className="stat-card">
-          <div className="stat-top">
-            <span className="stat-label">Total Funds Added</span>
-            <div className="stat-icon-wrap" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
-              <TrendingUp size={18} />
-            </div>
-          </div>
-          <div className="stat-value" style={{ color: '#10b981' }}>
-            {formatCurrency(summary.totalBudget)}
-          </div>
-          <div className="stat-subtext" style={{ color: '#64748b' }}>
-            Inflow from business capital
-          </div>
-        </div>
-
-        {/* Total Expenses */}
-        <div className="stat-card">
-          <div className="stat-top">
-            <span className="stat-label">Total Expenses Paid</span>
-            <div className="stat-icon-wrap" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
-              <TrendingDown size={18} />
-            </div>
-          </div>
-          <div className="stat-value" style={{ color: '#ef4444' }}>
-            {formatCurrency(summary.totalExpenses ?? summary.totalExpense ?? 0)}
-          </div>
-          <div className="stat-subtext" style={{ color: '#64748b' }}>
-            Fuel, office, repairs, labor
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="card" style={{ padding: '14px 18px', marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {/* Row 1: Search & Type/Category Dropdowns */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '240px' }}>
-            <Search size={16} color="#64748b" />
-            <input
-              type="text"
-              className="form-input"
-              style={{ border: 'none', background: 'transparent', padding: '6px' }}
-              placeholder="Search expenses by reason, voucher no..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <select
-              className="form-select"
-              style={{ width: 'auto', fontSize: '13px', padding: '6px 12px' }}
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-            >
-              <option value="all">All Flow Types</option>
-              <option value="budget">Funds Inward (+)</option>
-              <option value="expense">Expenses Outward (-)</option>
-            </select>
-
-            <select
-              className="form-select"
-              style={{ width: 'auto', fontSize: '13px', padding: '6px 12px' }}
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-            >
-              <option value="all">All Categories</option>
-              {expenseCategories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
+      {/* Filter Bar */}
+      <div className="card" style={{ padding: '12px 14px', marginBottom: '16px' }}>
+        {/* Search */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px 10px', marginBottom: '10px' }}>
+          <Search size={14} color="#94a3b8" />
+          <input type="text" style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '13px', flex: 1, color: '#0f172a' }}
+            placeholder="Search by reason, voucher no..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          {searchTerm && <button onClick={() => setSearchTerm('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}><X size={14} /></button>}
         </div>
 
-        {/* Row 2: Date-wise Filter Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>Timeframe:</span>
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'today', label: 'Today' },
-              { id: 'yesterday', label: 'Yesterday' },
-              { id: 'month', label: 'This Month' }
-            ].map((d) => {
+        {/* Dropdowns */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          <select className="form-select" style={{ flex: 1, minWidth: '130px', fontSize: '12px', padding: '6px 8px' }}
+            value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            <option value="all">All Flow Types</option>
+            <option value="budget">Funds Inward (+)</option>
+            <option value="expense">Expenses Outward (-)</option>
+          </select>
+          <select className="form-select" style={{ flex: 1, minWidth: '130px', fontSize: '12px', padding: '6px 8px' }}
+            value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            <option value="all">All Categories</option>
+            {expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        {/* Date quick chips */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b' }}>DATE:</span>
+            {[{ id: 'all', label: 'All' }, { id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'month', label: 'Month' }].map((d) => {
               const active = !filterDate && quickDate === d.id;
               return (
-                <button
-                  key={d.id}
-                  onClick={() => {
-                    setFilterDate('');
-                    setQuickDate(d.id);
-                  }}
-                  style={{
-                    padding: '3px 10px',
-                    fontSize: '11px',
-                    fontWeight: active ? 700 : 500,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: active ? '#0f172a' : '#f1f5f9',
-                    color: active ? '#ffffff' : '#64748b',
-                    cursor: 'pointer'
-                  }}
-                >
+                <button key={d.id} onClick={() => { setFilterDate(''); setQuickDate(d.id); }}
+                  style={{ padding: '3px 9px', fontSize: '11px', fontWeight: active ? 700 : 500, borderRadius: '6px', border: 'none', background: active ? '#0f172a' : '#f1f5f9', color: active ? '#fff' : '#64748b', cursor: 'pointer' }}>
                   {d.label}
                 </button>
               );
             })}
           </div>
-
-          {/* Specific Date Input */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '4px 10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-            <Calendar size={13} color="#64748b" />
-            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Filter by Date:</span>
-            <input
-              type="date"
-              value={filterDate}
-              onChange={(e) => {
-                setFilterDate(e.target.value);
-                if (e.target.value) setQuickDate('all');
-              }}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                fontSize: '11px',
-                color: '#0f172a',
-                fontWeight: 700,
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            />
-            {filterDate && (
-              <button
-                onClick={() => setFilterDate('')}
-                title="Clear date filter"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '0 2px', display: 'flex' }}
-              >
-                <X size={12} />
-              </button>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f8fafc', padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+            <Calendar size={12} color="#64748b" />
+            <input type="date" value={filterDate}
+              onChange={(e) => { setFilterDate(e.target.value); if (e.target.value) setQuickDate('all'); }}
+              style={{ border: 'none', background: 'transparent', fontSize: '11px', color: '#0f172a', fontWeight: 700, outline: 'none', cursor: 'pointer', maxWidth: '120px' }} />
+            {filterDate && <button onClick={() => setFilterDate('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex' }}><X size={11} /></button>}
           </div>
         </div>
       </div>
 
-      {/* Transactions Table */}
-      <div className="card" style={{ padding: '16px' }}>
-        <div className="table-responsive" style={{ border: 'none' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Voucher No</th>
-                <th>Date & Time</th>
-                <th>Type</th>
-                <th>Category</th>
-                <th>Reason / Description</th>
-                <th style={{ textAlign: 'right' }}>Amount</th>
-                <th>Recorded By</th>
-                <th style={{ textAlign: 'center' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.length === 0 ? (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                    No wallet transactions recorded yet. Click "Add Funds" or "Record Expense" to begin.
-                  </td>
-                </tr>
-              ) : (
-                filteredTransactions.map((txn) => {
-                  const isBudget = txn.type === 'budget';
-                  return (
-                    <tr key={txn.id}>
-                      <td style={{ fontWeight: 600, color: '#0284c7', fontSize: '12px' }}>
-                        {txn.txn_no}
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{formatDate(txn.date)}</div>
-                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>{txn.time || '—'}</div>
-                      </td>
-                      <td>
-                        {isBudget ? (
-                          <span className="badge badge-paid" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                            <ArrowDownLeft size={11} /> Fund Inflow
-                          </span>
-                        ) : (
-                          <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                            <ArrowUpRight size={11} /> Expense
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
-                          {txn.category || 'General'}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 500, color: '#0f172a' }}>{txn.reason}</div>
-                        {txn.notes && (
-                          <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
-                            {txn.notes}
+      {/* Transactions — Mobile Cards + Desktop Table */}
+      <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+        {filteredTransactions.length === 0 ? (
+          <div style={{ padding: '48px 20px', textAlign: 'center', color: '#64748b' }}>
+            <Wallet size={40} color="#cbd5e1" style={{ marginBottom: '10px' }} />
+            <div style={{ fontWeight: 600, fontSize: '14px' }}>No transactions found</div>
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>Click "Add Funds" or "Record Expense" to begin.</div>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table — hidden on small screens */}
+            <div className="table-responsive" style={{ border: 'none', display: 'none' }} id="wallet-table-desktop">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Voucher No</th>
+                    <th>Date &amp; Time</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Reason</th>
+                    <th style={{ textAlign: 'right' }}>Amount</th>
+                    <th>Recorded By</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTransactions.map((txn) => {
+                    const isBudget = txn.type === 'budget';
+                    return (
+                      <tr key={txn.id}>
+                        <td style={{ fontWeight: 600, color: '#0284c7', fontSize: '12px' }}>{txn.txn_no}</td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{formatDate(txn.date)}</div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>{txn.time || '—'}</div>
+                        </td>
+                        <td>
+                          {isBudget
+                            ? <span className="badge badge-paid" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><ArrowDownLeft size={11} /> Fund Inflow</span>
+                            : <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><ArrowUpRight size={11} /> Expense</span>}
+                        </td>
+                        <td><span className="badge badge-neutral" style={{ fontSize: '11px' }}>{txn.category || 'General'}</span></td>
+                        <td>
+                          <div style={{ fontWeight: 500, color: '#0f172a' }}>{txn.reason}</div>
+                          {txn.notes && <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>{txn.notes}</div>}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                          <span style={{ color: isBudget ? '#10b981' : '#ef4444' }}>{isBudget ? '+' : '-'}{formatCurrency(txn.amount)}</span>
+                        </td>
+                        <td><span style={{ fontSize: '12px', color: '#64748b' }}>{txn.recorded_by || 'Admin'}</span></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '11px', padding: '3px 8px' }} onClick={() => handleOpenEdit(txn)}><Edit2 size={12} /> Edit</button>
+                            {dataService?.canDelete && dataService.canDelete(currentUser) && (
+                              <button className="btn btn-sm" style={{ fontSize: '11px', padding: '3px 8px', backgroundColor: '#ef4444', color: '#fff', border: '1px solid #dc2626', borderRadius: '6px', cursor: 'pointer' }} onClick={() => handleDelete(txn)}><Trash2 size={12} /></button>
+                            )}
                           </div>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                        <span style={{ color: isBudget ? '#10b981' : '#ef4444' }}>
-                          {isBudget ? '+' : '-'}{formatCurrency(txn.amount)}
-                        </span>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>{txn.recorded_by || 'Admin'}</span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            style={{ fontSize: '11px', padding: '3px 8px' }}
-                            onClick={() => handleOpenEdit(txn)}
-                            title="Edit Transaction"
-                          >
-                            <Edit2 size={12} /> Edit
-                          </button>
-                          {dataService?.canDelete && dataService.canDelete(currentUser) && (
-                            <button
-                              className="btn btn-danger btn-sm"
-                              style={{
-                                fontSize: '11px',
-                                padding: '3px 8px',
-                                backgroundColor: '#ef4444',
-                                color: '#ffffff',
-                                border: '1px solid #dc2626'
-                              }}
-                              onClick={() => handleDelete(txn)}
-                              title="Delete Transaction"
-                            >
-                              <Trash2 size={12} /> Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Add Funds / Record Expense Modal */}
-      {activeModal && (
-        <div className="modal-backdrop">
-          <div
-            className="modal-card modal-content"
-            style={{ maxWidth: '480px', width: '92%' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h2 style={{ fontSize: '17px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {editingTxn ? (
-                  <><Edit2 size={18} color="#0284c7" /> Edit Wallet Transaction — {editingTxn.txn_no}</>
-                ) : activeModal === 'budget' ? (
-                  <><ArrowDownLeft size={18} color="#16a34a" /> Add Operating Funds to Wallet</>
-                ) : (
-                  <><ArrowUpRight size={18} color="#ef4444" /> Record Operations Expense</>
-                )}
-              </h2>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ padding: '16px' }}>
-              {error && (
-                <div style={{
-                  background: '#fef2f2', border: '1px solid #fecaca',
-                  color: '#b91c1c', padding: '8px 12px', borderRadius: '6px',
-                  marginBottom: '14px', fontSize: '12px'
-                }}>
-                  {error}
-                </div>
-              )}
+            {/* Mobile Card List */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {filteredTransactions.map((txn, idx) => {
+                const isBudget = txn.type === 'budget';
+                return (
+                  <div key={txn.id} style={{
+                    padding: '14px 16px',
+                    borderBottom: idx < filteredTransactions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                    display: 'flex', flexDirection: 'column', gap: '6px'
+                  }}>
+                    {/* Row 1: Type badge + Amount */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {isBudget
+                          ? <span className="badge badge-paid" style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><ArrowDownLeft size={11} /> Fund Inflow</span>
+                          : <span className="badge badge-danger" style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><ArrowUpRight size={11} /> Expense</span>}
+                        <span className="badge badge-neutral" style={{ fontSize: '10px' }}>{txn.category || 'General'}</span>
+                      </div>
+                      <span style={{ fontSize: '16px', fontWeight: 800, color: isBudget ? '#10b981' : '#ef4444' }}>
+                        {isBudget ? '+' : '-'}{formatCurrency(txn.amount)}
+                      </span>
+                    </div>
+                    {/* Row 2: Reason */}
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{txn.reason}</div>
+                    {txn.notes && <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>{txn.notes}</div>}
+                    {/* Row 3: Meta + Actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: 600 }}>{txn.txn_no}</span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>{formatDate(txn.date)} {txn.time || ''}</span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>by {txn.recorded_by || 'Admin'}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: '11px', padding: '3px 8px' }} onClick={() => handleOpenEdit(txn)}><Edit2 size={11} /> Edit</button>
+                        {dataService?.canDelete && dataService.canDelete(currentUser) && (
+                          <button style={{ fontSize: '11px', padding: '3px 8px', backgroundColor: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer' }} onClick={() => handleDelete(txn)}><Trash2 size={11} /></button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
 
+      {/* Modal */}
+      {activeModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card modal-content" style={{ maxWidth: '480px', width: '96%' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {editingTxn ? <><Edit2 size={17} color="#0284c7" /> Edit — {editingTxn.txn_no}</>
+                  : activeModal === 'budget' ? <><ArrowDownLeft size={17} color="#16a34a" /> Add Operating Funds</>
+                  : <><ArrowUpRight size={17} color="#ef4444" /> Record Expense</>}
+              </h2>
+            </div>
+            <form onSubmit={handleSubmit} style={{ padding: '16px' }}>
+              {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '8px 12px', borderRadius: '6px', marginBottom: '12px', fontSize: '12px' }}>{error}</div>}
               <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label className="form-label">Amount (₹) *</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  min="1"
-                  step="0.01"
-                  required
-                  autoFocus
-                  placeholder="e.g. 5000"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
+                <input type="number" className="form-input" min="1" step="0.01" required autoFocus placeholder="e.g. 5000"
+                  value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
-
               {activeModal === 'expense' && (
                 <div className="form-group" style={{ marginBottom: '12px' }}>
                   <label className="form-label">Expense Category *</label>
-                  <select
-                    className="form-select"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                  >
-                    {expenseCategories.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
+                  <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                    {expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               )}
-
               <div className="form-group" style={{ marginBottom: '12px' }}>
-                <label className="form-label">
-                  {activeModal === 'budget' ? 'Source / Fund Reason *' : 'Expense Purpose / Description *'}
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  required
-                  placeholder={activeModal === 'budget' ? 'e.g. Weekly petty cash fund from Shiva' : 'e.g. Diesel for delivery truck TS 08 AB 1234'}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
+                <label className="form-label">{activeModal === 'budget' ? 'Source / Fund Reason *' : 'Expense Purpose *'}</label>
+                <input type="text" className="form-input" required
+                  placeholder={activeModal === 'budget' ? 'e.g. Weekly petty cash from Shiva' : 'e.g. Diesel for delivery truck'}
+                  value={reason} onChange={(e) => setReason(e.target.value)} />
               </div>
-
               <div className="form-row">
                 <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label">Date</label>
-                  <input
-                    type="date"
-                    className="form-input"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
+                  <input type="date" className="form-input" value={date} onChange={(e) => setDate(e.target.value)} />
                 </div>
                 <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label">Time</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                  />
+                  <input type="text" className="form-input" value={time} onChange={(e) => setTime(e.target.value)} />
                 </div>
               </div>
-
               <div className="form-group" style={{ marginBottom: '16px' }}>
-                <label className="form-label">Additional Notes / Bill Reference</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g. Petrol pump receipt #8812"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
+                <label className="form-label">Notes / Bill Reference</label>
+                <input type="text" className="form-input" placeholder="e.g. Petrol pump receipt #8812"
+                  value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setActiveModal(null);
-                    setEditingTxn(null);
-                    setError('');
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={activeModal === 'budget' ? 'btn btn-primary' : 'btn btn-danger'}
-                >
-                  {editingTxn ? 'Save Changes' : activeModal === 'budget' ? 'Add Funds to Wallet' : 'Record Expense'}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setActiveModal(null); setEditingTxn(null); setError(''); }}>Cancel</button>
+                <button type="submit" className={activeModal === 'budget' ? 'btn btn-primary' : 'btn btn-danger'}>
+                  {editingTxn ? 'Save Changes' : activeModal === 'budget' ? 'Add Funds' : 'Record Expense'}
                 </button>
               </div>
             </form>
