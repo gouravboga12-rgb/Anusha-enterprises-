@@ -433,14 +433,24 @@ export const DailyTransactions = ({ dataService }) => {
             </div>
 
             <div className="table-responsive" style={{ border: 'none' }}>
-              <table className="data-table">
+              <table className="data-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+                <colgroup>
+                  {dateMode === 'range' && <col style={{ width: '7%' }} />}
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: dateMode === 'range' ? '36%' : '40%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '8%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     {dateMode === 'range' && <th>Date</th>}
                     <th>Time</th>
                     <th>Transaction Type</th>
                     <th>Party / Counterpart</th>
-                    <th>Items & Transaction Breakdown</th>
+                    <th>Items &amp; Transaction Breakdown</th>
                     <th style={{ textAlign: 'right' }}>Amount (₹)</th>
                     <th>Reference</th>
                     <th>Status</th>
@@ -475,7 +485,7 @@ export const DailyTransactions = ({ dataService }) => {
                             </div>
                           )}
                         </td>
-                        <td style={{ fontSize: '12.5px', maxWidth: '340px' }}>
+                        <td style={{ fontSize: '12px', wordBreak: 'break-word' }}>
                           <div style={{ whiteSpace: 'pre-line', lineHeight: 1.4 }}>
                             {evt.details}
                           </div>
@@ -483,7 +493,8 @@ export const DailyTransactions = ({ dataService }) => {
                         <td style={{
                           textAlign: 'right',
                           fontWeight: 800,
-                          fontSize: '13.5px',
+                          fontSize: '12.5px',
+                          whiteSpace: 'nowrap',
                           color:
                             evt.amountType === 'inflow' ? '#10b981' :
                             evt.amountType === 'outflow' ? '#e11d48' : '#0f172a'

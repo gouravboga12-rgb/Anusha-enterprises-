@@ -202,8 +202,36 @@ export const GodownList = ({ dataService, currentUser }) => {
                   </div>
 
                   {g.location && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '12px', marginBottom: '4px' }}>
                       <MapPin size={12} /> {g.location}
+                    </div>
+                  )}
+
+                  {/* Contact Person & Phone */}
+                  {(g.contact_person || g.contact_phone) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                      {g.contact_person && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#374151', fontWeight: 600 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                          {g.contact_person}
+                        </span>
+                      )}
+                      {g.contact_phone && (
+                        <a
+                          href={`tel:${g.contact_phone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '4px',
+                            fontSize: '12px', fontWeight: 700, color: '#ffffff',
+                            background: 'linear-gradient(135deg, #16a34a, #15803d)',
+                            padding: '3px 10px', borderRadius: '999px',
+                            textDecoration: 'none', boxShadow: '0 1px 4px rgba(22,163,74,0.3)'
+                          }}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.87a16 16 0 0 0 5.5 5.5l.77-1.08a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.03z"/></svg>
+                          {g.contact_phone}
+                        </a>
+                      )}
                     </div>
                   )}
 

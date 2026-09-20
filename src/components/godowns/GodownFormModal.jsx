@@ -8,6 +8,7 @@ export const GodownFormModal = ({ isOpen, onClose, godown, dataService, currentU
     code: godown?.code || '',
     location: godown?.location || '',
     contact_person: godown?.contact_person || '',
+    contact_phone: godown?.contact_phone || '',
     notes: godown?.notes || '',
     is_active: godown?.is_active !== false
   });
@@ -82,6 +83,11 @@ export const GodownFormModal = ({ isOpen, onClose, godown, dataService, currentU
               <label className="form-label">Contact Person</label>
               <input className="form-input" placeholder="Person in charge" value={form.contact_person}
                 onChange={(e) => handleChange('contact_person', e.target.value)} />
+            </div>
+            <div>
+              <label className="form-label">Contact Phone</label>
+              <input className="form-input" type="tel" placeholder="e.g. 9876543210" value={form.contact_phone}
+                onChange={(e) => handleChange('contact_phone', e.target.value)} />
             </div>
             <div style={{ gridColumn: '1/-1' }}>
               <label className="form-label">Location / Address</label>

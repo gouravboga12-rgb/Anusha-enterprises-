@@ -723,6 +723,7 @@ class DataService {
       code: godownData.code || '',
       location: godownData.location || '',
       contact_person: godownData.contact_person || '',
+      contact_phone: godownData.contact_phone || '',
       notes: godownData.notes || '',
       is_active: godownData.is_active !== false,
       is_default: godownData.is_default || false,

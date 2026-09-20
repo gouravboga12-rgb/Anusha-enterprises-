@@ -20,7 +20,7 @@ export const exportElementToPdf = async ({ element, filename, title }) => {
   const cleanFilename = filename ? (filename.endsWith('.pdf') ? filename : `${filename}.pdf`) : 'document.pdf';
 
   const opt = {
-    margin: [8, 8, 8, 8],
+    margin: [6, 6, 6, 6],
     filename: cleanFilename,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: {
@@ -32,7 +32,7 @@ export const exportElementToPdf = async ({ element, filename, title }) => {
     jsPDF: {
       unit: 'mm',
       format: 'a4',
-      orientation: 'portrait'
+      orientation: 'landscape'
     },
     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   };
