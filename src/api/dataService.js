@@ -399,6 +399,192 @@ class DataService {
   }
 
   // ==============================================================================
+  // GODOWN & STOCK ACTIVITIES
+  // ==============================================================================
+  getGodownActivities(options = {}) {
+    const {
+      date = null,       // 'YYYY-MM-DD'
+      quickDate = 'all', // 'all' | 'today' | 'yesterday' | 'week'
+      type = 'all',      // 'all' | 'purchases' | 'sales' | 'transfers' | 'adjustments' | 'godowns_products'
+      search = ''
+    } = options;
+
+    const relevantModules = new Set(['Godowns', 'Stock', 'Products', 'Purchases', 'Sales']);
+
+    // 1. Logs from activityLog
+    const rawLogs = (this.activityLog || []).filter((l) => {
+      if (!relevantModules.has(l.module)) return false;
+      // Filter out automated system background update noise
+      if (l.user_name === 'System' && l.action === 'UPDATE' && l.module === 'Products') return false;
+      return true;
+    });
+
+    // 2. Identify existing record references to prevent duplication
+    const existingRefs = new Set();
+    rawLogs.forEach((l) => {
+      if (l.record_ref) existingRefs.add(l.record_ref);
+      if (l.record_id) existingRefs.add(l.record_id);
+    });
+
+    const synthesized = [];
+
+    // Synthesize any purchases not present in activityLog
+    (this.purchases || []).forEach((p) => {
+      if (!existingRefs.has(p.purchase_no) && !existingRefs.has(p.id)) {
+        const supp = this.getSupplierById(p.supplier_id);
+        const g = this.getGodownById(p.godown_id);
+        const itemsStr = (p.items || []).map((i) => {
+          const itemG = i.godown_id ? this.getGodownById(i.godown_id) : g;
+          return `${i.product_name}: ${i.quantity} × ₹${i.purchase_price} = ₹${i.total}${itemG ? ' → ' + itemG.name : ''}`;
+        }).join(' | ');
+        synthesized.push({
+          id: 'syn-' + p.id,
+          user_name: p.recorded_by || 'Admin',
+          user_email: '',
+          action: 'CREATE',
+          module: 'Purchases',
+          record_id: p.id,
+          record_ref: p.purchase_no,
+          details: `Purchase from ${supp?.company_name || 'Supplier'} → ${g?.name || 'Main Godown'} — ${itemsStr} — Total: ₹${p.total_amount}`,
+          created_at: p.created_at || (p.date ? `${p.date}T${p.time || '12:00:00'}Z` : new Date().toISOString())
+        });
+      }
+    });
+
+    // Synthesize any sales not present in activityLog
+    (this.sales || []).forEach((s) => {
+      if (!existingRefs.has(s.invoice_no) && !existingRefs.has(s.id)) {
+        const cust = this.getCustomerById(s.customer_id);
+        const itemsStr = (s.items || []).map((i) => {
+          const g = i.godown_id ? this.getGodownById(i.godown_id) : null;
+          return `${i.product_name}: ${i.quantity} × ₹${i.selling_price} = ₹${i.total}${g ? ' (from ' + g.name + ')' : ''}`;
+        }).join(' | ');
+        synthesized.push({
+          id: 'syn-' + s.id,
+          user_name: s.recorded_by || 'Admin',
+          user_email: '',
+          action: 'CREATE',
+          module: 'Sales',
+          record_id: s.id,
+          record_ref: s.invoice_no,
+          details: `Sale to ${cust?.name || 'Customer'} — ${itemsStr} — Total: ₹${s.total_amount}`,
+          created_at: s.created_at || (s.date ? `${s.date}T${s.time || '12:00:00'}Z` : new Date().toISOString())
+        });
+      }
+    });
+
+    // Synthesize any transfers not present in activityLog
+    (this.stockTransfers || []).forEach((t) => {
+      if (!existingRefs.has(t.transfer_no) && !existingRefs.has(t.id)) {
+        synthesized.push({
+          id: 'syn-' + t.id,
+          user_name: t.transferred_by || 'Admin',
+          user_email: '',
+          action: 'TRANSFER',
+          module: 'Stock',
+          record_id: t.id,
+          record_ref: t.transfer_no,
+          details: `Transferred ${t.quantity} units of ${t.product_name} from ${t.from_godown_name} to ${t.to_godown_name}. Reason: ${t.reason || 'N/A'}`,
+          created_at: t.created_at || (t.date ? `${t.date}T12:00:00Z` : new Date().toISOString())
+        });
+      }
+    });
+
+    // Synthesize any adjustments not present in activityLog
+    (this.adjustments || []).forEach((a) => {
+      if (!existingRefs.has(a.id)) {
+        const prod = this.getProductById(a.product_id);
+        const g = this.getGodownById(a.godown_id);
+        synthesized.push({
+          id: 'syn-' + a.id,
+          user_name: a.adjusted_by || 'Admin',
+          user_email: '',
+          action: 'ADJUSTMENT',
+          module: 'Stock',
+          record_id: a.id,
+          record_ref: 'ADJ',
+          details: `Stock adjustment of ${a.quantity > 0 ? '+' : ''}${a.quantity} for ${prod?.name || 'Product'} in ${g?.name || 'Godown'}. Reason: ${a.reason || 'N/A'}`,
+          created_at: a.created_at || (a.date ? `${a.date}T12:00:00Z` : new Date().toISOString())
+        });
+      }
+    });
+
+    // Combine and sort newest first
+    const allEvents = [...rawLogs, ...synthesized].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    // Deduplicate any exact duplicates
+    const deduped = [];
+    const seen = new Set();
+    for (const ev of allEvents) {
+      const key = `${ev.module}-${ev.record_ref || ev.record_id}-${ev.action}-${ev.details?.slice(0, 40)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(ev);
+      }
+    }
+
+    let result = deduped;
+
+    // Filter by type
+    if (type === 'purchases') {
+      result = result.filter((e) => e.module === 'Purchases');
+    } else if (type === 'sales') {
+      result = result.filter((e) => e.module === 'Sales');
+    } else if (type === 'transfers') {
+      result = result.filter((e) => e.module === 'Stock' && e.action === 'TRANSFER');
+    } else if (type === 'adjustments') {
+      result = result.filter((e) => e.module === 'Stock' && (e.action === 'ADJUSTMENT' || e.action === 'ADJUST'));
+    } else if (type === 'godowns_products') {
+      result = result.filter((e) => e.module === 'Godowns' || e.module === 'Products');
+    }
+
+    // Filter by date
+    const todayStr = getTodayDateString();
+    if (date) {
+      result = result.filter((e) => {
+        const itemDate = e.created_at ? e.created_at.slice(0, 10) : '';
+        return itemDate === date;
+      });
+    } else if (quickDate === 'today') {
+      result = result.filter((e) => {
+        const itemDate = e.created_at ? e.created_at.slice(0, 10) : '';
+        return itemDate === todayStr;
+      });
+    } else if (quickDate === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yDateStr = yesterday.toISOString().slice(0, 10);
+      result = result.filter((e) => {
+        const itemDate = e.created_at ? e.created_at.slice(0, 10) : '';
+        return itemDate === yDateStr;
+      });
+    } else if (quickDate === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+      result = result.filter((e) => {
+        const itemDate = e.created_at ? e.created_at.slice(0, 10) : '';
+        return itemDate >= weekAgoStr;
+      });
+    }
+
+    // Filter by search
+    if (search && search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((e) => {
+        return (
+          (e.record_ref && e.record_ref.toLowerCase().includes(q)) ||
+          (e.details && e.details.toLowerCase().includes(q)) ||
+          (e.user_name && e.user_name.toLowerCase().includes(q)) ||
+          (e.module && e.module.toLowerCase().includes(q))
+        );
+      });
+    }
+
+    return result;
+  }
+
+  // ==============================================================================
   // AUDIT TRAIL
   // ==============================================================================
   recordAuditEntry(tableName, recordId, recordRef, changes, reason, changedBy) {
@@ -1292,7 +1478,10 @@ class DataService {
     }
 
     const cust = this.getCustomerById(saleData.customer_id);
-    const itemsSummary = cleanItems.map((i) => `${i.product_name}: ${i.quantity} × ₹${i.selling_price} = ₹${i.total}`).join(' | ');
+    const itemsSummary = cleanItems.map((i) => {
+      const g = i.godown_id ? this.getGodownById(i.godown_id) : null;
+      return `${i.product_name}: ${i.quantity} × ₹${i.selling_price} = ₹${i.total}${g ? ' (from ' + g.name + ')' : ''}`;
+    }).join(' | ');
     this.logActivity(currentUser, 'CREATE', 'Sales', saleId, invoiceNo,
       `Sale to ${cust?.name || 'Customer'} — ${itemsSummary} — Total: ₹${totalAmount}`
     );
@@ -1546,7 +1735,10 @@ class DataService {
 
     const supp = this.getSupplierById(purData.supplier_id);
     const godown = this.getGodownById(godownId);
-    const itemsSummary = cleanItems.map((i) => `${i.product_name}: ${i.quantity} × ₹${i.purchase_price} = ₹${i.total}`).join(' | ');
+    const itemsSummary = cleanItems.map((i) => {
+      const g = i.godown_id ? this.getGodownById(i.godown_id) : godown;
+      return `${i.product_name}: ${i.quantity} × ₹${i.purchase_price} = ₹${i.total}${g ? ' → ' + g.name : ''}`;
+    }).join(' | ');
     this.logActivity(currentUser, 'CREATE', 'Purchases', purId, purchaseNo,
       `Purchase from ${supp?.company_name || 'Supplier'} → ${godown?.name || 'Main Godown'} — ${itemsSummary} — Total: ₹${totalAmount}`
     );
