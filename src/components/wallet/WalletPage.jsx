@@ -30,7 +30,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
 
   const summary = dataService?.getWalletSummary
     ? dataService.getWalletSummary()
-    : { balance: 0, totalBudget: 0, totalExpenses: 0 };
+    : { balance: 0, totalBudget: 0, totalExpenses: 0, totalExpense: 0 };
 
   const transactions = dataService?.getWalletTransactions
     ? dataService.getWalletTransactions()
@@ -246,7 +246,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
             </div>
           </div>
           <div className="stat-value" style={{ color: '#ef4444' }}>
-            {formatCurrency(summary.totalExpenses)}
+            {formatCurrency(summary.totalExpenses ?? summary.totalExpense ?? 0)}
           </div>
           <div className="stat-subtext" style={{ color: '#64748b' }}>
             Fuel, office, repairs, labor

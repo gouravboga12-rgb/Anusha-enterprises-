@@ -2061,11 +2061,16 @@ class DataService {
   getWalletSummary() {
     const totalBudget = this.walletTransactions
       .filter((t) => t.type === 'budget')
-      .reduce((acc, t) => acc + t.amount, 0);
+      .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
     const totalExpense = this.walletTransactions
       .filter((t) => t.type === 'expense')
-      .reduce((acc, t) => acc + t.amount, 0);
-    return { totalBudget, totalExpense, balance: Math.max(0, totalBudget - totalExpense) };
+      .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    return {
+      totalBudget,
+      totalExpense,
+      totalExpenses: totalExpense,
+      balance: Math.max(0, totalBudget - totalExpense)
+    };
   }
 
   addWalletBudget(data, currentUser) {
