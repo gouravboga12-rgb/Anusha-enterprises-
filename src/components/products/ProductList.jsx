@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { PlusCircle, Search, Boxes, History, Edit, Sliders, AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
+import { PlusCircle, Search, Boxes, History, Edit, Sliders, AlertTriangle, CheckCircle2, Trash2, BookOpen } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
+import { ProductLedger } from './ProductLedger';
 
 export const ProductList = ({
   products,
   dataService,
+  currentUser,
   onAddProduct,
   onEditProduct,
   onViewStockHistory,
@@ -12,6 +14,9 @@ export const ProductList = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
+  const [selectedProductForLedger, setSelectedProductForLedger] = useState(null);
+
+  const canDelete = dataService ? dataService.canDelete(currentUser) : true;
 
   const handleDeleteProduct = async (prod) => {
     if (window.confirm(`Are you sure you want to delete product "${prod.name}" (${prod.sku})?\n\nCurrent physical stock: ${prod.current_stock} ${prod.unit}.\nThis action cannot be undone.`)) {
@@ -132,7 +137,13 @@ export const ProductList = ({
                             }}
                           />
                           <div>
-                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{prod.name}</div>
+                            <div
+                              style={{ fontWeight: 700, color: '#0f172a', cursor: 'pointer', textDecoration: 'underline decoration-dotted' }}
+                              onClick={() => setSelectedProductForLedger(prod)}
+                              title="Click to view Product Stock Ledger"
+                            >
+                              {prod.name}
+                            </div>
                             {prod.description && (
                               <div style={{ fontSize: '11px', color: '#94a3b8', maxWidth: '240px' }}>
                                 {prod.description}
@@ -188,6 +199,14 @@ export const ProductList = ({
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                           <button
                             className="btn btn-secondary btn-sm"
+                            style={{ padding: '4px 8px', color: '#3b82f6' }}
+                            onClick={() => setSelectedProductForLedger(prod)}
+                            title="View Complete Product Ledger"
+                          >
+                            <BookOpen size={13} /> Ledger
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
                             style={{ padding: '4px 8px' }}
                             onClick={() => onViewStockHistory(prod)}
                             title="View Stock Movement Audit Trail"
@@ -202,14 +221,16 @@ export const ProductList = ({
                           >
                             <Edit size={13} />
                           </button>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            style={{ padding: '4px 7px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                            onClick={() => handleDeleteProduct(prod)}
-                            title="Delete Product from Catalog"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {canDelete && (
+                            <button
+                              className="btn btn-danger btn-sm"
+                              style={{ padding: '4px 7px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                              onClick={() => handleDeleteProduct(prod)}
+                              title="Delete Product from Catalog"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -320,6 +341,13 @@ export const ProductList = ({
                 <div className="card-action-bar">
                   <button
                     className="btn btn-secondary btn-sm"
+                    style={{ color: '#3b82f6' }}
+                    onClick={() => setSelectedProductForLedger(prod)}
+                  >
+                    <BookOpen size={14} /> Ledger
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
                     onClick={() => onViewStockHistory(prod)}
                   >
                     <History size={14} /> Stock Trail
@@ -331,19 +359,31 @@ export const ProductList = ({
                   >
                     <Edit size={14} /> Edit
                   </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    style={{ flex: 0.8, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
-                    onClick={() => handleDeleteProduct(prod)}
-                  >
-                    <Trash2 size={14} /> Delete
-                  </button>
+                  {canDelete && (
+                    <button
+                      className="btn btn-danger btn-sm"
+                      style={{ flex: 0.8, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                      onClick={() => handleDeleteProduct(prod)}
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* Unified Product Stock Ledger Modal */}
+      {selectedProductForLedger && (
+        <ProductLedger
+          product={selectedProductForLedger}
+          isOpen={!!selectedProductForLedger}
+          onClose={() => setSelectedProductForLedger(null)}
+          dataService={dataService}
+        />
+      )}
     </div>
   );
 };

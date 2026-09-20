@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Mail, Phone, Eye, EyeOff, ShieldCheck, ArrowRight, AlertCircle, CheckCircle2, Building2 } from 'lucide-react';
 
-export const LoginPage = ({ onLoginSuccess }) => {
+export const LoginPage = ({ onLoginSuccess, dataService }) => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -32,21 +32,37 @@ export const LoginPage = ({ onLoginSuccess }) => {
 
       if ((isEmailMatch || isPhoneMatch) && isPasswordMatch) {
         const userObj = {
+          id: 'admin-owner',
           email: 'shivat9640@gmail.com',
           phone: '96409 12521',
           name: 'Shiva',
-          role: 'Owner / Administrator',
+          role: 'owner',
+          role_label: 'Owner / Administrator',
           loginTime: new Date().toISOString()
         };
+        if (dataService?.logActivity) {
+          dataService.logActivity(userObj, 'LOGIN', 'Auth', 'owner', 'Shiva', 'Owner logged in successfully');
+        }
         onLoginSuccess(userObj);
-      } else {
-        setIsLoading(false);
-        if (!isEmailMatch && !isPhoneMatch) {
-          setError('Invalid ID. Please enter shivat9640@gmail.com or 96409 12521');
-        } else {
-          setError('Incorrect password. Please verify your password and try again.');
+        return;
+      }
+
+      // Check staff credentials via dataService if available
+      if (dataService?.authenticateUser) {
+        const staffUser = dataService.authenticateUser(cleanInputId, cleanInputPwd);
+        if (staffUser) {
+          dataService.logActivity(staffUser, 'LOGIN', 'Auth', staffUser.id, staffUser.name, `Staff logged in: ${staffUser.name} (${staffUser.role})`);
+          onLoginSuccess(staffUser);
+          return;
         }
       }
+
+      // Login failed
+      if (dataService?.logActivity) {
+        dataService.logActivity({ name: identifier }, 'LOGIN_FAILED', 'Auth', 'fail', identifier, `Failed login attempt for ID: ${identifier}`);
+      }
+      setIsLoading(false);
+      setError('Invalid credentials. Please check your ID and password.');
     }, 400);
   };
 

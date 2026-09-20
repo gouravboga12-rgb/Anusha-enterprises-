@@ -1,24 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
-import { Plus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, CheckCircle2, Warehouse } from 'lucide-react';
 import { formatCurrency, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 
 export const NewSaleModal = ({
   isOpen,
   onClose,
   dataService,
+  currentUser,
   initialCustomerId = '',
   onSaleCreated,
   onOpenPayment
 }) => {
   const customers = dataService.getCustomers();
   const products = dataService.getProducts().filter((p) => p.is_active);
+  const godowns = dataService.getGodowns();
+
+  const getDefaultGodownForProduct = (prodId) => {
+    if (!prodId) return godowns[0]?.id || '';
+    const gWithStock = godowns.find((g) => dataService.getProductStockInGodown(prodId, g.id) > 0);
+    return gWithStock ? gWithStock.id : (godowns[0]?.id || '');
+  };
 
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [date, setDate] = useState(getTodayDateString());
   const [time, setTime] = useState(getCurrentTimeString());
   const [items, setItems] = useState([
-    { product_id: products[0]?.id || '', quantity: 1, selling_price: products[0]?.selling_price || 0 }
+    {
+      product_id: products[0]?.id || '',
+      godown_id: getDefaultGodownForProduct(products[0]?.id),
+      quantity: 1,
+      selling_price: products[0]?.selling_price || 0
+    }
   ]);
   const [initialPayment, setInitialPayment] = useState('');
   const [paymentMode, setPaymentMode] = useState('Cash');
@@ -33,7 +46,12 @@ export const NewSaleModal = ({
       setTime(getCurrentTimeString());
       setItems(
         products.length > 0
-          ? [{ product_id: products[0].id, quantity: 1, selling_price: products[0].selling_price || 0 }]
+          ? [{
+              product_id: products[0].id,
+              godown_id: getDefaultGodownForProduct(products[0].id),
+              quantity: 1,
+              selling_price: products[0].selling_price || 0
+            }]
           : []
       );
       setInitialPayment('');
@@ -50,6 +68,7 @@ export const NewSaleModal = ({
     updated[index] = {
       ...updated[index],
       product_id: prodId,
+      godown_id: getDefaultGodownForProduct(prodId),
       selling_price: prod ? prod.selling_price : 0
     };
     setItems(updated);
@@ -63,9 +82,15 @@ export const NewSaleModal = ({
 
   const addItemRow = () => {
     if (products.length === 0) return;
+    const defProd = products[0];
     setItems([
       ...items,
-      { product_id: products[0].id, quantity: 1, selling_price: products[0].selling_price || 0 }
+      {
+        product_id: defProd.id,
+        godown_id: getDefaultGodownForProduct(defProd.id),
+        quantity: 1,
+        selling_price: defProd.selling_price || 0
+      }
     ]);
   };
 
@@ -97,21 +122,26 @@ export const NewSaleModal = ({
       return;
     }
 
-    // STRICT STOCK VALIDATION: Block transaction if stock is insufficient
+    // STRICT GODOWN-LEVEL STOCK VALIDATION: Block transaction if stock is insufficient in selected godown
     for (const item of items) {
       const prod = products.find((p) => p.id === item.product_id);
       const reqQty = Number(item.quantity) || 0;
-      if (reqQty <= 0) {
-        setError(`Quantity for ${prod?.name || 'product'} must be at least 1`);
-        return;
-      }
       if (!prod) {
         setError('Please select a valid product');
         return;
       }
-      const availableStock = prod.current_stock || 0;
-      if (reqQty > availableStock) {
-        setError(`Only ${availableStock} units of "${prod.name}" are currently available. You cannot sell ${reqQty} units.`);
+      if (reqQty <= 0) {
+        setError(`Quantity for ${prod.name} must be at least 1`);
+        return;
+      }
+      if (!item.godown_id) {
+        setError(`Please select a godown location for "${prod.name}"`);
+        return;
+      }
+      const availableInGodown = dataService.getProductStockInGodown(item.product_id, item.godown_id);
+      const godown = dataService.getGodownById(item.godown_id);
+      if (reqQty > availableInGodown) {
+        setError(`Only ${availableInGodown} units of "${prod.name}" available in ${godown?.name || 'selected godown'}. You cannot sell ${reqQty} units from this location.`);
         return;
       }
     }
@@ -126,7 +156,7 @@ export const NewSaleModal = ({
         payment_mode: paymentMode,
         reference_no: referenceNo,
         notes
-      });
+      }, currentUser);
 
       if (onSaleCreated) onSaleCreated(sale);
       onClose();
@@ -140,7 +170,7 @@ export const NewSaleModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Create New Customer Sale (Invoice)"
-      maxWidth="750px"
+      maxWidth="880px"
     >
       <form onSubmit={handleSubmit}>
         {error && (
@@ -237,10 +267,11 @@ export const NewSaleModal = ({
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: '45%' }}>Product</th>
-                  <th style={{ width: '18%' }}>Quantity</th>
-                  <th style={{ width: '22%' }}>Price (₹)</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: '32%' }}>Product</th>
+                  <th style={{ width: '26%' }}>Source Godown</th>
+                  <th style={{ width: '13%' }}>Quantity</th>
+                  <th style={{ width: '15%' }}>Price (₹)</th>
+                  <th style={{ width: '14%', textAlign: 'right' }}>Total</th>
                   <th></th>
                 </tr>
               </thead>
@@ -248,6 +279,8 @@ export const NewSaleModal = ({
                 {items.map((item, idx) => {
                   const prod = products.find((p) => p.id === item.product_id);
                   const lineTotal = (Number(item.quantity) || 0) * (Number(item.selling_price) || 0);
+                  const stockInGodown = dataService.getProductStockInGodown(item.product_id, item.godown_id);
+                  const isExceeding = Number(item.quantity) > stockInGodown;
 
                   return (
                     <tr key={idx}>
@@ -259,9 +292,26 @@ export const NewSaleModal = ({
                         >
                           {products.map((p) => (
                             <option key={p.id} value={p.id}>
-                              {p.name} (Stock: {p.current_stock} {p.unit})
+                              {p.name} (Total: {p.current_stock} {p.unit})
                             </option>
                           ))}
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          className="form-select"
+                          value={item.godown_id}
+                          onChange={(e) => handleItemChange(idx, 'godown_id', e.target.value)}
+                          style={{ fontSize: '12px' }}
+                        >
+                          {godowns.map((g) => {
+                            const gStock = dataService.getProductStockInGodown(item.product_id, g.id);
+                            return (
+                              <option key={g.id} value={g.id} disabled={gStock <= 0}>
+                                {g.name} ({gStock} available) {gStock <= 0 ? '— Empty' : ''}
+                              </option>
+                            );
+                          })}
                         </select>
                       </td>
                       <td>
@@ -270,15 +320,15 @@ export const NewSaleModal = ({
                           className="form-input"
                           min="1"
                           style={{
-                            borderColor: (prod && Number(item.quantity) > (prod.current_stock || 0)) ? '#ef4444' : undefined,
-                            background: (prod && Number(item.quantity) > (prod.current_stock || 0)) ? '#fef2f2' : undefined
+                            borderColor: isExceeding ? '#ef4444' : undefined,
+                            background: isExceeding ? '#fef2f2' : undefined
                           }}
                           value={item.quantity}
                           onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
                         />
-                        {prod && Number(item.quantity) > (prod.current_stock || 0) && (
-                          <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '2px', fontWeight: 600 }}>
-                            Exceeds stock ({prod.current_stock})
+                        {isExceeding && (
+                          <div style={{ color: '#ef4444', fontSize: '10.5px', marginTop: '2px', fontWeight: 600 }}>
+                            Max: {stockInGodown}
                           </div>
                         )}
                       </td>

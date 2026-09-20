@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Warehouse, Sparkles } from 'lucide-react';
 import { formatCurrency, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 
 export const NewPurchaseModal = ({
   isOpen,
   onClose,
   dataService,
+  currentUser,
   initialSupplierId = '',
   onPurchaseCreated,
   onOpenPayment
 }) => {
   const suppliers = dataService.getSuppliers();
   const products = dataService.getProducts();
+  const godowns = dataService.getGodowns();
 
   const [supplierId, setSupplierId] = useState(initialSupplierId);
+  const [godownId, setGodownId] = useState(godowns[0]?.id || '');
   const [date, setDate] = useState(getTodayDateString());
   const [time, setTime] = useState(getCurrentTimeString());
   const [items, setItems] = useState([
@@ -26,9 +29,18 @@ export const NewPurchaseModal = ({
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
+  // Suppliers mapped to currently selected products
+  const selectedProductIds = items.map((i) => i.product_id).filter(Boolean);
+  const suggestedSupplierIds = new Set();
+  selectedProductIds.forEach((pid) => {
+    const supps = dataService.getProductSuppliers(pid);
+    supps.forEach((s) => suggestedSupplierIds.add(s.id));
+  });
+
   useEffect(() => {
     if (isOpen) {
       setSupplierId(initialSupplierId || '');
+      setGodownId(godowns[0]?.id || '');
       setDate(getTodayDateString());
       setTime(getCurrentTimeString());
       setItems(
@@ -108,6 +120,7 @@ export const NewPurchaseModal = ({
     try {
       const pur = dataService.recordPurchase({
         supplier_id: supplierId,
+        godown_id: godownId,
         items,
         date,
         time,
@@ -115,7 +128,7 @@ export const NewPurchaseModal = ({
         payment_mode: paymentMode,
         reference_no: referenceNo,
         notes
-      });
+      }, currentUser);
 
       if (onPurchaseCreated) onPurchaseCreated(pur);
       onClose();
@@ -129,7 +142,7 @@ export const NewPurchaseModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Record Supplier Inward Purchase (Stock In)"
-      maxWidth="750px"
+      maxWidth="780px"
     >
       <form onSubmit={handleSubmit}>
         {error && (
@@ -138,9 +151,17 @@ export const NewPurchaseModal = ({
           </div>
         )}
 
+        {/* Row 1: Supplier & Destination Godown */}
         <div className="form-row">
-          <div className="form-group" style={{ flex: 2 }}>
-            <label className="form-label">Select Supplier *</label>
+          <div className="form-group" style={{ flex: 1.8 }}>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>Select Supplier *</span>
+              {suggestedSupplierIds.size > 0 && (
+                <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <Sparkles size={12} /> {suggestedSupplierIds.size} mapped supplier(s)
+                </span>
+              )}
+            </label>
             <select
               className="form-select"
               required
@@ -148,11 +169,22 @@ export const NewPurchaseModal = ({
               onChange={(e) => setSupplierId(e.target.value)}
             >
               <option value="">-- Choose Supplier --</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}
-                </option>
-              ))}
+              {suggestedSupplierIds.size > 0 && (
+                <optgroup label="✨ Mapped Suppliers (Supplies Selected Product)">
+                  {suppliers.filter((s) => suggestedSupplierIds.has(s.id)).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      ★ {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label={suggestedSupplierIds.size > 0 ? "All Other Suppliers" : "All Suppliers"}>
+                {suppliers.filter((s) => !suggestedSupplierIds.has(s.id)).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}
+                  </option>
+                ))}
+              </optgroup>
             </select>
             {previousPayable > 0 && (
               <div style={{ marginTop: '5px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
@@ -187,6 +219,30 @@ export const NewPurchaseModal = ({
             )}
           </div>
 
+          <div className="form-group" style={{ flex: 1.2 }}>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Warehouse size={13} color="#0284c7" /> Destination Godown *
+            </label>
+            <select
+              className="form-select"
+              required
+              value={godownId}
+              onChange={(e) => setGodownId(e.target.value)}
+            >
+              {godowns.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} ({g.code || 'Main'}) {g.location ? `— ${g.location}` : ''}
+                </option>
+              ))}
+            </select>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+              Stock will be received into this godown
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Date and Time */}
+        <div className="form-row">
           <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label">Purchase Date</label>
             <input
@@ -244,11 +300,14 @@ export const NewPurchaseModal = ({
                           value={item.product_id}
                           onChange={(e) => handleProductChange(idx, e.target.value)}
                         >
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} (Stock: {p.current_stock} {p.unit})
-                            </option>
-                          ))}
+                          {products.map((p) => {
+                            const inG = dataService.getProductStockInGodown(p.id, godownId);
+                            return (
+                              <option key={p.id} value={p.id}>
+                                {p.name} (Godown Stock: {inG} | Total: {p.current_stock} {p.unit})
+                              </option>
+                            );
+                          })}
                         </select>
                       </td>
                       <td>

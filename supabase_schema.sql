@@ -1,11 +1,17 @@
 -- ==============================================================================
 -- ANUSHA ENTERPRISES (Nandipet, Nizamabad)
 -- Complete Supabase PostgreSQL Schema & Relational Structure
+-- v2 — Major Feature Expansion (Godowns, Multi-User, Wallet, Activity Log, Audit Trail)
 -- Run this script in your Supabase Dashboard -> SQL Editor -> Run
+-- SAFE TO RE-RUN: All statements use IF NOT EXISTS / OR IGNORE patterns
 -- ==============================================================================
 
 -- 1. Enable UUID Extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ==============================================================================
+-- EXISTING TABLES (UNCHANGED — v1 compatible)
+-- ==============================================================================
 
 -- 2. CUSTOMERS TABLE
 CREATE TABLE IF NOT EXISTS public.customers (
@@ -79,6 +85,7 @@ CREATE TABLE IF NOT EXISTS public.customer_sale_items (
     quantity INTEGER NOT NULL,
     selling_price DECIMAL(12,2) NOT NULL,
     total DECIMAL(12,2) NOT NULL,
+    godown_id TEXT,  -- NEW: which godown this item was sold from
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -95,6 +102,7 @@ CREATE TABLE IF NOT EXISTS public.supplier_purchases (
     payment_status VARCHAR(30) DEFAULT 'Pending',
     notes TEXT,
     recorded_by VARCHAR(100) DEFAULT 'Admin',
+    godown_id TEXT,  -- NEW: which godown received this purchase
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -108,10 +116,11 @@ CREATE TABLE IF NOT EXISTS public.supplier_purchase_items (
     quantity INTEGER NOT NULL,
     purchase_price DECIMAL(12,2) NOT NULL,
     total DECIMAL(12,2) NOT NULL,
+    godown_id TEXT,  -- NEW: which godown this item went to
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 9. CUSTOMER PAYMENTS (Non-destructive Individual Receipts)
+-- 9. CUSTOMER PAYMENTS
 CREATE TABLE IF NOT EXISTS public.customer_payments (
     id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
     receipt_no VARCHAR(50) UNIQUE NOT NULL,
@@ -127,7 +136,7 @@ CREATE TABLE IF NOT EXISTS public.customer_payments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 10. SUPPLIER PAYMENTS (Non-destructive Individual Vouchers)
+-- 10. SUPPLIER PAYMENTS
 CREATE TABLE IF NOT EXISTS public.supplier_payments (
     id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
     receipt_no VARCHAR(50) UNIQUE NOT NULL,
@@ -153,6 +162,7 @@ CREATE TABLE IF NOT EXISTS public.manual_stock_adjustments (
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     time VARCHAR(20) NOT NULL,
     recorded_by VARCHAR(100) DEFAULT 'Admin',
+    godown_id TEXT,  -- NEW: which godown was adjusted
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -172,7 +182,127 @@ CREATE TABLE IF NOT EXISTS public.stock_movements (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 13. INDEXES FOR HIGH-SPEED LEDGER & DAY BOOK QUERIES
+-- ==============================================================================
+-- NEW TABLES — v2 Feature Expansion
+-- ==============================================================================
+
+-- 13. GODOWNS
+CREATE TABLE IF NOT EXISTS public.godowns (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(50),
+    location TEXT,
+    contact_person VARCHAR(255),
+    notes TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_default BOOLEAN DEFAULT FALSE,  -- The "Main Godown" for migration
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 14. GODOWN STOCK (Authoritative per-product per-godown quantity)
+-- products.current_stock = SUM of all rows here for that product
+CREATE TABLE IF NOT EXISTS public.godown_stock (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    godown_id TEXT NOT NULL REFERENCES public.godowns(id) ON DELETE RESTRICT,
+    product_id TEXT NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
+    quantity INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(godown_id, product_id)
+);
+
+-- 15. STOCK TRANSFERS (Permanent log — never deleted)
+CREATE TABLE IF NOT EXISTS public.stock_transfers (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    transfer_no VARCHAR(50) UNIQUE NOT NULL,
+    from_godown_id TEXT NOT NULL REFERENCES public.godowns(id) ON DELETE RESTRICT,
+    to_godown_id TEXT NOT NULL REFERENCES public.godowns(id) ON DELETE RESTRICT,
+    product_id TEXT NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
+    quantity INTEGER NOT NULL,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    time VARCHAR(20) NOT NULL,
+    reason TEXT,
+    notes TEXT,
+    recorded_by VARCHAR(100) DEFAULT 'Admin',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 16. SUPPLIER-PRODUCT MAPPING
+-- Tracks which supplier supplies which products (editable, historical purchases unaffected)
+CREATE TABLE IF NOT EXISTS public.supplier_products (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    supplier_id TEXT NOT NULL REFERENCES public.suppliers(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(supplier_id, product_id)
+);
+
+-- 17. CRM USERS (Staff accounts linked to same business)
+CREATE TABLE IF NOT EXISTS public.crm_users (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(30),
+    password_hash TEXT NOT NULL,
+    role VARCHAR(30) NOT NULL DEFAULT 'partial_access',
+    -- roles: owner | full_access | partial_access
+    is_active BOOLEAN DEFAULT TRUE,
+    created_by VARCHAR(100) DEFAULT 'Admin',
+    last_login_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 18. ACTIVITY LOG (Central record of every important action)
+CREATE TABLE IF NOT EXISTS public.activity_log (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    user_name VARCHAR(255) NOT NULL,
+    user_email VARCHAR(255),
+    action VARCHAR(100) NOT NULL,
+    -- e.g. LOGIN, LOGOUT, LOGIN_FAILED, CREATE, UPDATE, DELETE, TRANSFER, PAYMENT, etc.
+    module VARCHAR(100),
+    -- e.g. Products, Purchases, Sales, Godowns, Wallet, Users
+    record_id TEXT,
+    record_ref VARCHAR(100),
+    -- human-readable reference like PUR-125, INV-002
+    details TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 19. AUDIT TRAIL (Before/after record for every transaction correction)
+CREATE TABLE IF NOT EXISTS public.audit_trail (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    table_name VARCHAR(100) NOT NULL,
+    record_id TEXT NOT NULL,
+    record_ref VARCHAR(100),
+    field_name VARCHAR(100) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    reason TEXT,
+    changed_by VARCHAR(255) NOT NULL,
+    changed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 20. WALLET TRANSACTIONS
+CREATE TABLE IF NOT EXISTS public.wallet_transactions (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    txn_no VARCHAR(50) UNIQUE NOT NULL,
+    type VARCHAR(20) NOT NULL,
+    -- budget | expense
+    category VARCHAR(100),
+    -- Diesel, Vehicle Parts, Office, Salary, Utilities, Other
+    reason TEXT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    time VARCHAR(20) NOT NULL,
+    notes TEXT,
+    recorded_by VARCHAR(100) DEFAULT 'Admin',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- INDEXES
+-- ==============================================================================
 CREATE INDEX IF NOT EXISTS idx_customer_sales_customer ON public.customer_sales(customer_id);
 CREATE INDEX IF NOT EXISTS idx_customer_sales_date ON public.customer_sales(date);
 CREATE INDEX IF NOT EXISTS idx_customer_payments_customer ON public.customer_payments(customer_id);
@@ -183,8 +313,19 @@ CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier ON public.supplier_pay
 CREATE INDEX IF NOT EXISTS idx_supplier_payments_date ON public.supplier_payments(date);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON public.stock_movements(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_date ON public.stock_movements(date);
+CREATE INDEX IF NOT EXISTS idx_godown_stock_godown ON public.godown_stock(godown_id);
+CREATE INDEX IF NOT EXISTS idx_godown_stock_product ON public.godown_stock(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_transfers_product ON public.stock_transfers(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_transfers_date ON public.stock_transfers(date);
+CREATE INDEX IF NOT EXISTS idx_supplier_products_supplier ON public.supplier_products(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_supplier_products_product ON public.supplier_products(product_id);
+CREATE INDEX IF NOT EXISTS idx_activity_log_created ON public.activity_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_trail_record ON public.audit_trail(record_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_date ON public.wallet_transactions(date);
 
--- 14. ROW LEVEL SECURITY (RLS) POLICIES (Allow Public Anon Read/Write for CRM)
+-- ==============================================================================
+-- ROW LEVEL SECURITY (RLS) — Allow Public Anon Read/Write for CRM
+-- ==============================================================================
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow anon all on customers" ON public.customers;
 CREATE POLICY "Allow anon all on customers" ON public.customers FOR ALL TO anon USING (true) WITH CHECK (true);
@@ -229,12 +370,92 @@ ALTER TABLE public.stock_movements ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow anon all on stock_movements" ON public.stock_movements;
 CREATE POLICY "Allow anon all on stock_movements" ON public.stock_movements FOR ALL TO anon USING (true) WITH CHECK (true);
 
--- 15. ENABLE SUPABASE REALTIME REPLICATION FOR INSTANT LIVE SYNC
+ALTER TABLE public.godowns ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on godowns" ON public.godowns;
+CREATE POLICY "Allow anon all on godowns" ON public.godowns FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE public.godown_stock ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on godown_stock" ON public.godown_stock;
+CREATE POLICY "Allow anon all on godown_stock" ON public.godown_stock FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE public.stock_transfers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on stock_transfers" ON public.stock_transfers;
+CREATE POLICY "Allow anon all on stock_transfers" ON public.stock_transfers FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE public.supplier_products ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on supplier_products" ON public.supplier_products;
+CREATE POLICY "Allow anon all on supplier_products" ON public.supplier_products FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE public.crm_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on crm_users" ON public.crm_users;
+CREATE POLICY "Allow anon all on crm_users" ON public.crm_users FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE public.activity_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on activity_log" ON public.activity_log;
+CREATE POLICY "Allow anon all on activity_log" ON public.activity_log FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE public.audit_trail ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on audit_trail" ON public.audit_trail;
+CREATE POLICY "Allow anon all on audit_trail" ON public.audit_trail FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow anon all on wallet_transactions" ON public.wallet_transactions;
+CREATE POLICY "Allow anon all on wallet_transactions" ON public.wallet_transactions FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- ==============================================================================
+-- SCHEMA MIGRATION / SAFETY COLUMN ADDITIONS
+-- (In case tables already existed from v1 without the new columns)
+-- ==============================================================================
+ALTER TABLE public.customer_sale_items ADD COLUMN IF NOT EXISTS godown_id TEXT;
+ALTER TABLE public.supplier_purchases ADD COLUMN IF NOT EXISTS godown_id TEXT;
+ALTER TABLE public.supplier_purchase_items ADD COLUMN IF NOT EXISTS godown_id TEXT;
+ALTER TABLE public.manual_stock_adjustments ADD COLUMN IF NOT EXISTS godown_id TEXT;
+
+-- ==============================================================================
+-- SUPABASE REALTIME REPLICATION
+-- ==============================================================================
 DO $$
 BEGIN
   BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.customers, public.suppliers, public.products, public.customer_sales, public.customer_sale_items, public.supplier_purchases, public.supplier_purchase_items, public.customer_payments, public.supplier_payments, public.manual_stock_adjustments;
+    ALTER PUBLICATION supabase_realtime ADD TABLE
+      public.customers, public.suppliers, public.products,
+      public.customer_sales, public.customer_sale_items,
+      public.supplier_purchases, public.supplier_purchase_items,
+      public.customer_payments, public.supplier_payments,
+      public.manual_stock_adjustments,
+      public.godowns, public.godown_stock, public.stock_transfers,
+      public.supplier_products, public.crm_users,
+      public.activity_log, public.audit_trail, public.wallet_transactions;
   EXCEPTION WHEN OTHERS THEN
     NULL;
   END;
 END $$;
+
+-- ==============================================================================
+-- INITIAL SEED / DEFAULT DATA (Safe to run multiple times)
+-- ==============================================================================
+
+-- 1. Create Default Godowns if none exist
+INSERT INTO public.godowns (id, name, code, location, notes, is_active, is_default)
+VALUES 
+  ('godown-main', 'Main Godown', 'GD-01', 'Nandipet, Nizamabad', 'Primary warehouse and central storage', true, true),
+  ('godown-branch-1', 'Branch Godown 1', 'GD-02', 'Nizamabad Town', 'Secondary distribution godown', true, false)
+ON CONFLICT (id) DO NOTHING;
+
+-- 2. Seed godown_stock for all existing products into Main Godown if not already present
+INSERT INTO public.godown_stock (id, godown_id, product_id, quantity)
+SELECT 
+  'gs-' || p.id || '-main',
+  'godown-main',
+  p.id,
+  COALESCE(p.current_stock, 0)
+FROM public.products p
+ON CONFLICT (godown_id, product_id) DO NOTHING;
+
+-- 3. Create Default Staff Users if none exist
+INSERT INTO public.crm_users (id, name, email, phone, password_hash, role, is_active, created_by)
+VALUES 
+  ('user-admin-1', 'Admin (Owner)', 'admin@anusha.com', '9876543210', 'admin', 'owner', true, 'System'),
+  ('user-staff-1', 'Operations Staff', 'staff@anusha.com', '9876543211', 'staff123', 'full_access', true, 'Admin')
+ON CONFLICT (id) DO NOTHING;
+

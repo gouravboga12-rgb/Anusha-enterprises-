@@ -1,41 +1,192 @@
-import React, { useState } from 'react';
-import { Calendar, Printer, Filter, ArrowDownLeft, ArrowUpRight, CheckCircle2, TrendingUp, BookOpen, Package, Users } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import {
+  Calendar, Printer, Filter, ArrowDownLeft, ArrowUpRight,
+  CheckCircle2, TrendingUp, BookOpen, Package, Users, Warehouse, Download
+} from 'lucide-react';
 import { formatCurrency, formatDate, getTodayDateString } from '../../utils/formatters';
 import { RevenueProfitReport } from '../reports/RevenueProfitReport';
 
 export const DailyTransactions = ({ dataService }) => {
+  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState(getTodayDateString());
   const [typeFilter, setTypeFilter] = useState('all');
   const [activeSubTab, setActiveSubTab] = useState('daybook'); // 'daybook' or 'profit'
 
-  const dayBook = dataService.getDayBook(selectedDate);
-
-  const handleSetYesterday = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    const y = d.toISOString().split('T')[0];
-    setSelectedDate(y);
+  const handleSetToday = () => {
+    setDateMode('single');
+    setSelectedDate(getTodayDateString());
   };
 
-  const filteredEvents = dayBook.events.filter((evt) => {
-    if (typeFilter === 'all') return true;
-    if (typeFilter === 'sales') return evt.type === 'Customer Sale';
-    if (typeFilter === 'purchases') return evt.type === 'Supplier Purchase';
-    if (typeFilter === 'inflow') return evt.type === 'Customer Payment Inward';
-    if (typeFilter === 'outflow') return evt.type === 'Supplier Payment Outward';
-    if (typeFilter === 'stock') return evt.type.includes('Stock');
-    return true;
-  });
+  const handleSetYesterday = () => {
+    setDateMode('single');
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleSetThisWeek = () => {
+    setDateMode('range');
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+    const monday = new Date(d.setDate(diff)).toISOString().split('T')[0];
+    setFromDate(monday);
+    setToDate(getTodayDateString());
+  };
+
+  const handleSetThisMonth = () => {
+    setDateMode('range');
+    const d = new Date();
+    const firstDay = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+    setFromDate(firstDay);
+    setToDate(getTodayDateString());
+  };
+
+  // Compile transactions based on date mode
+  const { events, totalSalesAmount, totalPurchasesAmount, cashInflow, cashOutflow, netCashMovement } = useMemo(() => {
+    if (!dataService?.getDayBook) {
+      return { events: [], totalSalesAmount: 0, totalPurchasesAmount: 0, cashInflow: 0, cashOutflow: 0, netCashMovement: 0 };
+    }
+
+    if (dateMode === 'single') {
+      return dataService.getDayBook(selectedDate);
+    }
+
+    // Date range aggregation
+    const start = fromDate || '2000-01-01';
+    const end = toDate || '2099-12-31';
+
+    // Get all dates in range from sales, purchases, payments, adjustments, transfers
+    const salesInRange = dataService.sales.filter((s) => s.date >= start && s.date <= end);
+    const purchasesInRange = dataService.purchases.filter((p) => p.date >= start && p.date <= end);
+    const paymentsInRange = dataService.payments.filter((p) => p.date >= start && p.date <= end);
+    const adjInRange = (dataService.adjustments || []).filter((a) => a.date >= start && a.date <= end);
+    const transfersInRange = (dataService.stockTransfers || []).filter((t) => t.date >= start && t.date <= end);
+
+    let totSales = 0, totPurchases = 0, totInflow = 0, totOutflow = 0;
+    const allEvents = [];
+
+    salesInRange.forEach((s) => {
+      totSales += s.total_amount || 0;
+      const cust = dataService.getCustomerById(s.customer_id);
+      const itemLines = (s.items || []).map((i) => {
+        const g = dataService.getGodownById(i.godown_id);
+        return `${i.product_name}: ${i.quantity} × ₹${Number(i.selling_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}${g ? ` [${g.name}]` : ''}`;
+      });
+      allEvents.push({
+        id: s.id, date: s.date, time: s.time, type: 'Customer Sale', badgeClass: 'badge-active',
+        party: cust ? cust.name : 'Customer',
+        details: itemLines.join('\n'),
+        items_detail: s.items,
+        amount: s.total_amount, amountType: 'neutral',
+        reference: s.invoice_no, status: s.payment_status
+      });
+    });
+
+    purchasesInRange.forEach((p) => {
+      totPurchases += p.total_amount || 0;
+      const supp = dataService.getSupplierById(p.supplier_id);
+      const godown = dataService.getGodownById(p.godown_id);
+      const itemLines = (p.items || []).map((i) =>
+        `${i.product_name}: ${i.quantity} × ₹${Number(i.purchase_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}`
+      );
+      allEvents.push({
+        id: p.id, date: p.date, time: p.time, type: 'Supplier Purchase', badgeClass: 'badge-warning',
+        party: supp ? supp.company_name : 'Supplier',
+        details: itemLines.join('\n'),
+        items_detail: p.items,
+        godown: godown?.name,
+        amount: p.total_amount, amountType: 'neutral',
+        reference: p.purchase_no, status: p.payment_status
+      });
+    });
+
+    paymentsInRange.forEach((pay) => {
+      if (pay.type === 'customer_payment') {
+        totInflow += pay.amount || 0;
+        const cust = dataService.getCustomerById(pay.customer_id);
+        allEvents.push({
+          id: pay.id, date: pay.date, time: pay.time, type: 'Customer Payment Inward', badgeClass: 'badge-paid',
+          party: cust ? cust.name : 'Customer',
+          details: `Via ${pay.payment_mode}${pay.notes ? ` — ${pay.notes}` : ''}`,
+          amount: pay.amount, amountType: 'inflow',
+          reference: pay.receipt_no, status: 'Settled'
+        });
+      } else {
+        totOutflow += pay.amount || 0;
+        const supp = dataService.getSupplierById(pay.supplier_id);
+        allEvents.push({
+          id: pay.id, date: pay.date, time: pay.time, type: 'Supplier Payment Outward', badgeClass: 'badge-danger',
+          party: supp ? supp.company_name : 'Supplier',
+          details: `Via ${pay.payment_mode}${pay.notes ? ` — ${pay.notes}` : ''}`,
+          amount: pay.amount, amountType: 'outflow',
+          reference: pay.receipt_no, status: 'Settled'
+        });
+      }
+    });
+
+    adjInRange.forEach((adj) => {
+      const prod = dataService.getProductById(adj.product_id);
+      const godown = dataService.getGodownById(adj.godown_id);
+      allEvents.push({
+        id: adj.id, date: adj.date, time: adj.time,
+        type: `Stock ${adj.adjustment_type === 'increase' ? 'Addition' : 'Reduction'}`,
+        badgeClass: 'badge-neutral',
+        party: prod ? prod.name : 'Product',
+        details: `${adj.adjustment_type.toUpperCase()}: ${adj.quantity} ${prod?.unit || 'units'}${godown ? ` in ${godown.name}` : ''} — ${adj.reason}`,
+        amount: null, amountType: 'none', reference: 'ADJ', status: 'Audit Log'
+      });
+    });
+
+    transfersInRange.forEach((t) => {
+      const prod = dataService.getProductById(t.product_id);
+      const fromG = dataService.getGodownById(t.from_godown_id);
+      const toG = dataService.getGodownById(t.to_godown_id);
+      allEvents.push({
+        id: t.id, date: t.date, time: t.time, type: 'Stock Transfer', badgeClass: 'badge-info',
+        party: prod ? prod.name : 'Product',
+        details: `${t.quantity} ${prod?.unit || 'units'} from ${fromG?.name || '?'} → ${toG?.name || '?'}${t.reason ? ` — ${t.reason}` : ''}`,
+        amount: null, amountType: 'none', reference: t.transfer_no, status: 'Completed'
+      });
+    });
+
+    allEvents.sort((a, b) => new Date(`${b.date}T${b.time || '00:00'}`) - new Date(`${a.date}T${a.time || '00:00'}`));
+
+    return {
+      events: allEvents,
+      totalSalesAmount: totSales,
+      totalPurchasesAmount: totPurchases,
+      cashInflow: totInflow,
+      cashOutflow: totOutflow,
+      netCashMovement: totInflow - totOutflow
+    };
+  }, [dataService, dateMode, selectedDate, fromDate, toDate]);
+
+  const filteredEvents = useMemo(() => {
+    if (typeFilter === 'all') return events;
+    if (typeFilter === 'sales') return events.filter((e) => e.type === 'Customer Sale');
+    if (typeFilter === 'purchases') return events.filter((e) => e.type === 'Supplier Purchase');
+    if (typeFilter === 'inflow') return events.filter((e) => e.type === 'Customer Payment Inward');
+    if (typeFilter === 'outflow') return events.filter((e) => e.type === 'Supplier Payment Outward');
+    if (typeFilter === 'stock') return events.filter((e) => e.type.includes('Stock'));
+    return events;
+  }, [events, typeFilter]);
+
+  const periodLabel = dateMode === 'single'
+    ? formatDate(selectedDate)
+    : `${formatDate(fromDate || 'Start')} to ${formatDate(toDate)}`;
 
   return (
     <div>
       {/* Top Mode Toggle */}
-      <div className="subnav-tabs-bar" style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
+      <div className="subnav-tabs-bar no-print" style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
         <button
           className={`btn ${activeSubTab === 'daybook' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveSubTab('daybook')}
         >
-          <BookOpen size={16} /> Daily Register (Day Book)
+          <BookOpen size={16} /> Daily Register & Day Book
         </button>
         <button
           className={`btn ${activeSubTab === 'profit' ? 'btn-primary' : 'btn-secondary'}`}
@@ -49,254 +200,264 @@ export const DailyTransactions = ({ dataService }) => {
         <RevenueProfitReport dataService={dataService} />
       ) : (
         <>
-          <div className="card-header" style={{ marginBottom: '16px' }}>
+          <div className="card-header no-print" style={{ marginBottom: '16px' }}>
             <div>
-              <h1 style={{ fontSize: '20px' }}>Daily Transactions / Day Book (Roznamcha)</h1>
+              <h1 style={{ fontSize: '20px' }}>Daily Transactions Register & Statement</h1>
               <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-                Instant single-page answer to: <strong>"What happened in my business today?"</strong>
+                Complete audit register of all business movements — sales, purchases, payments, and godown transfers.
               </p>
             </div>
             <div className="header-actions-group" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => window.print()}>
-                <Printer size={15} /> Print Day Book
+                <Printer size={15} /> Print / Save PDF Statement
               </button>
             </div>
           </div>
 
-      {/* Date Selector Banner */}
-      <div className="card" style={{ padding: '16px 20px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar size={18} color="#0284c7" />
-              <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Select Date:</span>
-            </div>
-            <input
-              type="date"
-              className="form-input"
-              style={{ width: 'auto', fontWeight: 600 }}
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button
-                className={`btn btn-sm ${selectedDate === getTodayDateString() ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setSelectedDate(getTodayDateString())}
-              >
-                Today
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={handleSetYesterday}
-              >
-                Yesterday
-              </button>
-            </div>
-          </div>
+          {/* Date Selector Banner */}
+          <div className="card no-print" style={{ padding: '16px 20px', marginBottom: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Calendar size={18} color="#0284c7" />
+                  <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>Period:</span>
+                </div>
 
-          {/* Quick Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#64748b' }}>Filter By:</span>
-            <select
-              className="form-select"
-              style={{ width: 'auto', padding: '6px 12px' }}
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              <option value="all">All Events ({dayBook.events.length})</option>
-              <option value="sales">Sales Only</option>
-              <option value="purchases">Purchases Only</option>
-              <option value="inflow">Cash Inward Receipts</option>
-              <option value="outflow">Cash Outward Payments</option>
-              <option value="stock">Stock Adjustments</option>
-            </select>
-          </div>
-        </div>
-      </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    className={`btn btn-sm ${dateMode === 'single' && selectedDate === getTodayDateString() ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={handleSetToday}
+                  >
+                    Today
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleSetYesterday}
+                  >
+                    Yesterday
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleSetThisWeek}
+                  >
+                    This Week
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleSetThisMonth}
+                  >
+                    This Month
+                  </button>
+                </div>
 
-      {/* Daily Summary Cards Strip */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-        gap: '12px',
-        marginBottom: '20px'
-      }}>
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '14px 18px', borderRadius: '12px' }}>
-          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>TOTAL SALES BILLED</span>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-            {formatCurrency(dayBook.totalSalesAmount)}
-          </div>
-          <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Goods sold on {formatDate(selectedDate)}</p>
-        </div>
-
-        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '14px 18px', borderRadius: '12px' }}>
-          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>TOTAL PURCHASES INWARD</span>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-            {formatCurrency(dayBook.totalPurchasesAmount)}
-          </div>
-          <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Supplier stock added</p>
-        </div>
-
-        <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '14px 18px', borderRadius: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#047857' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700 }}>CASH/UPI INFLOW</span>
-            <ArrowDownLeft size={16} />
-          </div>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: '#065f46', marginTop: '4px' }}>
-            +{formatCurrency(dayBook.cashInflow)}
-          </div>
-          <p style={{ fontSize: '11px', color: '#059669', marginTop: '2px' }}>Collections from customers</p>
-        </div>
-
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '14px 18px', borderRadius: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#be123c' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700 }}>CASH/UPI OUTFLOW</span>
-            <ArrowUpRight size={16} />
-          </div>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: '#9f1239', marginTop: '4px' }}>
-            -{formatCurrency(dayBook.cashOutflow)}
-          </div>
-          <p style={{ fontSize: '11px', color: '#e11d48', marginTop: '2px' }}>Payments made to suppliers</p>
-        </div>
-
-        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '14px 18px', borderRadius: '12px' }}>
-          <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: 700 }}>NET CASH MOVEMENT</span>
-          <div style={{
-            fontSize: '18px',
-            fontWeight: 800,
-            color: dayBook.netCashMovement >= 0 ? '#10b981' : '#e11d48',
-            marginTop: '4px'
-          }}>
-            {formatCurrency(dayBook.netCashMovement)}
-          </div>
-          <p style={{ fontSize: '11px', color: '#0284c7', marginTop: '2px' }}>Daily net liquid balance</p>
-        </div>
-      </div>
-
-      {/* Day Book Transactions Desktop Table (hidden on tablet/mobile) */}
-      <div className="card desktop-table-view" style={{ padding: '16px' }}>
-        <div className="card-header" style={{ marginBottom: '12px' }}>
-          <h3 className="card-title">
-            Chronological Daily Register — {formatDate(selectedDate)}
-          </h3>
-          <span className="badge badge-active">{filteredEvents.length} records</span>
-        </div>
-
-        <div className="table-responsive" style={{ border: 'none' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Transaction Type</th>
-                <th>Party / Counterpart</th>
-                <th>Items / Transaction Details</th>
-                <th style={{ textAlign: 'right' }}>Amount (₹)</th>
-                <th>Reference #</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEvents.length === 0 ? (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                    No transactions recorded on {formatDate(selectedDate)}.
-                  </td>
-                </tr>
-              ) : (
-                filteredEvents.map((evt) => (
-                  <tr key={evt.id}>
-                    <td style={{ fontWeight: 600, color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                      {evt.time}
-                    </td>
-                    <td>
-                      <span className={`badge ${evt.badgeClass}`}>{evt.type}</span>
-                    </td>
-                    <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                      {evt.party}
-                    </td>
-                    <td style={{ fontSize: '13px', maxWidth: '320px' }}>
-                      {evt.details}
-                    </td>
-                    <td style={{
-                      textAlign: 'right',
-                      fontWeight: 800,
-                      fontSize: '14px',
-                      color:
-                        evt.amountType === 'inflow' ? '#10b981' :
-                        evt.amountType === 'outflow' ? '#e11d48' : '#0f172a'
-                    }}>
-                      {evt.amount !== null ? (
-                        `${evt.amountType === 'inflow' ? '+' : evt.amountType === 'outflow' ? '-' : ''}${formatCurrency(evt.amount)}`
-                      ) : '—'}
-                    </td>
-                    <td style={{ fontWeight: 600, fontSize: '12px', color: '#0284c7' }}>
-                      {evt.reference}
-                    </td>
-                    <td>
-                      <span className="badge badge-paid">{evt.status}</span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Zero-Scroll Mobile & Tablet Events List */}
-      <div className="mobile-cards-view">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 2px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Daily Register ({filteredEvents.length})</span>
-          <span style={{ fontSize: '11px', color: '#64748b' }}>{formatDate(selectedDate)}</span>
-        </div>
-
-        {filteredEvents.length === 0 ? (
-          <div className="card" style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
-            No transactions recorded on {formatDate(selectedDate)}.
-          </div>
-        ) : (
-          filteredEvents.map((evt) => (
-            <div key={evt.id} className="mobile-record-card">
-              <div className="card-top-row">
-                <div>
+                {dateMode === 'single' ? (
+                  <input
+                    type="date"
+                    className="form-input"
+                    style={{ width: 'auto', fontWeight: 600, fontSize: '12px', padding: '4px 8px' }}
+                    value={selectedDate}
+                    onChange={(e) => {
+                      setDateMode('single');
+                      setSelectedDate(e.target.value);
+                    }}
+                  />
+                ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span className={`badge ${evt.badgeClass}`} style={{ fontSize: '10px', padding: '1px 6px' }}>
-                      {evt.type}
-                    </span>
-                    <strong style={{ fontSize: '14px', color: '#0f172a' }}>{evt.party}</strong>
+                    <input
+                      type="date"
+                      className="form-input"
+                      style={{ width: 'auto', fontSize: '12px', padding: '4px 8px' }}
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                    />
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>to</span>
+                    <input
+                      type="date"
+                      className="form-input"
+                      style={{ width: 'auto', fontSize: '12px', padding: '4px 8px' }}
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                    />
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                    Time: {evt.time} • Ref: {evt.reference}
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{
-                    fontSize: '16px',
-                    fontWeight: 800,
-                    color:
-                      evt.amountType === 'inflow' ? '#10b981' :
-                      evt.amountType === 'outflow' ? '#e11d48' : '#0f172a'
-                  }}>
-                    {evt.amount !== null ? (
-                      `${evt.amountType === 'inflow' ? '+' : evt.amountType === 'outflow' ? '-' : ''}${formatCurrency(evt.amount)}`
-                    ) : '—'}
-                  </div>
-                  <span className="badge badge-paid" style={{ fontSize: '10px', padding: '1px 6px', marginTop: '2px' }}>
-                    {evt.status}
-                  </span>
-                </div>
+                )}
               </div>
 
-              <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', color: '#334155', border: '1px solid #f1f5f9' }}>
-                {evt.details}
+              {/* Quick Type Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>Filter:</span>
+                <select
+                  className="form-select"
+                  style={{ width: 'auto', padding: '5px 10px', fontSize: '12.5px' }}
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                >
+                  <option value="all">All Events ({events.length})</option>
+                  <option value="sales">Sales Only</option>
+                  <option value="purchases">Purchases Only</option>
+                  <option value="inflow">Cash Inward Receipts</option>
+                  <option value="outflow">Cash Outward Payments</option>
+                  <option value="stock">Stock Transfers & Adjustments</option>
+                </select>
               </div>
             </div>
-          ))
-        )}
-      </div>
-    </>
-  )}
-</div>
+          </div>
+
+          {/* Daily Summary Cards Strip */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '12px',
+            marginBottom: '18px'
+          }}>
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '10px' }}>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>TOTAL SALES BILLED</span>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                {formatCurrency(totalSalesAmount)}
+              </div>
+              <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', margin: 0 }}>Goods dispatched</p>
+            </div>
+
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '10px' }}>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>TOTAL PURCHASES</span>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                {formatCurrency(totalPurchasesAmount)}
+              </div>
+              <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', margin: 0 }}>Supplier goods received</p>
+            </div>
+
+            <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '14px 16px', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#047857' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700 }}>CASH INFLOW</span>
+                <ArrowDownLeft size={16} />
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#065f46', marginTop: '4px' }}>
+                +{formatCurrency(cashInflow)}
+              </div>
+              <p style={{ fontSize: '11px', color: '#059669', marginTop: '2px', margin: 0 }}>Customer receipts</p>
+            </div>
+
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '14px 16px', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#be123c' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700 }}>CASH OUTFLOW</span>
+                <ArrowUpRight size={16} />
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#9f1239', marginTop: '4px' }}>
+                -{formatCurrency(cashOutflow)}
+              </div>
+              <p style={{ fontSize: '11px', color: '#e11d48', marginTop: '2px', margin: 0 }}>Supplier payouts</p>
+            </div>
+
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '14px 16px', borderRadius: '10px' }}>
+              <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: 700 }}>NET LIQUID FLOW</span>
+              <div style={{
+                fontSize: '18px',
+                fontWeight: 800,
+                color: netCashMovement >= 0 ? '#10b981' : '#e11d48',
+                marginTop: '4px'
+              }}>
+                {formatCurrency(netCashMovement)}
+              </div>
+              <p style={{ fontSize: '11px', color: '#0284c7', marginTop: '2px', margin: 0 }}>Period net movement</p>
+            </div>
+          </div>
+
+          {/* Printable Statement Document */}
+          <div className="card print-document" style={{ padding: '16px' }}>
+            {/* Print Header */}
+            <div className="print-header" style={{ display: 'none', borderBottom: '2px solid #0f172a', paddingBottom: '14px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#0f172a' }}>ANUSHA ENTERPRISES</h2>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#475569' }}>
+                    Main Road, Nandipet, Nizamabad Dist. • Ph: 96409 12521
+                  </p>
+                  <div style={{ marginTop: '6px', fontSize: '13px', fontWeight: 700, color: '#0284c7' }}>
+                    BUSINESS DAY BOOK & ACTIVITY STATEMENT
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', fontSize: '12px', color: '#334155' }}>
+                  <div><strong>Period:</strong> {periodLabel}</div>
+                  <div><strong>Generated:</strong> {formatDate(getTodayDateString())}</div>
+                  <div><strong>Total Events:</strong> {filteredEvents.length}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="table-responsive" style={{ border: 'none' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    {dateMode === 'range' && <th>Date</th>}
+                    <th>Time</th>
+                    <th>Transaction Type</th>
+                    <th>Party / Counterpart</th>
+                    <th>Items & Transaction Breakdown</th>
+                    <th style={{ textAlign: 'right' }}>Amount (₹)</th>
+                    <th>Reference</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEvents.length === 0 ? (
+                    <tr>
+                      <td colSpan={dateMode === 'range' ? 8 : 7} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                        No transactions recorded in this period.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredEvents.map((evt) => (
+                      <tr key={evt.id}>
+                        {dateMode === 'range' && (
+                          <td style={{ fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {formatDate(evt.date)}
+                          </td>
+                        )}
+                        <td style={{ fontWeight: 600, color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          {evt.time || '—'}
+                        </td>
+                        <td>
+                          <span className={`badge ${evt.badgeClass}`}>{evt.type}</span>
+                        </td>
+                        <td style={{ fontWeight: 700, color: '#0f172a' }}>
+                          {evt.party}
+                          {evt.godown && (
+                            <div style={{ fontSize: '11px', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Warehouse size={11} /> {evt.godown}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '12.5px', maxWidth: '340px' }}>
+                          <div style={{ whiteSpace: 'pre-line', lineHeight: 1.4 }}>
+                            {evt.details}
+                          </div>
+                        </td>
+                        <td style={{
+                          textAlign: 'right',
+                          fontWeight: 800,
+                          fontSize: '13.5px',
+                          color:
+                            evt.amountType === 'inflow' ? '#10b981' :
+                            evt.amountType === 'outflow' ? '#e11d48' : '#0f172a'
+                        }}>
+                          {evt.amount !== null && evt.amount !== undefined ? (
+                            `${evt.amountType === 'inflow' ? '+' : evt.amountType === 'outflow' ? '-' : ''}${formatCurrency(evt.amount)}`
+                          ) : '—'}
+                        </td>
+                        <td style={{ fontWeight: 600, fontSize: '12px', color: '#0284c7' }}>
+                          {evt.reference || '—'}
+                        </td>
+                        <td>
+                          <span className="badge badge-paid">{evt.status}</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 };

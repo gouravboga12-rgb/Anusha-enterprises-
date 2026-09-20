@@ -14,13 +14,18 @@ import {
   RotateCcw,
   Sliders,
   X,
-  LogOut
+  LogOut,
+  Wallet,
+  Activity,
+  ShieldCheck
 } from 'lucide-react';
 import { dataService } from '../../api/dataService';
 
 export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, onLogout }) => {
   const products = dataService.getProducts();
   const lowStockCount = products.filter((p) => p.current_stock <= (p.min_stock_alert || 20)).length;
+
+  const isOwner = !currentUser || currentUser.role === 'owner' || currentUser.role === 'Owner / Administrator';
 
   const navItems = [
     { id: 'dashboard', label: 'Home / Day Summary', icon: LayoutDashboard },
@@ -29,6 +34,15 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
     { id: 'products', label: 'Products & Stock', icon: Boxes, badge: lowStockCount ? `${lowStockCount} Low` : null, alert: lowStockCount > 0 },
     { id: 'daybook', label: 'Day Book & Reports', icon: CalendarCheck }
   ];
+
+  const operationsItems = [
+    { id: 'wallet', label: 'Wallet & Expenses', icon: Wallet },
+    { id: 'activity-log', label: 'Activity Log', icon: Activity }
+  ];
+
+  const adminItems = isOwner ? [
+    { id: 'users', label: 'Staff & Roles', icon: ShieldCheck }
+  ] : [];
 
   const handleResetData = () => {
     if (window.confirm('Reset all CRM and Ledger records back to default demo state?')) {
@@ -81,6 +95,7 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
           )}
         </div>
 
+        {/* Section 1: Main Business Modules */}
         <div className="nav-section">
           <div className="nav-label">Main Business Modules</div>
           {navItems.map((item) => {
@@ -106,6 +121,52 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
             );
           })}
         </div>
+
+        {/* Section 2: Operations */}
+        <div className="nav-section" style={{ marginTop: '10px' }}>
+          <div className="nav-label">Operations</div>
+          {operationsItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <div
+                key={item.id}
+                className={`nav-link ${isActive ? 'active' : ''}`}
+                onClick={() => {
+                  onSelectTab(item.id);
+                  if (window.innerWidth <= 1024) onClose();
+                }}
+              >
+                <Icon size={18} />
+                <span>{item.label}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Section 3: Administration (Owner Only) */}
+        {adminItems.length > 0 && (
+          <div className="nav-section" style={{ marginTop: '10px' }}>
+            <div className="nav-label">Administration</div>
+            {adminItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <div
+                  key={item.id}
+                  className={`nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectTab(item.id);
+                    if (window.innerWidth <= 1024) onClose();
+                  }}
+                >
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <div style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
           {currentUser && (

@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
-import { Plus, Trash2, AlertCircle } from 'lucide-react';
-import { formatCurrency } from '../../utils/formatters';
+import { Plus, Trash2, AlertCircle, Warehouse, History, ShieldAlert } from 'lucide-react';
+import { formatCurrency, formatDate } from '../../utils/formatters';
 
 export const EditSaleModal = ({
   isOpen,
   onClose,
   sale,
   dataService,
+  currentUser,
   onSaleUpdated
 }) => {
   const customers = dataService.getCustomers();
   const products = dataService.getProducts().filter((p) => p.is_active);
+  const godowns = dataService.getGodowns();
 
   const [customerId, setCustomerId] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [items, setItems] = useState([]);
+  const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
@@ -28,10 +31,12 @@ export const EditSaleModal = ({
       setItems(
         sale.items.map((i) => ({
           product_id: i.product_id,
+          godown_id: i.godown_id || godowns[0]?.id || '',
           quantity: i.quantity,
           selling_price: i.selling_price
         }))
       );
+      setReason('');
       setNotes(sale.notes || '');
       setError('');
     }
@@ -45,6 +50,7 @@ export const EditSaleModal = ({
     updated[index] = {
       ...updated[index],
       product_id: prodId,
+      godown_id: updated[index].godown_id || godowns[0]?.id || '',
       selling_price: prod ? prod.selling_price : 0
     };
     setItems(updated);
@@ -58,9 +64,15 @@ export const EditSaleModal = ({
 
   const addItemRow = () => {
     if (products.length === 0) return;
+    const defProd = products[0];
     setItems([
       ...items,
-      { product_id: products[0].id, quantity: 1, selling_price: products[0].selling_price || 0 }
+      {
+        product_id: defProd.id,
+        godown_id: godowns[0]?.id || '',
+        quantity: 1,
+        selling_price: defProd.selling_price || 0
+      }
     ]);
   };
 
@@ -119,6 +131,11 @@ export const EditSaleModal = ({
       }
     }
 
+    if (!reason.trim()) {
+      setError('Please provide a mandatory reason for this sale invoice correction (required for audit trail)');
+      return;
+    }
+
     try {
       const updated = dataService.updateSale(sale.id, {
         customer_id: customerId,
@@ -126,7 +143,7 @@ export const EditSaleModal = ({
         date,
         time,
         notes
-      });
+      }, reason.trim(), currentUser);
 
       if (onSaleUpdated) onSaleUpdated(updated);
       onClose();
@@ -135,12 +152,14 @@ export const EditSaleModal = ({
     }
   };
 
+  const auditTrail = dataService?.getAuditTrail ? dataService.getAuditTrail('customer_sales', sale.id) : [];
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={`Edit Sale Invoice — ${sale.invoice_no}`}
-      maxWidth="750px"
+      maxWidth="880px"
     >
       <form onSubmit={handleSubmit}>
         {error && (
@@ -149,9 +168,9 @@ export const EditSaleModal = ({
           </div>
         )}
 
-        {/* Informative Note: Payments are NOT touched here */}
+        {/* Informative Note */}
         <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '12px', color: '#166534' }}>
-          <strong>Note:</strong> Editing this bill adjusts only products, quantities, and line prices. Existing customer payments remain completely safe and are never overwritten.
+          <strong>Note:</strong> Editing this bill adjusts products, quantities, godown stock, and line prices. Existing customer payments remain completely safe and are never overwritten.
         </div>
 
         {/* Customer & Date Selector */}
@@ -210,10 +229,11 @@ export const EditSaleModal = ({
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: '45%' }}>Product</th>
-                  <th style={{ width: '18%' }}>Quantity</th>
-                  <th style={{ width: '22%' }}>Price (₹)</th>
-                  <th style={{ width: '15%', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: '32%' }}>Product</th>
+                  <th style={{ width: '26%' }}>Source Godown</th>
+                  <th style={{ width: '13%' }}>Quantity</th>
+                  <th style={{ width: '15%' }}>Price (₹)</th>
+                  <th style={{ width: '14%', textAlign: 'right' }}>Total</th>
                   <th></th>
                 </tr>
               </thead>
@@ -238,6 +258,23 @@ export const EditSaleModal = ({
                               {p.name} (Stock: {p.current_stock} {p.unit})
                             </option>
                           ))}
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          className="form-select"
+                          value={item.godown_id}
+                          onChange={(e) => handleItemChange(idx, 'godown_id', e.target.value)}
+                          style={{ fontSize: '12px' }}
+                        >
+                          {godowns.map((g) => {
+                            const gStock = dataService.getProductStockInGodown(item.product_id, g.id);
+                            return (
+                              <option key={g.id} value={g.id}>
+                                {g.name} ({gStock} available)
+                              </option>
+                            );
+                          })}
                         </select>
                       </td>
                       <td>
@@ -321,6 +358,22 @@ export const EditSaleModal = ({
           </div>
         </div>
 
+        {/* Reason for Correction */}
+        <div className="form-group" style={{ marginBottom: '16px' }}>
+          <label className="form-label" style={{ fontWeight: 700, color: '#b45309', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ShieldAlert size={14} /> Reason for Correction * (Mandatory for Audit Trail)
+          </label>
+          <input
+            type="text"
+            className="form-input"
+            required
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Corrected quantity billed / customer return..."
+            style={{ borderColor: '#fde68a', backgroundColor: '#fffbeb' }}
+          />
+        </div>
+
         <div className="form-group" style={{ marginBottom: '20px' }}>
           <label className="form-label">Notes / Remarks</label>
           <input
@@ -340,6 +393,39 @@ export const EditSaleModal = ({
             Save Updated Bill
           </button>
         </div>
+
+        {/* Audit Trail Section */}
+        {auditTrail && auditTrail.length > 0 && (
+          <div style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <History size={14} color="#64748b" /> Modification History & Audit Trail ({auditTrail.length})
+            </h4>
+            <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px' }}>
+              <table className="data-table" style={{ margin: 0 }}>
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>Field Changed</th>
+                    <th>Correction Detail</th>
+                    <th>Reason</th>
+                    <th>Changed By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditTrail.map((a, i) => (
+                    <tr key={a.id || i}>
+                      <td>{formatDate(a.changed_at)} {new Date(a.changed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                      <td><strong>{a.field_name}</strong></td>
+                      <td>{String(a.old_value)} → {String(a.new_value)}</td>
+                      <td style={{ color: '#b45309' }}>{a.reason || '—'}</td>
+                      <td>{a.changed_by}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </form>
     </Modal>
   );

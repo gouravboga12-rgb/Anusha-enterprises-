@@ -1,13 +1,33 @@
-import React, { useState } from 'react';
-import { BookMarked, Printer } from 'lucide-react';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import React, { useState, useMemo } from 'react';
+import { BookMarked, Printer, Download, Warehouse, Calendar, Filter } from 'lucide-react';
+import { formatCurrency, formatDate, getTodayDateString } from '../../utils/formatters';
 
 export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPayment }) => {
   const suppliers = dataService.getSuppliers();
   const [selectedSupplierId, setSelectedSupplierId] = useState(suppliers[0]?.id || '');
+  const [dateRangeFilter, setDateRangeFilter] = useState('all'); // 'all' | 'this_month' | 'custom'
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState(getTodayDateString());
 
   const selectedSupplier = dataService.getSupplierById(selectedSupplierId);
-  const ledgerData = selectedSupplierId ? dataService.getSupplierLedger(selectedSupplierId) : null;
+  const rawLedgerData = selectedSupplierId ? dataService.getSupplierLedger(selectedSupplierId) : null;
+
+  // Filter entries by date range
+  const filteredEntries = useMemo(() => {
+    if (!rawLedgerData?.entries) return [];
+    let list = rawLedgerData.entries;
+
+    if (dateRangeFilter === 'this_month') {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      list = list.filter((e) => e.date >= firstDay);
+    } else if (dateRangeFilter === 'custom') {
+      if (fromDate) list = list.filter((e) => e.date >= fromDate);
+      if (toDate) list = list.filter((e) => e.date <= toDate);
+    }
+
+    return list;
+  }, [rawLedgerData, dateRangeFilter, fromDate, toDate]);
 
   const handlePrint = () => {
     window.print();
@@ -15,7 +35,8 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
 
   return (
     <div>
-      <div className="card-header" style={{ marginBottom: '16px' }}>
+      {/* Non-Printable Header */}
+      <div className="card-header no-print" style={{ marginBottom: '16px' }}>
         <div>
           <h1 style={{ fontSize: '20px' }}>Supplier Ledger (Vendor Account Passbook)</h1>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
@@ -24,13 +45,13 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-secondary" onClick={handlePrint}>
-            <Printer size={15} /> Print Ledger
+            <Printer size={15} /> Print / Save PDF Statement
           </button>
         </div>
       </div>
 
       {/* Supplier Selector */}
-      <div className="card" style={{ padding: '16px 20px', marginBottom: '20px' }}>
+      <div className="card no-print" style={{ padding: '16px 20px', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '280px' }}>
             <label className="form-label" style={{ fontSize: '12px', color: '#64748b' }}>Select Supplier Account:</label>
@@ -56,32 +77,32 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
               <div style={{ background: '#f8fafc', padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>TOTAL PURCHASES</span>
                 <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                  {formatCurrency(ledgerData?.totalPurchases || 0)}
+                  {formatCurrency(rawLedgerData?.totalPurchases || 0)}
                 </div>
               </div>
               <div style={{ background: '#ecfdf5', padding: '8px 16px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
                 <span style={{ fontSize: '11px', color: '#047857', fontWeight: 600 }}>TOTAL PAID</span>
                 <div style={{ fontSize: '16px', fontWeight: 800, color: '#065f46' }}>
-                  {formatCurrency(ledgerData?.totalPaid || 0)}
+                  {formatCurrency(rawLedgerData?.totalPaid || 0)}
                 </div>
               </div>
               <div style={{
-                background: (ledgerData?.pendingBalance || 0) > 0 ? '#fffbeb' : '#f8fafc',
+                background: (rawLedgerData?.pendingBalance || 0) > 0 ? '#fffbeb' : '#f8fafc',
                 padding: '8px 16px',
                 borderRadius: '8px',
-                border: `1px solid ${(ledgerData?.pendingBalance || 0) > 0 ? '#fde68a' : '#e2e8f0'}`
+                border: `1px solid ${(rawLedgerData?.pendingBalance || 0) > 0 ? '#fde68a' : '#e2e8f0'}`
               }}>
-                <span style={{ fontSize: '11px', color: (ledgerData?.pendingBalance || 0) > 0 ? '#b45309' : '#64748b', fontWeight: 600 }}>
+                <span style={{ fontSize: '11px', color: (rawLedgerData?.pendingBalance || 0) > 0 ? '#b45309' : '#64748b', fontWeight: 600 }}>
                   PAYABLE BALANCE
                 </span>
                 <div style={{
                   fontSize: '16px',
                   fontWeight: 800,
-                  color: (ledgerData?.pendingBalance || 0) > 0 ? '#d97706' : '#10b981'
+                  color: (rawLedgerData?.pendingBalance || 0) > 0 ? '#d97706' : '#10b981'
                 }}>
-                  {formatCurrency(ledgerData?.pendingBalance || 0)}
+                  {formatCurrency(rawLedgerData?.pendingBalance || 0)}
                 </div>
-                {(ledgerData?.pendingBalance || 0) > 0 && onOpenPayment && (
+                {(rawLedgerData?.pendingBalance || 0) > 0 && onOpenPayment && (
                   <button
                     className="btn btn-sm"
                     style={{
@@ -102,32 +123,97 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
             </div>
           )}
         </div>
+
+        {/* Date Range Filter Controls */}
+        <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Statement Period:</span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              className={`btn btn-sm ${dateRangeFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setDateRangeFilter('all')}
+            >
+              All Records
+            </button>
+            <button
+              className={`btn btn-sm ${dateRangeFilter === 'this_month' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setDateRangeFilter('this_month')}
+            >
+              This Month
+            </button>
+            <button
+              className={`btn btn-sm ${dateRangeFilter === 'custom' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setDateRangeFilter('custom')}
+            >
+              Custom Range
+            </button>
+          </div>
+
+          {dateRangeFilter === 'custom' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="date"
+                className="form-input"
+                style={{ padding: '4px 8px', fontSize: '12px' }}
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+              <span style={{ fontSize: '12px', color: '#64748b' }}>to</span>
+              <input
+                type="date"
+                className="form-input"
+                style={{ padding: '4px 8px', fontSize: '12px' }}
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Ledger Table */}
-      <div className="card">
+      {/* Printable Statement Document Header */}
+      <div className="card print-document">
+        <div className="print-header" style={{ display: 'none', borderBottom: '2px solid #0f172a', paddingBottom: '16px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ fontSize: '22px', fontWeight: 800, margin: 0, color: '#0f172a' }}>ANUSHA ENTERPRISES</h2>
+              <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#475569' }}>
+                Main Road, Nandipet, Nizamabad Dist. • Ph: 96409 12521
+              </p>
+              <div style={{ marginTop: '8px', fontSize: '14px', fontWeight: 700, color: '#0284c7' }}>
+                SUPPLIER ACCOUNT PASSBOOK STATEMENT
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: '12px', color: '#334155' }}>
+              <div><strong>Vendor:</strong> {selectedSupplier?.company_name}</div>
+              <div><strong>Code:</strong> {selectedSupplier?.supplier_id}</div>
+              <div><strong>Area:</strong> {selectedSupplier?.area || 'Hub'}</div>
+              <div><strong>Statement Date:</strong> {formatDate(getTodayDateString())}</div>
+            </div>
+          </div>
+        </div>
+
         <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
                 <th>Date & Time</th>
-                <th>Transaction Type</th>
+                <th>Type</th>
                 <th>Purchase / Voucher #</th>
                 <th>Particulars & Goods Received</th>
-                <th style={{ textAlign: 'right', color: '#d97706' }}>Credit (Purchase ₹)</th>
+                <th style={{ textAlign: 'right', color: '#d97706' }}>Credit (Inward ₹)</th>
                 <th style={{ textAlign: 'right', color: '#15803d' }}>Debit (Paid Out ₹)</th>
                 <th style={{ textAlign: 'right', color: '#0284c7' }}>Running Balance</th>
               </tr>
             </thead>
             <tbody>
-              {!ledgerData || ledgerData.entries.length === 0 ? (
+              {filteredEntries.length === 0 ? (
                 <tr>
                   <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                    No ledger transactions recorded yet for this supplier.
+                    No ledger transactions recorded in this period.
                   </td>
                 </tr>
               ) : (
-                ledgerData.entries.map((entry) => (
+                filteredEntries.map((entry) => (
                   <tr key={entry.id}>
                     <td style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>
                       <div style={{ fontWeight: 600 }}>{formatDate(entry.date)}</div>
@@ -141,8 +227,20 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
                     <td style={{ fontWeight: 700, fontSize: '12px', color: '#0284c7' }}>
                       {entry.reference}
                     </td>
-                    <td style={{ fontSize: '13px', maxWidth: '320px' }}>
-                      {entry.particulars}
+                    <td style={{ fontSize: '12.5px', maxWidth: '380px' }}>
+                      <div style={{ fontWeight: 500, color: '#0f172a' }}>{entry.particulars}</div>
+                      {entry.items_detail && entry.items_detail.length > 0 && (
+                        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          {entry.items_detail.map((itm, idx) => (
+                            <div key={idx} style={{ fontSize: '11px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>• {itm.product_name}: <strong>{itm.quantity}</strong> × ₹{itm.purchase_price} = <strong>₹{itm.total}</strong></span>
+                              {itm.godown && (
+                                <span style={{ color: '#0284c7', fontSize: '10.5px' }}>[{itm.godown}]</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 600, color: '#d97706' }}>
                       {entry.credit > 0 ? formatCurrency(entry.credit) : '—'}
@@ -154,7 +252,7 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
                       textAlign: 'right',
                       fontWeight: 800,
                       fontSize: '14px',
-                      color: entry.balance > 0 ? '#d97706' : '#15803d'
+                      color: entry.balance > 0 ? '#d97706' : '#10b981'
                     }}>
                       {formatCurrency(entry.balance)}
                     </td>

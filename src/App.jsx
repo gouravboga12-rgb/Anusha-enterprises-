@@ -26,9 +26,14 @@ import { SupplierLedgerView } from './components/ledger/SupplierLedgerView';
 import { DailyTransactions } from './components/daybook/DailyTransactions';
 import { ManualAdjustmentModal } from './components/inventory/ManualAdjustmentModal';
 import { RevenueProfitReport } from './components/reports/RevenueProfitReport';
+import { GodownList } from './components/godowns/GodownList';
+import { WalletPage } from './components/wallet/WalletPage';
+import { ActivityLogPage } from './components/activitylog/ActivityLogPage';
+import { UserManagement } from './components/users/UserManagement';
 import { BottomNav } from './components/common/BottomNav';
 import { Footer } from './components/common/Footer';
 import { LoginPage } from './components/auth/LoginPage';
+import { Boxes, Warehouse } from 'lucide-react';
 
 import { dataService } from './api/dataService';
 
@@ -44,6 +49,7 @@ export const App = () => {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [productsSubTab, setProductsSubTab] = useState('catalog'); // 'catalog' | 'godowns'
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [, setTick] = useState(0); // For re-rendering when dataService changes
 
@@ -178,7 +184,7 @@ export const App = () => {
   };
 
   if (!currentUser) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+    return <LoginPage onLoginSuccess={handleLoginSuccess} dataService={dataService} />;
   }
 
   return (
@@ -325,20 +331,42 @@ export const App = () => {
           )}
 
           {activeTab === 'products' && (
-            <ProductList
-              products={dataService.getProducts()}
-              dataService={dataService}
-              onAddProduct={() => {
-                setEditingProduct(null);
-                setIsProductFormOpen(true);
-              }}
-              onEditProduct={(p) => {
-                setEditingProduct(p);
-                setIsProductFormOpen(true);
-              }}
-              onViewStockHistory={(p) => setStockHistoryProduct(p)}
-              onAdjustStock={() => setIsAdjustmentOpen(true)}
-            />
+            <div>
+              <div className="subnav-tabs-bar" style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <button
+                  className={`btn ${productsSubTab === 'catalog' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setProductsSubTab('catalog')}
+                >
+                  <Boxes size={16} /> Products & Overall Stock
+                </button>
+                <button
+                  className={`btn ${productsSubTab === 'godowns' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setProductsSubTab('godowns')}
+                >
+                  <Warehouse size={16} /> Godown Management & Transfers
+                </button>
+              </div>
+
+              {productsSubTab === 'catalog' ? (
+                <ProductList
+                  products={dataService.getProducts()}
+                  dataService={dataService}
+                  currentUser={currentUser}
+                  onAddProduct={() => {
+                    setEditingProduct(null);
+                    setIsProductFormOpen(true);
+                  }}
+                  onEditProduct={(p) => {
+                    setEditingProduct(p);
+                    setIsProductFormOpen(true);
+                  }}
+                  onViewStockHistory={(p) => setStockHistoryProduct(p)}
+                  onAdjustStock={() => setIsAdjustmentOpen(true)}
+                />
+              ) : (
+                <GodownList dataService={dataService} currentUser={currentUser} />
+              )}
+            </div>
           )}
 
           {activeTab === 'sales' && (
@@ -410,6 +438,18 @@ export const App = () => {
           {(activeTab === 'daybook' || activeTab === 'day-book' || activeTab === 'reports') && (
             <DailyTransactions dataService={dataService} />
           )}
+
+          {activeTab === 'wallet' && (
+            <WalletPage dataService={dataService} currentUser={currentUser} />
+          )}
+
+          {activeTab === 'activity-log' && (
+            <ActivityLogPage dataService={dataService} currentUser={currentUser} />
+          )}
+
+          {activeTab === 'users' && (
+            <UserManagement dataService={dataService} currentUser={currentUser} />
+          )}
         </main>
 
         <Footer />
@@ -420,6 +460,7 @@ export const App = () => {
         isOpen={isNewSaleOpen}
         onClose={() => setIsNewSaleOpen(false)}
         dataService={dataService}
+        currentUser={currentUser}
         initialCustomerId={saleInitialCustId}
         onOpenPayment={(cId, type) => openPayment(cId, type)}
       />
@@ -428,6 +469,7 @@ export const App = () => {
         isOpen={isNewPurchaseOpen}
         onClose={() => setIsNewPurchaseOpen(false)}
         dataService={dataService}
+        currentUser={currentUser}
         initialSupplierId={purInitialSuppId}
         onOpenPayment={(sId, type) => openPayment(sId, type)}
       />
@@ -454,7 +496,7 @@ export const App = () => {
           setEditingCustomer(null);
         }}
         customer={editingCustomer}
-        onSave={(cData) => dataService.saveCustomer(cData)}
+        onSave={(cData) => dataService.saveCustomer(cData, currentUser)}
       />
 
       <SupplierFormModal
@@ -464,7 +506,14 @@ export const App = () => {
           setEditingSupplier(null);
         }}
         supplier={editingSupplier}
-        onSave={(sData) => dataService.saveSupplier(sData)}
+        dataService={dataService}
+        currentUser={currentUser}
+        onSave={(sData, productIds) => {
+          const s = dataService.saveSupplier(sData, currentUser);
+          if (productIds && s?.id) {
+            dataService.saveSupplierProducts(s.id, productIds, currentUser);
+          }
+        }}
       />
 
       <ProductFormModal
@@ -511,6 +560,7 @@ export const App = () => {
         }}
         sale={editingSale}
         dataService={dataService}
+        currentUser={currentUser}
         onSave={() => {
           setIsEditSaleOpen(false);
           setEditingSale(null);
@@ -543,6 +593,7 @@ export const App = () => {
         }}
         purchase={editingPurchase}
         dataService={dataService}
+        currentUser={currentUser}
         onSave={() => {
           setIsEditPurchaseOpen(false);
           setEditingPurchase(null);

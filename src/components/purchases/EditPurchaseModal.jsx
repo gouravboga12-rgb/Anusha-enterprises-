@@ -1,28 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
-import { Plus, Trash2 } from 'lucide-react';
-import { formatCurrency } from '../../utils/formatters';
+import { Plus, Trash2, Warehouse, History, ShieldAlert } from 'lucide-react';
+import { formatCurrency, formatDate } from '../../utils/formatters';
 
 export const EditPurchaseModal = ({
   isOpen,
   onClose,
   purchase,
   dataService,
+  currentUser,
   onPurchaseUpdated
 }) => {
   const suppliers = dataService.getSuppliers();
   const products = dataService.getProducts();
+  const godowns = dataService.getGodowns();
 
   const [supplierId, setSupplierId] = useState('');
+  const [godownId, setGodownId] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [items, setItems] = useState([]);
+  const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (purchase && isOpen) {
       setSupplierId(purchase.supplier_id || '');
+      setGodownId(purchase.godown_id || godowns[0]?.id || '');
       setDate(purchase.date || '');
       setTime(purchase.time || '');
       setItems(
@@ -32,6 +37,7 @@ export const EditPurchaseModal = ({
           purchase_price: i.purchase_price
         }))
       );
+      setReason('');
       setNotes(purchase.notes || '');
       setError('');
     }
@@ -115,14 +121,20 @@ export const EditPurchaseModal = ({
       }
     }
 
+    if (!reason.trim()) {
+      setError('Please provide a mandatory reason for this purchase correction (required for audit trail)');
+      return;
+    }
+
     try {
       const updated = dataService.updatePurchase(purchase.id, {
         supplier_id: supplierId,
+        godown_id: godownId,
         items,
         date,
         time,
         notes
-      });
+      }, reason.trim(), currentUser);
 
       if (onPurchaseUpdated) onPurchaseUpdated(updated);
       onClose();
@@ -130,6 +142,8 @@ export const EditPurchaseModal = ({
       setError(err.message || 'Failed to update supplier purchase');
     }
   };
+
+  const auditTrail = dataService?.getAuditTrail ? dataService.getAuditTrail('supplier_purchases', purchase.id) : [];
 
   return (
     <Modal
@@ -150,7 +164,7 @@ export const EditPurchaseModal = ({
         </div>
 
         <div className="form-row">
-          <div className="form-group" style={{ flex: 2 }}>
+          <div className="form-group" style={{ flex: 1.5 }}>
             <label className="form-label">Supplier / Vendor</label>
             <select
               className="form-select"
@@ -161,6 +175,23 @@ export const EditPurchaseModal = ({
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.company_name} ({s.supplier_id})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Warehouse size={13} color="#0284c7" /> Storage Godown
+            </label>
+            <select
+              className="form-select"
+              value={godownId}
+              onChange={(e) => setGodownId(e.target.value)}
+            >
+              {godowns.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} ({g.code || 'Main'})
                 </option>
               ))}
             </select>
@@ -305,6 +336,21 @@ export const EditPurchaseModal = ({
           </div>
         </div>
 
+        <div className="form-group" style={{ marginBottom: '16px' }}>
+          <label className="form-label" style={{ fontWeight: 700, color: '#b45309', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ShieldAlert size={14} /> Reason for Correction * (Mandatory for Audit Trail)
+          </label>
+          <input
+            type="text"
+            className="form-input"
+            required
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Corrected supplier invoice quantity / price mismatch..."
+            style={{ borderColor: '#fde68a', backgroundColor: '#fffbeb' }}
+          />
+        </div>
+
         <div className="form-group" style={{ marginBottom: '20px' }}>
           <label className="form-label">Notes / Remarks</label>
           <input
@@ -324,6 +370,39 @@ export const EditPurchaseModal = ({
             Save Updated Purchase
           </button>
         </div>
+
+        {/* Audit Trail Section */}
+        {auditTrail && auditTrail.length > 0 && (
+          <div style={{ marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <History size={14} color="#64748b" /> Modification History & Audit Trail ({auditTrail.length})
+            </h4>
+            <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px' }}>
+              <table className="data-table" style={{ margin: 0 }}>
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>Field Changed</th>
+                    <th>Correction Detail</th>
+                    <th>Reason</th>
+                    <th>Changed By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditTrail.map((a, i) => (
+                    <tr key={a.id || i}>
+                      <td>{formatDate(a.changed_at)} {new Date(a.changed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                      <td><strong>{a.field_name}</strong></td>
+                      <td>{String(a.old_value)} → {String(a.new_value)}</td>
+                      <td style={{ color: '#b45309' }}>{a.reason || '—'}</td>
+                      <td>{a.changed_by}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </form>
     </Modal>
   );
