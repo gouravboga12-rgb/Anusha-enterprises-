@@ -295,6 +295,26 @@ class DataService {
 
       this.godowns = (godownsData || []);
       this.godownStock = (godownStockData || []).map((gs) => ({ ...gs, quantity: Number(gs.quantity) || 0 }));
+
+      // Reconcile any zero-stock products against godown_stock
+      // If a product has current_stock === 0, any remaining godown stock for it must be cleared
+      this.products.forEach((p) => {
+        const pStock = Number(p.current_stock) || 0;
+        const pGodownStock = this.godownStock.filter((gs) => gs.product_id === p.id);
+        const gTotal = pGodownStock.reduce((sum, gs) => sum + (Number(gs.quantity) || 0), 0);
+
+        if (pStock === 0 && gTotal > 0) {
+          this.godownStock = this.godownStock.map((gs) =>
+            gs.product_id === p.id ? { ...gs, quantity: 0, updated_at: new Date().toISOString() } : gs
+          );
+          if (isSupabaseConfigured) {
+            supabase.from('godown_stock')
+              .update({ quantity: 0, updated_at: new Date().toISOString() })
+              .eq('product_id', p.id)
+              .then().catch((e) => console.warn('reconcile godown zero error:', e));
+          }
+        }
+      });
       this.stockTransfers = (transfersData || []).map((t) => ({ ...t, quantity: Number(t.quantity) || 0 }));
       this.supplierProducts = suppProdsData || [];
       this.crmUsers = usersData || [];
@@ -566,6 +586,107 @@ class DataService {
     }
   }
 
+  _setGodownStockQuantity(godownId, productId, exactQuantity) {
+    const qty = Math.max(0, Number(exactQuantity) || 0);
+    const existing = this.godownStock.find((gs) => gs.godown_id === godownId && gs.product_id === productId);
+
+    if (existing) {
+      this.godownStock = this.godownStock.map((gs) =>
+        gs.godown_id === godownId && gs.product_id === productId
+          ? { ...gs, quantity: qty, updated_at: new Date().toISOString() }
+          : gs
+      );
+
+      if (isSupabaseConfigured) {
+        supabase.from('godown_stock')
+          .update({ quantity: qty, updated_at: new Date().toISOString() })
+          .eq('godown_id', godownId).eq('product_id', productId)
+          .then().catch((e) => console.warn('godown_stock set error:', e));
+      }
+    } else {
+      const newRow = {
+        id: `gs-${godownId}-${productId}-${Date.now()}`,
+        godown_id: godownId,
+        product_id: productId,
+        quantity: qty,
+        updated_at: new Date().toISOString()
+      };
+      this.godownStock = [...this.godownStock, newRow];
+
+      if (isSupabaseConfigured) {
+        supabase.from('godown_stock').upsert([newRow], { onConflict: 'godown_id,product_id' })
+          .then().catch((e) => console.warn('godown_stock insert error:', e));
+      }
+    }
+  }
+
+  _syncProductStockToGodowns(productId, targetStock) {
+    const target = Math.max(0, Number(targetStock) || 0);
+    const existingRows = this.godownStock.filter((gs) => gs.product_id === productId);
+    const currentTotalInGodowns = existingRows.reduce((sum, gs) => sum + (Number(gs.quantity) || 0), 0);
+
+    if (target === 0) {
+      // Zero out all godown stock for this product
+      this.godownStock = this.godownStock.map((gs) =>
+        gs.product_id === productId
+          ? { ...gs, quantity: 0, updated_at: new Date().toISOString() }
+          : gs
+      );
+
+      if (isSupabaseConfigured) {
+        supabase.from('godown_stock')
+          .update({ quantity: 0, updated_at: new Date().toISOString() })
+          .eq('product_id', productId)
+          .then().catch((e) => console.warn('godown_stock zero error:', e));
+      }
+      return;
+    }
+
+    const defaultGodown = this.getDefaultGodown() || this.godowns[0];
+    if (!defaultGodown) return;
+
+    if (currentTotalInGodowns === 0 || existingRows.length === 0) {
+      // Allocate the entire target stock to the default godown
+      this._setGodownStockQuantity(defaultGodown.id, productId, target);
+      // Ensure other godown rows for this product are 0
+      existingRows.forEach((r) => {
+        if (r.godown_id !== defaultGodown.id && r.quantity > 0) {
+          this._setGodownStockQuantity(r.godown_id, productId, 0);
+        }
+      });
+      return;
+    }
+
+    if (target === currentTotalInGodowns) {
+      // Already matching
+      return;
+    }
+
+    // Allocate target proportionally across godowns that currently have stock
+    const activeRows = existingRows.filter((r) => (Number(r.quantity) || 0) > 0);
+    if (activeRows.length === 0) {
+      this._setGodownStockQuantity(defaultGodown.id, productId, target);
+      return;
+    }
+
+    if (activeRows.length === 1) {
+      this._setGodownStockQuantity(activeRows[0].godown_id, productId, target);
+      return;
+    }
+
+    let remaining = target;
+    activeRows.forEach((row, idx) => {
+      if (idx === activeRows.length - 1) {
+        this._setGodownStockQuantity(row.godown_id, productId, Math.max(0, remaining));
+      } else {
+        const allocated = Math.max(0, Math.round((row.quantity / currentTotalInGodowns) * target));
+        const actual = Math.min(allocated, remaining);
+        this._setGodownStockQuantity(row.godown_id, productId, actual);
+        remaining -= actual;
+      }
+    });
+  }
+
   // ==============================================================================
   // STOCK TRANSFERS
   // ==============================================================================
@@ -723,6 +844,10 @@ class DataService {
       this.products = this.products.map((p) => (p.id === prodId ? saved : p));
       this.logActivity(currentUser, 'UPDATE', 'Products', prodId, dbRecord.name, `Updated product: ${dbRecord.name}`);
     }
+
+    // Synchronize godown stock so godowns match edited product quantity
+    this._syncProductStockToGodowns(prodId, dbRecord.current_stock);
+
     this.notify();
 
     if (isNew) {

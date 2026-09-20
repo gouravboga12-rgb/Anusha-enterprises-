@@ -527,7 +527,7 @@ export const App = () => {
           setEditingProduct(null);
         }}
         product={editingProduct}
-        onSave={(pData) => dataService.saveProduct(pData)}
+        onSave={(pData) => dataService.saveProduct(pData, currentUser)}
       />
 
       <StockMovementModal
