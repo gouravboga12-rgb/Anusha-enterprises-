@@ -1644,6 +1644,8 @@ h1, h2, h3, h4, h5, h6 {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .app-container,
@@ -1661,6 +1663,14 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0 !important;
     margin: 0 !important;
     background: transparent !important;
+  }
+
+  /* Always show structured table and hide mobile card view on print */
+  .desktop-table-view {
+    display: block !important;
+  }
+  .mobile-cards-view {
+    display: none !important;
   }
 
   /* Show dedicated print document header */

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle } from 'lucide-react';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer } from 'lucide-react';
+import { formatCurrency, formatDate, formatDateTime, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 
 export const SupplierProfile = ({
   supplierId,
@@ -32,6 +32,10 @@ export const SupplierProfile = ({
   const payments = dataService.getPayments().filter((p) => p.supplier_id === supplierId && p.type === 'supplier_payment');
   const pendingPurchases = purchases.filter((p) => p.pending_amount > 0);
   const firstPurchaseId = pendingPurchases.length > 0 ? pendingPurchases[0].id : '';
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   const handleDeleteSupplier = async () => {
     const warning = ledgerData.pendingBalance > 0
@@ -69,7 +73,7 @@ export const SupplierProfile = ({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+      <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <button
           className="btn btn-secondary btn-sm"
           onClick={onBack}
@@ -101,7 +105,7 @@ export const SupplierProfile = ({
       </div>
 
       {/* Supplier Header */}
-      <div className="card" style={{ marginBottom: '20px' }}>
+      <div className="card no-print" style={{ marginBottom: '20px' }}>
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -220,7 +224,7 @@ export const SupplierProfile = ({
       </div>
 
       {/* Tabs */}
-      <div className="profile-tabs-nav" style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+      <div className="profile-tabs-nav no-print" style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
         <button
           className={`btn btn-sm ${activeTab === 'ledger' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveTab('ledger')}
@@ -245,14 +249,83 @@ export const SupplierProfile = ({
       {activeTab === 'ledger' && (
         <>
           {/* Desktop Supplier Ledger Table */}
-          <div className="card desktop-table-view" style={{ padding: '16px' }}>
-            <div className="card-header" style={{ marginBottom: '12px' }}>
+          <div className="card print-document desktop-table-view" style={{ padding: '16px' }}>
+            {/* Printable Statement Document Header (visible only on print) */}
+            <div className="print-header" style={{ display: 'none', borderBottom: '2px solid #0f172a', paddingBottom: '14px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.5px' }}>ANUSHA ENTERPRISES</h2>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#475569' }}>
+                    Main Road, Nandipet, Nizamabad Dist. • Telangana • Ph: 96409 12521
+                  </p>
+                  <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    SUPPLIER ACCOUNT LEDGER (PURCHASE & PAYMENT KHATA)
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', fontSize: '11px', color: '#334155', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>{supplier.company_name}</div>
+                  <div><strong>Supplier Code:</strong> {supplier.supplier_id}</div>
+                  {supplier.supplier_name && <div><strong>Contact:</strong> {supplier.supplier_name}</div>}
+                  {supplier.mobile && <div><strong>Phone:</strong> {supplier.mobile}</div>}
+                  {supplier.area && <div><strong>Location:</strong> {supplier.area}</div>}
+                  <div><strong>Statement Date:</strong> {formatDate(getTodayDateString())}</div>
+                </div>
+              </div>
+
+              {/* Financial Summary Strip on Print */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: '10px',
+                marginTop: '12px',
+                paddingTop: '10px',
+                borderTop: '1px solid #e2e8f0',
+                fontSize: '11px'
+              }}>
+                <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 600 }}>TOTAL PURCHASES: </span>
+                  <strong style={{ fontSize: '13px', color: '#0f172a' }}>{formatCurrency(ledgerData.totalPurchases)}</strong>
+                </div>
+                <div style={{ background: '#ecfdf5', padding: '6px 10px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                  <span style={{ color: '#047857', fontSize: '10px', fontWeight: 600 }}>TOTAL PAID OUT: </span>
+                  <strong style={{ fontSize: '13px', color: '#065f46' }}>{formatCurrency(ledgerData.totalPaid)}</strong>
+                </div>
+                <div style={{
+                  background: ledgerData.pendingBalance > 0 ? '#fffbeb' : '#f8fafc',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
+                  border: `1px solid ${ledgerData.pendingBalance > 0 ? '#fde68a' : '#e2e8f0'}`
+                }}>
+                  <span style={{ color: ledgerData.pendingBalance > 0 ? '#b45309' : '#64748b', fontSize: '10px', fontWeight: 600 }}>BALANCE TO PAY: </span>
+                  <strong style={{ fontSize: '13px', color: ledgerData.pendingBalance > 0 ? '#d97706' : '#10b981' }}>{formatCurrency(ledgerData.pendingBalance)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="card-header no-print" style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <h3 className="card-title">Supplier Ledger (Khata)</h3>
                 <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                   Chronological purchases (credit) and payment vouchers (debit) with automatic running balance.
                 </p>
               </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handlePrint}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  padding: '6px 14px',
+                  cursor: 'pointer'
+                }}
+                title="Print or Save PDF Statement"
+              >
+                <Printer size={15} /> PDF Print
+              </button>
             </div>
 
             <div className="table-responsive" style={{ border: 'none' }}>
@@ -304,10 +377,35 @@ export const SupplierProfile = ({
                 </tbody>
               </table>
             </div>
+
+            {/* Print Footer with signature line */}
+            <div className="print-header" style={{ display: 'none', marginTop: '24px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1', fontSize: '11px', color: '#64748b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                  <p style={{ margin: 0 }}>* This is a computer-generated account statement from Anusha Enterprises Digital Ledger.</p>
+                  <p style={{ margin: '2px 0 0', fontSize: '10px' }}>Printed on: {formatDateTime(getTodayDateString(), getCurrentTimeString())}</p>
+                </div>
+                <div style={{ textAlign: 'center', minWidth: '160px' }}>
+                  <div style={{ borderBottom: '1px solid #0f172a', height: '30px', marginBottom: '4px' }}></div>
+                  <strong style={{ color: '#0f172a' }}>Authorized Signature</strong>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Mobile Ledger Cards (Zero-scroll) */}
-          <div className="mobile-cards-view">
+          <div className="mobile-cards-view no-print">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Ledger Records</span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={handlePrint}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', padding: '4px 10px' }}
+              >
+                <Printer size={14} /> PDF Print
+              </button>
+            </div>
             {ledgerData.entries.length === 0 ? (
               <div className="card" style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
                 No ledger entries recorded for this supplier.
