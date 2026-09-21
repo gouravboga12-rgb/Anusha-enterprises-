@@ -514,10 +514,13 @@ export const GodownList = ({ dataService, currentUser }) => {
               }
 
               const ts = log.created_at ? new Date(log.created_at) : null;
-              const timeStr = ts
+              const isValidDate = ts && !isNaN(ts.getTime());
+              const timeStr = isValidDate
                 ? ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
-                : '';
-              const dateStr = ts ? formatDate(ts.toISOString().split('T')[0]) : '';
+                : (log.time || '');
+              const dateStr = isValidDate
+                ? formatDate(ts.toISOString().split('T')[0])
+                : (log.date ? formatDate(log.date) : '');
 
               return (
                 <div

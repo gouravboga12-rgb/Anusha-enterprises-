@@ -526,7 +526,9 @@ export const App = () => {
           setEditingCustomer(null);
         }}
         customer={editingCustomer}
-        onSave={(cData) => dataService.saveCustomer(cData, currentUser)}
+        onSave={async (cData) => {
+          await dataService.saveCustomer(cData, currentUser);
+        }}
       />
 
       <SupplierFormModal
@@ -538,10 +540,10 @@ export const App = () => {
         supplier={editingSupplier}
         dataService={dataService}
         currentUser={currentUser}
-        onSave={(sData, productIds) => {
-          const s = dataService.saveSupplier(sData, currentUser);
+        onSave={async (sData, productIds) => {
+          const s = await dataService.saveSupplier(sData, currentUser);
           if (productIds && s?.id) {
-            dataService.saveSupplierProducts(s.id, productIds, currentUser);
+            await dataService.saveSupplierProducts(s.id, productIds, currentUser);
           }
         }}
       />
@@ -553,7 +555,9 @@ export const App = () => {
           setEditingProduct(null);
         }}
         product={editingProduct}
-        onSave={(pData) => dataService.saveProduct(pData, currentUser)}
+        onSave={async (pData) => {
+          await dataService.saveProduct(pData, currentUser);
+        }}
       />
 
       <StockMovementModal

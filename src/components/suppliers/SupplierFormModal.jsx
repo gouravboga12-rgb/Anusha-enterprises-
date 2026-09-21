@@ -76,13 +76,13 @@ export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataServi
     );
   }, [allProducts, productSearch]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.company_name.trim()) {
       alert('Please enter supplier company name');
       return;
     }
-    onSave(formData, selectedProductIds);
+    await onSave(formData, selectedProductIds);
     onClose();
   };
 

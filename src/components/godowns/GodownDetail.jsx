@@ -205,7 +205,11 @@ export const GodownDetail = ({ godownId, dataService, currentUser, onBack, onOpe
               });
             }
 
-            historyItems.sort((a, b) => new Date(`${b.date}T${b.time || '00:00'}`) - new Date(`${a.date}T${a.time || '00:00'}`));
+            historyItems.sort((a, b) => {
+              const tA = `${a.date || ''} ${a.time || ''}`;
+              const tB = `${b.date || ''} ${b.time || ''}`;
+              return tB.localeCompare(tA);
+            });
 
             if (historyItems.length === 0) {
               return <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>No transactions yet for this godown.</div>;

@@ -98,6 +98,8 @@ class DataService {
 
     this.isLiveConnected = false;
     this.connectionError = null;
+    this.isFetching = false;
+    this.realtimeDebounceTimer = null;
     this.listeners = new Set();
     this.realtimeChannel = null;
 
@@ -213,6 +215,9 @@ class DataService {
   }
 
   async fetchAll() {
+    if (this.isFetching) return;
+    this.isFetching = true;
+
     try {
       // 1. Products
       const { data: prods, error: pErr } = await supabase
@@ -325,28 +330,23 @@ class DataService {
 
       this.adjustments = (adjs || []).map((a) => ({ ...a, quantity: Number(a.quantity) || 0 }));
 
-      this.godowns = (godownsData || []);
-      this.godownStock = (godownStockData || []).map((gs) => ({ ...gs, quantity: Number(gs.quantity) || 0 }));
-
-      // Reconcile any zero-stock products against godown_stock
-      // If a product has current_stock === 0, any remaining godown stock for it must be cleared
-      this.products.forEach((p) => {
-        const pStock = Number(p.current_stock) || 0;
-        const pGodownStock = this.godownStock.filter((gs) => gs.product_id === p.id);
-        const gTotal = pGodownStock.reduce((sum, gs) => sum + (Number(gs.quantity) || 0), 0);
-
-        if (pStock === 0 && gTotal > 0) {
-          this.godownStock = this.godownStock.map((gs) =>
-            gs.product_id === p.id ? { ...gs, quantity: 0, updated_at: new Date().toISOString() } : gs
-          );
-          if (isSupabaseConfigured) {
-            supabase.from('godown_stock')
-              .update({ quantity: 0, updated_at: new Date().toISOString() })
-              .eq('product_id', p.id)
-              .then().catch((e) => console.warn('reconcile godown zero error:', e));
-          }
+      // Parse contact_person and contact_phone seamlessly from godownsData
+      this.godowns = (godownsData || []).map((g) => {
+        let contactPerson = g.contact_person || '';
+        let contactPhone = g.contact_phone || '';
+        if (contactPerson && contactPerson.includes('|')) {
+          const parts = contactPerson.split('|').map((s) => s.trim());
+          contactPerson = parts[0] || '';
+          contactPhone = contactPhone || parts[1] || '';
         }
+        return {
+          ...g,
+          contact_person: contactPerson,
+          contact_phone: contactPhone
+        };
       });
+
+      this.godownStock = (godownStockData || []).map((gs) => ({ ...gs, quantity: Number(gs.quantity) || 0 }));
       this.stockTransfers = (transfersData || []).map((t) => ({ ...t, quantity: Number(t.quantity) || 0 }));
       this.supplierProducts = suppProdsData || [];
       this.crmUsers = usersData || [];
@@ -356,9 +356,12 @@ class DataService {
 
       this.isLiveConnected = true;
       this.connectionError = null;
-      this.notify();
     } catch (err) {
       throw err;
+    } finally {
+      this.isFetching = false;
+      this.isLoading = false;
+      this.notify();
     }
   }
 
@@ -369,7 +372,11 @@ class DataService {
       this.realtimeChannel = supabase
         .channel('anusha-crm-live-v2')
         .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-          this.fetchAll().catch((e) => console.warn('Realtime refresh error:', e));
+          // Debounce realtime refreshes (5000ms window) to prevent rapid query loops and free limit exhaustion
+          if (this.realtimeDebounceTimer) clearTimeout(this.realtimeDebounceTimer);
+          this.realtimeDebounceTimer = setTimeout(() => {
+            this.fetchAll().catch((e) => console.warn('Realtime refresh error:', e));
+          }, 5000);
         })
         .subscribe();
     } catch (e) {
@@ -519,7 +526,6 @@ class DataService {
         const g = this.getGodownById(p.godown_id);
         const itemsStr = (p.items || []).map((i) => {
           const itemG = i.godown_id ? this.getGodownById(i.godown_id) : g;
-          return `${i.product_name}: ${i.quantity} × ₹${i.purchase_price} = ₹${i.total}${itemG ? ' → ' + itemG.name : ''}`;
         }).join(' | ');
         synthesized.push({
           id: 'syn-' + p.id,
@@ -530,7 +536,7 @@ class DataService {
           record_id: p.id,
           record_ref: p.purchase_no,
           details: `Purchase from ${supp?.company_name || 'Supplier'} → ${g?.name || 'Main Godown'} — ${itemsStr} — Total: ₹${p.total_amount}`,
-          created_at: p.created_at || (p.date ? `${p.date}T${p.time || '12:00:00'}Z` : new Date().toISOString())
+          created_at: p.created_at || (p.date ? `${p.date}T12:00:00.000Z` : new Date().toISOString())
         });
       }
     });
@@ -552,7 +558,7 @@ class DataService {
           record_id: s.id,
           record_ref: s.invoice_no,
           details: `Sale to ${cust?.name || 'Customer'} — ${itemsStr} — Total: ₹${s.total_amount}`,
-          created_at: s.created_at || (s.date ? `${s.date}T${s.time || '12:00:00'}Z` : new Date().toISOString())
+          created_at: s.created_at || (s.date ? `${s.date}T12:00:00.000Z` : new Date().toISOString())
         });
       }
     });
@@ -569,7 +575,7 @@ class DataService {
           record_id: t.id,
           record_ref: t.transfer_no,
           details: `Transferred ${t.quantity} units of ${t.product_name} from ${t.from_godown_name} to ${t.to_godown_name}. Reason: ${t.reason || 'N/A'}`,
-          created_at: t.created_at || (t.date ? `${t.date}T12:00:00Z` : new Date().toISOString())
+          created_at: t.created_at || (t.date ? `${t.date}T12:00:00.000Z` : new Date().toISOString())
         });
       }
     });
@@ -588,13 +594,17 @@ class DataService {
           record_id: a.id,
           record_ref: 'ADJ',
           details: `Stock adjustment of ${a.quantity > 0 ? '+' : ''}${a.quantity} for ${prod?.name || 'Product'} in ${g?.name || 'Godown'}. Reason: ${a.reason || 'N/A'}`,
-          created_at: a.created_at || (a.date ? `${a.date}T12:00:00Z` : new Date().toISOString())
+          created_at: a.created_at || (a.date ? `${a.date}T12:00:00.000Z` : new Date().toISOString())
         });
       }
     });
 
-    // Combine and sort newest first
-    const allEvents = [...rawLogs, ...synthesized].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Combine and sort newest first safely
+    const allEvents = [...rawLogs, ...synthesized].sort((a, b) => {
+      const tA = a.created_at ? new Date(a.created_at).getTime() || 0 : 0;
+      const tB = b.created_at ? new Date(b.created_at).getTime() || 0 : 0;
+      return tB - tA;
+    });
 
     // Deduplicate any exact duplicates
     const deduped = [];
@@ -717,41 +727,77 @@ class DataService {
     const isNew = !godownData.id;
     const gId = godownData.id || 'godown-' + Date.now();
 
+    let storedContactPerson = (godownData.contact_person || '').trim();
+    const phone = (godownData.contact_phone || '').trim();
+    if (phone) {
+      if (storedContactPerson && !storedContactPerson.includes(phone)) {
+        storedContactPerson = `${storedContactPerson} | ${phone}`;
+      } else if (!storedContactPerson) {
+        storedContactPerson = phone;
+      }
+    }
+
+    // Strict schema matching columns for public.godowns
     const dbRecord = {
       id: gId,
-      name: godownData.name,
-      code: godownData.code || '',
-      location: godownData.location || '',
-      contact_person: godownData.contact_person || '',
-      contact_phone: godownData.contact_phone || '',
-      notes: godownData.notes || '',
+      name: (godownData.name || '').trim(),
+      code: godownData.code ? godownData.code.trim() : '',
+      location: godownData.location ? godownData.location.trim() : '',
+      contact_person: storedContactPerson || null,
+      notes: godownData.notes ? godownData.notes.trim() : '',
       is_active: godownData.is_active !== false,
-      is_default: godownData.is_default || false,
+      is_default: Boolean(godownData.is_default),
       updated_at: new Date().toISOString()
+    };
+
+    const localRecord = {
+      ...dbRecord,
+      contact_person: godownData.contact_person ? godownData.contact_person.trim() : '',
+      contact_phone: phone,
+      created_at: godownData.created_at || new Date().toISOString()
     };
 
     let saved;
     if (isNew) {
-      saved = { ...dbRecord, created_at: new Date().toISOString() };
+      saved = { ...localRecord };
       this.godowns = [...this.godowns, saved];
       this.logActivity(currentUser, 'CREATE', 'Godowns', gId, dbRecord.name, `Created godown: ${dbRecord.name}`);
     } else {
-      saved = { ...this.getGodownById(gId), ...dbRecord };
+      saved = { ...this.getGodownById(gId), ...localRecord };
       this.godowns = this.godowns.map((g) => (g.id === gId ? saved : g));
       this.logActivity(currentUser, 'UPDATE', 'Godowns', gId, dbRecord.name, `Updated godown: ${dbRecord.name}`);
     }
+
+    // Pre-populate godown_stock with 0 for all products if it's a new godown
+    if (isNew) {
+      const newGodownStockRows = (this.products || []).map((p) => ({
+        id: `gs-${gId}-${p.id}-${Date.now()}`,
+        godown_id: gId,
+        product_id: p.id,
+        quantity: 0,
+        updated_at: new Date().toISOString()
+      }));
+      this.godownStock = [...this.godownStock, ...newGodownStockRows];
+    }
+
     this.notify();
 
-    if (isNew) {
-      supabase.from('godowns').insert([dbRecord]).then().catch((e) => console.warn('saveGodown error:', e));
-    } else {
-      supabase.from('godowns').update(dbRecord).eq('id', gId).then().catch((e) => console.warn('saveGodown error:', e));
+    if (isSupabaseConfigured) {
+      if (isNew) {
+        supabase.from('godowns').insert([{ ...dbRecord, created_at: saved.created_at }])
+          .then(({ error: insErr }) => { if (insErr) console.error('saveGodown insert error:', insErr); })
+          .catch((e) => console.error('saveGodown error:', e));
+      } else {
+        supabase.from('godowns').update(dbRecord).eq('id', gId)
+          .then(({ error: updErr }) => { if (updErr) console.error('saveGodown update error:', updErr); })
+          .catch((e) => console.error('saveGodown error:', e));
+      }
     }
 
     return saved;
   }
 
-  archiveGodown(id, currentUser) {
+  async archiveGodown(id, currentUser) {
     const godown = this.getGodownById(id);
     if (!godown) throw new Error('Godown not found');
 
@@ -777,7 +823,13 @@ class DataService {
     this.logActivity(currentUser, 'ARCHIVE', 'Godowns', id, godown.name, `Archived godown: ${godown.name}`);
     this.notify();
 
-    supabase.from('godowns').update({ is_active: false, updated_at: updated.updated_at }).eq('id', id).then().catch((e) => console.warn(e));
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('godowns').update({ is_active: false, updated_at: updated.updated_at }).eq('id', id);
+      } catch (e) {
+        console.warn('archiveGodown sync warning:', e);
+      }
+    }
   }
 
   // ==============================================================================
@@ -1000,9 +1052,46 @@ class DataService {
       created_at: new Date().toISOString()
     };
 
-    // Atomic stock update
-    this._updateGodownStock(from_godown_id, product_id, -qty);
-    this._updateGodownStock(to_godown_id, product_id, qty);
+    // Calculate updated stock numbers
+    const existingFrom = this.godownStock.find((gs) => gs.godown_id === from_godown_id && gs.product_id === product_id);
+    const existingTo = this.godownStock.find((gs) => gs.godown_id === to_godown_id && gs.product_id === product_id);
+
+    const fromNewQty = Math.max(0, (existingFrom?.quantity || 0) - qty);
+    const toNewQty = (existingTo?.quantity || 0) + qty;
+    const nowIso = new Date().toISOString();
+
+    // 1. Update in-memory state
+    if (existingFrom) {
+      this.godownStock = this.godownStock.map((gs) =>
+        gs.godown_id === from_godown_id && gs.product_id === product_id
+          ? { ...gs, quantity: fromNewQty, updated_at: nowIso }
+          : gs
+      );
+    } else {
+      this.godownStock.push({
+        id: `gs-${from_godown_id}-${product_id}-${Date.now()}`,
+        godown_id: from_godown_id,
+        product_id,
+        quantity: fromNewQty,
+        updated_at: nowIso
+      });
+    }
+
+    if (existingTo) {
+      this.godownStock = this.godownStock.map((gs) =>
+        gs.godown_id === to_godown_id && gs.product_id === product_id
+          ? { ...gs, quantity: toNewQty, updated_at: nowIso }
+          : gs
+      );
+    } else {
+      this.godownStock.push({
+        id: `gs-${to_godown_id}-${product_id}-${Date.now()}`,
+        godown_id: to_godown_id,
+        product_id,
+        quantity: toNewQty,
+        updated_at: nowIso
+      });
+    }
 
     this.stockTransfers = [newTransfer, ...this.stockTransfers];
 
@@ -1012,8 +1101,20 @@ class DataService {
 
     this.notify();
 
+    // 2. Persist directly to Supabase RDS
     if (isSupabaseConfigured) {
-      supabase.from('stock_transfers').insert([newTransfer]).then().catch((e) => console.warn('transfer insert error:', e));
+      const fromRowId = existingFrom?.id || `gs-${from_godown_id}-${product_id}-${Date.now()}`;
+      const toRowId = existingTo?.id || `gs-${to_godown_id}-${product_id}-${Date.now()}`;
+
+      // Atomic upserts for both source and destination rows
+      supabase.from('godown_stock').upsert([
+        { id: fromRowId, godown_id: from_godown_id, product_id, quantity: fromNewQty, updated_at: nowIso },
+        { id: toRowId, godown_id: to_godown_id, product_id, quantity: toNewQty, updated_at: nowIso }
+      ], { onConflict: 'godown_id,product_id' })
+        .then(() => {
+          return supabase.from('stock_transfers').insert([newTransfer]);
+        })
+        .catch((e) => console.error('transferStock async persistence exception:', e));
     }
 
     return newTransfer;
@@ -1065,9 +1166,10 @@ class DataService {
       supabase.from('supplier_products').delete().eq('supplier_id', supplierId)
         .then(() => {
           if (newMappings.length > 0) {
-            supabase.from('supplier_products').insert(newMappings).then().catch((e) => console.warn(e));
+            return supabase.from('supplier_products').insert(newMappings);
           }
-        }).catch((e) => console.warn('saveSupplierProducts error:', e));
+        })
+        .catch((e) => console.warn('saveSupplierProducts exception:', e));
     }
   }
 
@@ -1088,8 +1190,8 @@ class DataService {
 
     const dbRecord = {
       id: prodId,
-      sku: productData.sku || `SKU-${Math.floor(100 + Math.random() * 900)}`,
-      name: productData.name,
+      sku: productData.sku ? productData.sku.trim() : `SKU-${Math.floor(100 + Math.random() * 900)}`,
+      name: (productData.name || '').trim(),
       current_stock: productData.current_stock !== undefined && productData.current_stock !== ''
         ? Number(productData.current_stock) : 0,
       unit: productData.unit || 'boxes',
@@ -1121,16 +1223,22 @@ class DataService {
 
     this.notify();
 
-    if (isNew) {
-      supabase.from('products').insert([dbRecord]).then().catch((e) => console.warn('saveProduct error:', e));
-    } else {
-      supabase.from('products').update(dbRecord).eq('id', prodId).then().catch((e) => console.warn('saveProduct error:', e));
+    if (isSupabaseConfigured) {
+      if (isNew) {
+        supabase.from('products').insert([{ ...dbRecord, created_at: saved.created_at }])
+          .then(({ error: insErr }) => { if (insErr) console.warn('saveProduct insert error:', insErr); })
+          .catch((e) => console.warn('saveProduct exception:', e));
+      } else {
+        supabase.from('products').update(dbRecord).eq('id', prodId)
+          .then(({ error: updErr }) => { if (updErr) console.warn('saveProduct update error:', updErr); })
+          .catch((e) => console.warn('saveProduct exception:', e));
+      }
     }
 
     return saved;
   }
 
-  async deleteProduct(id, currentUser) {
+  deleteProduct(id, currentUser) {
     if (!this.canDelete(currentUser)) throw new Error('Permission denied: you do not have delete access.');
 
     const prod = this.getProductById(id);
@@ -1141,18 +1249,20 @@ class DataService {
 
     if (!isSupabaseConfigured) return;
 
-    try {
-      await supabase.from('manual_stock_adjustments').delete().eq('product_id', id);
-      await supabase.from('customer_sale_items').delete().eq('product_id', id);
-      await supabase.from('supplier_purchase_items').delete().eq('product_id', id);
-      await supabase.from('godown_stock').delete().eq('product_id', id);
+    (async () => {
+      try {
+        await supabase.from('manual_stock_adjustments').delete().eq('product_id', id);
+        await supabase.from('customer_sale_items').delete().eq('product_id', id);
+        await supabase.from('supplier_purchase_items').delete().eq('product_id', id);
+        await supabase.from('godown_stock').delete().eq('product_id', id);
 
-      const { error: delErr } = await supabase.from('products').delete().eq('id', id);
-      if (delErr) await supabase.from('products').update({ is_active: false }).eq('id', id);
-    } catch (e) {
-      console.warn('deleteProduct exception:', e);
-      try { await supabase.from('products').update({ is_active: false }).eq('id', id); } catch { }
-    }
+        const { error: delErr } = await supabase.from('products').delete().eq('id', id);
+        if (delErr) await supabase.from('products').update({ is_active: false }).eq('id', id);
+      } catch (e) {
+        console.warn('deleteProduct exception:', e);
+        try { await supabase.from('products').update({ is_active: false }).eq('id', id); } catch { }
+      }
+    })();
   }
 
   toggleProductActive(id) {
@@ -1313,13 +1423,13 @@ class DataService {
 
     const dbRecord = {
       id: custId,
-      customer_id: custData.customer_id || `CUST-${100 + this.customers.length + 1}`,
-      name: custData.name,
-      mobile: custData.mobile || null,
-      area: custData.area || null,
-      address: custData.address || null,
+      customer_id: custData.customer_id ? custData.customer_id.trim() : `CUST-${100 + this.customers.length + 1}`,
+      name: (custData.name || '').trim(),
+      mobile: custData.mobile ? custData.mobile.trim() : null,
+      area: custData.area ? custData.area.trim() : null,
+      address: custData.address ? custData.address.trim() : null,
       status: custData.status || 'active',
-      notes: custData.notes || null,
+      notes: custData.notes ? custData.notes.trim() : null,
       updated_at: new Date().toISOString()
     };
 
@@ -1335,15 +1445,21 @@ class DataService {
     }
     this.notify();
 
-    if (isNew) {
-      supabase.from('customers').insert([dbRecord]).then().catch((e) => console.warn(e));
-    } else {
-      supabase.from('customers').update(dbRecord).eq('id', custId).then().catch((e) => console.warn(e));
+    if (isSupabaseConfigured) {
+      if (isNew) {
+        supabase.from('customers').insert([{ ...dbRecord, created_at: saved.created_at }])
+          .then(({ error: insErr }) => { if (insErr) console.warn('saveCustomer insert error:', insErr); })
+          .catch((e) => console.warn('saveCustomer exception:', e));
+      } else {
+        supabase.from('customers').update(dbRecord).eq('id', custId)
+          .then(({ error: updErr }) => { if (updErr) console.warn('saveCustomer update error:', updErr); })
+          .catch((e) => console.warn('saveCustomer exception:', e));
+      }
     }
     return saved;
   }
 
-  async deleteCustomer(id, currentUser) {
+  deleteCustomer(id, currentUser) {
     if (!this.canDelete(currentUser)) throw new Error('Permission denied.');
     const c = this.getCustomerById(id);
     this.customers = this.customers.filter((cust) => cust.id !== id);
@@ -1354,30 +1470,32 @@ class DataService {
 
     if (!isSupabaseConfigured) return;
 
-    try {
-      // 1. Delete associated payments
-      await supabase.from('customer_payments').delete().eq('customer_id', id);
-
-      // 2. Delete associated sale items & sales
-      const { data: salesOfCustomer } = await supabase.from('customer_sales').select('id').eq('customer_id', id);
-      if (salesOfCustomer && salesOfCustomer.length > 0) {
-        const saleIds = salesOfCustomer.map((s) => s.id);
-        await supabase.from('customer_sale_items').delete().in('sale_id', saleIds);
-      }
-      await supabase.from('customer_sales').delete().eq('customer_id', id);
-
-      // 3. Delete customer record
-      const { error: delErr } = await supabase.from('customers').delete().eq('id', id);
-      if (delErr) {
-        console.warn('Direct customer delete failed, soft deleting customer:', delErr);
-        await supabase.from('customers').update({ status: 'archived' }).eq('id', id);
-      }
-    } catch (e) {
-      console.warn('deleteCustomer exception:', e);
+    (async () => {
       try {
-        await supabase.from('customers').update({ status: 'archived' }).eq('id', id);
-      } catch {}
-    }
+        // 1. Delete associated payments
+        await supabase.from('customer_payments').delete().eq('customer_id', id);
+
+        // 2. Delete associated sale items & sales
+        const { data: salesOfCustomer } = await supabase.from('customer_sales').select('id').eq('customer_id', id);
+        if (salesOfCustomer && salesOfCustomer.length > 0) {
+          const saleIds = salesOfCustomer.map((s) => s.id);
+          await supabase.from('customer_sale_items').delete().in('sale_id', saleIds);
+        }
+        await supabase.from('customer_sales').delete().eq('customer_id', id);
+
+        // 3. Delete customer record
+        const { error: delErr } = await supabase.from('customers').delete().eq('id', id);
+        if (delErr) {
+          console.warn('Direct customer delete failed, soft deleting customer:', delErr);
+          await supabase.from('customers').update({ status: 'archived' }).eq('id', id);
+        }
+      } catch (e) {
+        console.warn('deleteCustomer exception:', e);
+        try {
+          await supabase.from('customers').update({ status: 'archived' }).eq('id', id);
+        } catch {}
+      }
+    })();
   }
 
   // ==============================================================================
@@ -1390,15 +1508,20 @@ class DataService {
     const isNew = !suppData.id;
     const suppId = suppData.id || 'supp-' + Date.now();
 
+    let autoSuppId = suppData.supplier_id ? suppData.supplier_id.trim() : `SUPP-${100 + this.suppliers.length + 1}`;
+    if (!suppData.supplier_id && this.suppliers.some((s) => s.supplier_id === autoSuppId && s.id !== suppId)) {
+      autoSuppId = `SUPP-${Date.now().toString().slice(-4)}`;
+    }
+
     const dbRecord = {
       id: suppId,
-      supplier_id: suppData.supplier_id || `SUPP-${100 + this.suppliers.length + 1}`,
-      company_name: suppData.company_name,
-      supplier_name: suppData.supplier_name || null,
-      mobile: suppData.mobile || null,
-      area: suppData.area || null,
-      address: suppData.address || null,
-      notes: suppData.notes || null,
+      supplier_id: autoSuppId,
+      company_name: (suppData.company_name || '').trim(),
+      supplier_name: suppData.supplier_name ? suppData.supplier_name.trim() : null,
+      mobile: suppData.mobile ? suppData.mobile.trim() : null,
+      area: suppData.area ? suppData.area.trim() : null,
+      address: suppData.address ? suppData.address.trim() : null,
+      notes: suppData.notes ? suppData.notes.trim() : null,
       updated_at: new Date().toISOString()
     };
 
@@ -1414,15 +1537,21 @@ class DataService {
     }
     this.notify();
 
-    if (isNew) {
-      supabase.from('suppliers').insert([dbRecord]).then().catch((e) => console.warn(e));
-    } else {
-      supabase.from('suppliers').update(dbRecord).eq('id', suppId).then().catch((e) => console.warn(e));
+    if (isSupabaseConfigured) {
+      if (isNew) {
+        supabase.from('suppliers').insert([{ ...dbRecord, created_at: saved.created_at }])
+          .then(({ error: insErr }) => { if (insErr) console.warn('saveSupplier insert error:', insErr); })
+          .catch((e) => console.warn('saveSupplier exception:', e));
+      } else {
+        supabase.from('suppliers').update(dbRecord).eq('id', suppId)
+          .then(({ error: updErr }) => { if (updErr) console.warn('saveSupplier update error:', updErr); })
+          .catch((e) => console.warn('saveSupplier exception:', e));
+      }
     }
     return saved;
   }
 
-  async deleteSupplier(id, currentUser) {
+  deleteSupplier(id, currentUser) {
     if (!this.canDelete(currentUser)) throw new Error('Permission denied.');
     const s = this.getSupplierById(id);
     this.suppliers = this.suppliers.filter((supp) => supp.id !== id);
@@ -1434,33 +1563,35 @@ class DataService {
 
     if (!isSupabaseConfigured) return;
 
-    try {
-      // 1. Delete supplier products mapping
-      await supabase.from('supplier_products').delete().eq('supplier_id', id);
-
-      // 2. Delete associated payments
-      await supabase.from('supplier_payments').delete().eq('supplier_id', id);
-
-      // 3. Delete associated purchase items & purchases
-      const { data: purOfSupplier } = await supabase.from('supplier_purchases').select('id').eq('supplier_id', id);
-      if (purOfSupplier && purOfSupplier.length > 0) {
-        const purIds = purOfSupplier.map((p) => p.id);
-        await supabase.from('supplier_purchase_items').delete().in('purchase_id', purIds);
-      }
-      await supabase.from('supplier_purchases').delete().eq('supplier_id', id);
-
-      // 4. Delete supplier record
-      const { error: delErr } = await supabase.from('suppliers').delete().eq('id', id);
-      if (delErr) {
-        console.warn('Direct supplier delete failed, soft deleting supplier:', delErr);
-        await supabase.from('suppliers').update({ status: 'archived' }).eq('id', id);
-      }
-    } catch (e) {
-      console.warn('deleteSupplier exception:', e);
+    (async () => {
       try {
-        await supabase.from('suppliers').update({ status: 'archived' }).eq('id', id);
-      } catch {}
-    }
+        // 1. Delete supplier products mapping
+        await supabase.from('supplier_products').delete().eq('supplier_id', id);
+
+        // 2. Delete associated payments
+        await supabase.from('supplier_payments').delete().eq('supplier_id', id);
+
+        // 3. Delete associated purchase items & purchases
+        const { data: purOfSupplier } = await supabase.from('supplier_purchases').select('id').eq('supplier_id', id);
+        if (purOfSupplier && purOfSupplier.length > 0) {
+          const purIds = purOfSupplier.map((p) => p.id);
+          await supabase.from('supplier_purchase_items').delete().in('purchase_id', purIds);
+        }
+        await supabase.from('supplier_purchases').delete().eq('supplier_id', id);
+
+        // 4. Delete supplier record
+        const { error: delErr } = await supabase.from('suppliers').delete().eq('id', id);
+        if (delErr) {
+          console.warn('Direct supplier delete failed, soft deleting supplier:', delErr);
+          await supabase.from('suppliers').update({ status: 'archived' }).eq('id', id);
+        }
+      } catch (e) {
+        console.warn('deleteSupplier exception:', e);
+        try {
+          await supabase.from('suppliers').update({ status: 'archived' }).eq('id', id);
+        } catch {}
+      }
+    })();
   }
 
   // ==============================================================================
@@ -1533,8 +1664,9 @@ class DataService {
 
     // Deduct godown stock per item
     for (const item of cleanItems) {
-      if (item.godown_id) {
-        this._updateGodownStock(item.godown_id, item.product_id, -item.quantity);
+      const targetG = item.godown_id || this.getDefaultGodown()?.id || (this.godowns[0] && this.godowns[0].id);
+      if (targetG) {
+        this._updateGodownStock(targetG, item.product_id, -item.quantity);
       } else {
         // Legacy: deduct from overall only
         const prod = this.getProductById(item.product_id);
@@ -1625,15 +1757,19 @@ class DataService {
     }
 
     // Stock delta per godown
+    const defaultGodownId = this.getDefaultGodown()?.id || this.godowns[0]?.id || 'default';
+
     const oldItemMap = {};
     existingSale.items.forEach((i) => {
-      const key = `${i.product_id}::${i.godown_id || 'none'}`;
+      const gId = i.godown_id || defaultGodownId;
+      const key = `${i.product_id}::${gId}`;
       oldItemMap[key] = (oldItemMap[key] || 0) + i.quantity;
     });
 
     const newItemMap = {};
     newItems.forEach((i) => {
-      const key = `${i.product_id}::${i.godown_id || 'none'}`;
+      const gId = i.godown_id || defaultGodownId;
+      const key = `${i.product_id}::${gId}`;
       newItemMap[key] = (newItemMap[key] || 0) + Number(i.quantity);
     });
 
@@ -1643,12 +1779,19 @@ class DataService {
       const oldQty = oldItemMap[key] || 0;
       const newQty = newItemMap[key];
       const delta = newQty - oldQty;
-      if (delta > 0 && gId && gId !== 'none') {
-        const available = this.getProductStockInGodown(prodId, gId);
-        if (available < delta) {
+      if (delta > 0) {
+        if (gId && gId !== 'default') {
+          const available = this.getProductStockInGodown(prodId, gId);
+          if (available < delta) {
+            const prod = this.getProductById(prodId);
+            const g = this.getGodownById(gId);
+            throw new Error(`Insufficient stock in ${g?.name || 'godown'} for ${prod?.name}. Available: ${available}, Additional needed: ${delta}`);
+          }
+        } else {
           const prod = this.getProductById(prodId);
-          const g = this.getGodownById(gId);
-          throw new Error(`Insufficient stock in ${g?.name || 'godown'} for ${prod?.name}. Available: ${available}, Additional needed: ${delta}`);
+          if ((prod?.current_stock || 0) < delta) {
+            throw new Error(`Insufficient stock for ${prod?.name || 'Product'}. Available: ${prod?.current_stock || 0}, Additional needed: ${delta}`);
+          }
         }
       }
     }
@@ -1661,8 +1804,9 @@ class DataService {
       const newQty = newItemMap[key] || 0;
       const delta = newQty - oldQty;
       if (delta !== 0) {
-        if (gId && gId !== 'none') {
-          this._updateGodownStock(gId, prodId, -delta); // sales = negative
+        const targetG = (gId && gId !== 'default') ? gId : defaultGodownId;
+        if (targetG && targetG !== 'default') {
+          this._updateGodownStock(targetG, prodId, -delta); // sales = negative
         } else {
           const prod = this.getProductById(prodId);
           if (prod) {
@@ -1726,8 +1870,9 @@ class DataService {
 
     // Restore godown stock
     for (const item of sale.items) {
-      if (item.godown_id) {
-        this._updateGodownStock(item.godown_id, item.product_id, item.quantity);
+      const targetG = item.godown_id || this.getDefaultGodown()?.id || (this.godowns[0] && this.godowns[0].id);
+      if (targetG) {
+        this._updateGodownStock(targetG, item.product_id, item.quantity);
       } else {
         const prod = this.getProductById(item.product_id);
         if (prod) {
@@ -1894,12 +2039,6 @@ class DataService {
       this.recordAuditEntry('supplier_purchases', purId, existingPur.purchase_no, changes, reason, currentUser?.name || 'Admin');
     }
 
-    // Reverse old godown stock
-    for (const item of (existingPur.items || [])) {
-      const gId = item.godown_id || existingPur.godown_id || this.getDefaultGodown()?.id;
-      if (gId) this._updateGodownStock(gId, item.product_id, -Number(item.quantity));
-    }
-
     const cleanItems = newItems.map((i, idx) => ({
       id: i.id || `pitem-${Date.now()}-${idx}`,
       purchase_id: purId,
@@ -1911,10 +2050,42 @@ class DataService {
       godown_id: i.godown_id || newGodownId
     }));
 
-    // Apply new godown stock per item
-    for (const item of cleanItems) {
-      const gId = item.godown_id || newGodownId;
-      if (gId) this._updateGodownStock(gId, item.product_id, Number(item.quantity));
+    // Stock delta per godown
+    const defaultGodownId = this.getDefaultGodown()?.id || this.godowns[0]?.id || 'default';
+
+    const oldItemMap = {};
+    (existingPur.items || []).forEach((i) => {
+      const gId = i.godown_id || existingPur.godown_id || defaultGodownId;
+      const key = `${i.product_id}::${gId}`;
+      oldItemMap[key] = (oldItemMap[key] || 0) + (Number(i.quantity) || 0);
+    });
+
+    const newItemMap = {};
+    cleanItems.forEach((i) => {
+      const gId = i.godown_id || newGodownId || defaultGodownId;
+      const key = `${i.product_id}::${gId}`;
+      newItemMap[key] = (newItemMap[key] || 0) + (Number(i.quantity) || 0);
+    });
+
+    // Apply delta to godown stock
+    const allKeys = new Set([...Object.keys(oldItemMap), ...Object.keys(newItemMap)]);
+    for (const key of allKeys) {
+      const [prodId, gId] = key.split('::');
+      const oldQty = oldItemMap[key] || 0;
+      const newQty = newItemMap[key] || 0;
+      const delta = newQty - oldQty;
+      if (delta !== 0) {
+        const targetG = (gId && gId !== 'default') ? gId : defaultGodownId;
+        if (targetG && targetG !== 'default') {
+          this._updateGodownStock(targetG, prodId, delta); // purchases = positive delta
+        } else {
+          const prod = this.getProductById(prodId);
+          if (prod) {
+            prod.current_stock = Math.max(0, prod.current_stock + delta);
+            supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', prodId).then().catch(console.warn);
+          }
+        }
+      }
     }
 
     const totalAmount = cleanItems.reduce((acc, i) => acc + i.total, 0);
@@ -2749,6 +2920,9 @@ class DataService {
     this.purchases = JSON.parse(JSON.stringify(initialPurchases));
     this.payments = JSON.parse(JSON.stringify(initialPayments));
     this.adjustments = JSON.parse(JSON.stringify(initialAdjustments));
+    this.godowns = [];
+    this.godownStock = [];
+    this.stockTransfers = [];
     this._ensureDefaultGodownDemo();
     this.notify();
   }

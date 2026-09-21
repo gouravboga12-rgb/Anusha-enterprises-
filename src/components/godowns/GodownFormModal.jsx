@@ -24,10 +24,10 @@ export const GodownFormModal = ({ isOpen, onClose, godown, dataService, currentU
     setSaving(true);
     setError('');
     try {
-      dataService.saveGodown({ ...godown, ...form }, currentUser);
+      await dataService.saveGodown({ ...godown, ...form }, currentUser);
       onClose();
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'Failed to save godown');
     } finally {
       setSaving(false);
     }

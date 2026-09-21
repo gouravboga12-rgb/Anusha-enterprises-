@@ -413,6 +413,8 @@ ALTER TABLE public.customer_sale_items ADD COLUMN IF NOT EXISTS godown_id TEXT;
 ALTER TABLE public.supplier_purchases ADD COLUMN IF NOT EXISTS godown_id TEXT;
 ALTER TABLE public.supplier_purchase_items ADD COLUMN IF NOT EXISTS godown_id TEXT;
 ALTER TABLE public.manual_stock_adjustments ADD COLUMN IF NOT EXISTS godown_id TEXT;
+ALTER TABLE public.godowns ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50);
+ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
 
 -- ==============================================================================
 -- SUPABASE REALTIME REPLICATION

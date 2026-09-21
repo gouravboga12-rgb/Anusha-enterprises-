@@ -45,7 +45,7 @@ export const StockTransferModal = ({ isOpen, onClose, dataService, currentUser, 
 
     setSaving(true);
     try {
-      const result = dataService.transferStock({
+      const result = await dataService.transferStock({
         from_godown_id: form.from_godown_id,
         to_godown_id: form.to_godown_id,
         product_id: form.product_id,
@@ -68,7 +68,7 @@ export const StockTransferModal = ({ isOpen, onClose, dataService, currentUser, 
         notes: ''
       });
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'Transfer failed');
     } finally {
       setSaving(false);
     }

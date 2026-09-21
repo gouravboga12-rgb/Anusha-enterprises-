@@ -43,8 +43,9 @@ export const GodownActivityModal = ({ isOpen, onClose, dataService }) => {
   const handlePrint = () => {
     const rows = activities.map((a) => {
       const ts = a.created_at ? new Date(a.created_at) : null;
-      const timeStr = ts ? ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
-      const dateStr = ts ? formatDate(ts.toISOString().split('T')[0]) : '';
+      const isValidDate = ts && !isNaN(ts.getTime());
+      const timeStr = isValidDate ? ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : (a.time || '');
+      const dateStr = isValidDate ? formatDate(ts.toISOString().split('T')[0]) : (a.date ? formatDate(a.date) : '');
       return `[${a.record_ref || a.module}] ${dateStr} ${timeStr} | ${a.module} (${a.action}) | ${a.details || ''} | by ${a.user_name || 'Admin'}`;
     }).join('\n');
 
@@ -459,10 +460,13 @@ ${'='.repeat(90)}
               {activities.map((act, idx) => {
                 const cfg = getModuleConfig(act);
                 const ts = act.created_at ? new Date(act.created_at) : null;
-                const timeStr = ts
+                const isValidDate = ts && !isNaN(ts.getTime());
+                const timeStr = isValidDate
                   ? ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
-                  : '';
-                const dateStr = ts ? formatDate(ts.toISOString().split('T')[0]) : '';
+                  : (act.time || '');
+                const dateStr = isValidDate
+                  ? formatDate(ts.toISOString().split('T')[0])
+                  : (act.date ? formatDate(act.date) : '');
 
                 return (
                   <div
