@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowLeft, Warehouse, Package, AlertTriangle, ArrowLeftRight,
-  ShoppingCart, TrendingUp, RefreshCw, Clock, MapPin, User
+  ShoppingCart, TrendingUp, RefreshCw, Clock, MapPin, User, Trash2
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { StockTransferModal } from './StockTransferModal';
@@ -13,6 +13,7 @@ export const GodownDetail = ({ godownId, dataService, currentUser, onBack, onOpe
   const godown = dataService.getGodownById(godownId);
   const stockRows = dataService.getGodownStock(godownId);
   const products = dataService.getProducts();
+  const canManage = dataService?.canDelete ? (dataService.canDelete(currentUser) || currentUser?.role === 'full_access') : true;
 
   if (!godown) return (
     <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
@@ -21,6 +22,28 @@ export const GodownDetail = ({ godownId, dataService, currentUser, onBack, onOpe
       {onBack && <button className="btn btn-secondary" style={{ marginTop: '12px' }} onClick={onBack}><ArrowLeft size={14}/> Back</button>}
     </div>
   );
+
+  const handleDelete = () => {
+    if (!godown) return;
+    if (godown.is_default) {
+      alert('Cannot delete the default Main Godown.');
+      return;
+    }
+    const activeUnits = stockRows.reduce((sum, gs) => sum + (Number(gs.quantity) || 0), 0);
+    if (activeUnits > 0) {
+      alert(`Cannot delete "${godown.name}" because it still contains ${activeUnits.toLocaleString('en-IN')} units of stock. Please transfer or adjust the stock to zero first.`);
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to permanently delete "${godown.name}" (${godown.code || 'No Code'})? This will remove the godown and its records.`)) {
+      try {
+        dataService.deleteGodown(godown.id, currentUser);
+        if (onBack) onBack();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+  };
 
   // Build per-godown transaction history
   const purchases = dataService.getPurchases().filter((p) => p.godown_id === godownId);
@@ -38,7 +61,7 @@ export const GodownDetail = ({ godownId, dataService, currentUser, onBack, onOpe
     <div>
       {/* Header */}
       {!embedded && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" onClick={onBack} style={{ padding: '8px' }}>
             <ArrowLeft size={16} />
           </button>
@@ -52,9 +75,20 @@ export const GodownDetail = ({ godownId, dataService, currentUser, onBack, onOpe
               </p>
             )}
           </div>
-          <button className="btn btn-secondary" style={{ marginLeft: 'auto' }} onClick={() => setIsTransferOpen(true)}>
-            <ArrowLeftRight size={14} /> Transfer Stock
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={() => setIsTransferOpen(true)}>
+              <ArrowLeftRight size={14} /> Transfer Stock
+            </button>
+            {!godown.is_default && canManage && (
+              <button
+                className="btn btn-secondary"
+                style={{ color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+                onClick={handleDelete}
+              >
+                <Trash2 size={14} /> Delete Godown
+              </button>
+            )}
+          </div>
         </div>
       )}
 

@@ -3,7 +3,7 @@ import {
   Warehouse, Plus, MapPin, Package, AlertTriangle, ChevronRight,
   Edit2, Archive, ArrowLeftRight, History, BarChart2, Clock, Activity,
   TrendingDown, TrendingUp, RefreshCw, Calendar, X, ExternalLink,
-  PackagePlus, ShoppingCart, Sliders, CheckCircle2, AlertCircle
+  PackagePlus, ShoppingCart, Sliders, CheckCircle2, AlertCircle, Trash2
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { GodownFormModal } from './GodownFormModal';
@@ -61,6 +61,28 @@ export const GodownList = ({ dataService, currentUser }) => {
       dataService.archiveGodown(godown.id, currentUser);
     } catch (e) {
       alert(e.message);
+    }
+  };
+
+  const handleDeleteGodown = (godown) => {
+    if (!godown) return;
+    if (godown.is_default) {
+      alert('Cannot delete the default Main Godown.');
+      return;
+    }
+    const stock = dataService.getGodownStock(godown.id);
+    const activeUnits = stock.reduce((sum, gs) => sum + (Number(gs.quantity) || 0), 0);
+    if (activeUnits > 0) {
+      alert(`Cannot delete "${godown.name}" because it still contains ${activeUnits.toLocaleString('en-IN')} units of stock. Please transfer or adjust the stock to zero first.`);
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to permanently delete "${godown.name}" (${godown.code || 'No Code'})? This will remove the godown and its records.`)) {
+      try {
+        dataService.deleteGodown(godown.id, currentUser);
+      } catch (e) {
+        alert(e.message);
+      }
     }
   };
 
@@ -252,11 +274,32 @@ export const GodownList = ({ dataService, currentUser }) => {
                       View Stock <ChevronRight size={13} />
                     </button>
                     {canManage && (
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button className="btn btn-secondary" style={{ fontSize: '11px', padding: '5px 8px' }}
-                          onClick={(e) => { e.stopPropagation(); setEditingGodown(g); setIsFormOpen(true); }}>
-                          <Edit2 size={12} />
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ fontSize: '11px', padding: '6px 9px', borderRadius: '7px' }}
+                          onClick={(e) => { e.stopPropagation(); setEditingGodown(g); setIsFormOpen(true); }}
+                          title="Edit Godown"
+                        >
+                          <Edit2 size={13} />
                         </button>
+                        {!g.is_default && (
+                          <button
+                            className="btn btn-secondary"
+                            style={{
+                              fontSize: '11px',
+                              padding: '6px 9px',
+                              borderRadius: '7px',
+                              color: '#ef4444',
+                              borderColor: '#fecaca',
+                              background: '#fef2f2'
+                            }}
+                            onClick={(e) => { e.stopPropagation(); handleDeleteGodown(g); }}
+                            title="Delete Godown"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -626,6 +669,7 @@ export const GodownList = ({ dataService, currentUser }) => {
           dataService={dataService}
           currentUser={currentUser}
           onArchive={handleArchive}
+          onDelete={handleDeleteGodown}
         />
       )}
 

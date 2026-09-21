@@ -464,3 +464,24 @@ VALUES
   ('user-staff-1', 'Operations Staff', 'staff@anusha.com', '9876543211', 'staff123', 'full_access', true, 'Admin')
 ON CONFLICT (id) DO NOTHING;
 
+-- ==============================================================================
+-- 18. GODOWN CLEANUP & CASCADE DELETION SQL QUERIES (Reference / Run when needed)
+-- ==============================================================================
+-- To manually delete a specific godown in Supabase SQL Editor:
+-- Replace 'TARGET_GODOWN_ID' with the actual godown ID (e.g., 'godown-1789991737973')
+--
+-- DO $$
+-- DECLARE
+--   target_id TEXT := 'TARGET_GODOWN_ID';
+-- BEGIN
+--   -- 1. Remove associated godown stock rows
+--   DELETE FROM public.godown_stock WHERE godown_id = target_id;
+--
+--   -- 2. Remove associated stock transfers referencing this godown
+--   DELETE FROM public.stock_transfers WHERE from_godown_id = target_id OR to_godown_id = target_id;
+--
+--   -- 3. Delete the godown record
+--   DELETE FROM public.godowns WHERE id = target_id;
+-- END $$;
+
+

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Warehouse, Save, Archive, AlertCircle } from 'lucide-react';
+import { X, Warehouse, Save, Archive, AlertCircle, Trash2 } from 'lucide-react';
 
-export const GodownFormModal = ({ isOpen, onClose, godown, dataService, currentUser, onArchive }) => {
+export const GodownFormModal = ({ isOpen, onClose, godown, dataService, currentUser, onArchive, onDelete }) => {
   const isEdit = !!godown;
+  const canManage = dataService?.canDelete ? (dataService.canDelete(currentUser) || currentUser?.role === 'full_access') : true;
   const [form, setForm] = useState({
     name: godown?.name || '',
     code: godown?.code || '',
@@ -38,6 +39,33 @@ export const GodownFormModal = ({ isOpen, onClose, godown, dataService, currentU
     if (window.confirm(`Archive "${godown.name}"? It will be deactivated if it has no stock or history.`)) {
       try {
         onArchive(godown);
+        onClose();
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+  };
+
+  const handleDelete = () => {
+    if (!godown) return;
+    if (godown.is_default) {
+      setError('Cannot delete the default Main Godown.');
+      return;
+    }
+    const stock = dataService.getGodownStock(godown.id);
+    const activeUnits = stock.reduce((sum, gs) => sum + (Number(gs.quantity) || 0), 0);
+    if (activeUnits > 0) {
+      setError(`Cannot delete "${godown.name}" because it still contains ${activeUnits.toLocaleString('en-IN')} units of stock. Please transfer or adjust the stock to zero first.`);
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to permanently delete "${godown.name}" (${godown.code || 'No Code'})? This will remove the godown and its records.`)) {
+      try {
+        if (onDelete) {
+          onDelete(godown);
+        } else {
+          dataService.deleteGodown(godown.id, currentUser);
+        }
         onClose();
       } catch (e) {
         setError(e.message);
@@ -112,12 +140,22 @@ export const GodownFormModal = ({ isOpen, onClose, godown, dataService, currentU
             <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ flex: 1 }}>
               {saving ? 'Saving...' : <><Save size={14} /> {isEdit ? 'Save Changes' : 'Create Godown'}</>}
             </button>
+            {isEdit && !godown.is_default && canManage && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleDelete}
+                style={{ color: '#ef4444', borderColor: '#fecaca', background: '#fef2f2' }}
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+            )}
             {isEdit && !godown.is_default && (
-              <button className="btn btn-secondary" onClick={handleArchive} style={{ color: '#d97706', borderColor: '#fde68a' }}>
+              <button type="button" className="btn btn-secondary" onClick={handleArchive} style={{ color: '#d97706', borderColor: '#fde68a' }}>
                 <Archive size={14} /> Archive
               </button>
             )}
-            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
           </div>
         </div>
       </div>

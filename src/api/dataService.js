@@ -797,6 +797,54 @@ class DataService {
     return saved;
   }
 
+  deleteGodown(id, currentUser) {
+    if (!this.canDelete(currentUser)) {
+      throw new Error('Permission denied: you do not have permission to delete godowns.');
+    }
+
+    const godown = this.getGodownById(id);
+    if (!godown) throw new Error('Godown not found');
+
+    if (godown.is_default) {
+      throw new Error('Cannot delete the default Main Godown.');
+    }
+
+    // Block if has active stock
+    const stockInGodown = this.godownStock.filter((gs) => gs.godown_id === id && (Number(gs.quantity) || 0) > 0);
+    const totalUnits = stockInGodown.reduce((sum, gs) => sum + (Number(gs.quantity) || 0), 0);
+    if (totalUnits > 0) {
+      throw new Error(`Cannot delete "${godown.name}" because it still has ${totalUnits} active units in stock. Please transfer or adjust the stock to 0 first.`);
+    }
+
+    // 1. In-memory cleanup
+    this.godowns = this.godowns.filter((g) => g.id !== id);
+    this.godownStock = this.godownStock.filter((gs) => gs.godown_id !== id);
+    this.stockTransfers = this.stockTransfers.filter((t) => t.from_godown_id !== id && t.to_godown_id !== id);
+
+    this.logActivity(currentUser, 'DELETE', 'Godowns', id, godown.name, `Deleted godown: ${godown.name} (${godown.code || 'No Code'})`);
+    this.notify();
+
+    // 2. Background Supabase cleanup
+    if (isSupabaseConfigured) {
+      (async () => {
+        try {
+          await supabase.from('godown_stock').delete().eq('godown_id', id);
+          await supabase.from('stock_transfers').delete().or(`from_godown_id.eq.${id},to_godown_id.eq.${id}`);
+          const { error: delErr } = await supabase.from('godowns').delete().eq('id', id);
+          if (delErr) {
+            console.warn('Direct godown delete error, soft archiving:', delErr);
+            await supabase.from('godowns').update({ is_active: false }).eq('id', id);
+          }
+        } catch (e) {
+          console.warn('deleteGodown exception:', e);
+          try { await supabase.from('godowns').update({ is_active: false }).eq('id', id); } catch {}
+        }
+      })();
+    }
+
+    return true;
+  }
+
   async archiveGodown(id, currentUser) {
     const godown = this.getGodownById(id);
     if (!godown) throw new Error('Godown not found');
