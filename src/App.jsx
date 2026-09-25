@@ -315,6 +315,7 @@ export const App = () => {
                 }}
                 onViewBillDetails={(sale) => openBillDetails(sale)}
                 onEditSale={(sale) => openEditSale(sale)}
+                onViewInvoice={(sale) => openInvoice(sale, 'sale')}
               />
             ) : (
               <CustomerList
@@ -351,6 +352,7 @@ export const App = () => {
                 }}
                 onViewPurchaseDetails={(pur) => openPurchaseDetails(pur)}
                 onEditPurchase={(pur) => openEditPurchase(pur)}
+                onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
               />
             ) : (
               <SupplierList
@@ -480,7 +482,10 @@ export const App = () => {
           )}
 
           {(activeTab === 'daybook' || activeTab === 'day-book' || activeTab === 'reports') && (
-            <DailyTransactions dataService={dataService} />
+            <DailyTransactions
+              dataService={dataService}
+              onViewInvoice={(doc, type) => openInvoice(doc, type)}
+            />
           )}
 
           {activeTab === 'wallet' && (
@@ -660,9 +665,19 @@ export const App = () => {
           setIsInvoiceModalOpen(false);
           setInvoiceModalDoc(null);
         }}
+        doc={invoiceModalDoc}
         document={invoiceModalDoc}
         type={invoiceModalType}
         dataService={dataService}
+        onEdit={(doc, type) => {
+          setIsInvoiceModalOpen(false);
+          setInvoiceModalDoc(null);
+          if (type === 'sale') {
+            openEditSale(doc);
+          } else {
+            openEditPurchase(doc);
+          }
+        }}
       />
 
       {/* Touch-Friendly Mobile Bottom Navigation Bar */}

@@ -27,6 +27,12 @@ export const RecordPaymentModal = ({
   const [error, setError] = useState('');
   const [isQuickCustomerOpen, setIsQuickCustomerOpen] = useState(false);
   const [isQuickSupplierOpen, setIsQuickSupplierOpen] = useState(false);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!dataService) return;
+    return dataService.subscribe(() => setTick((t) => t + 1));
+  }, [dataService]);
 
   const customers = dataService.getCustomers();
   const suppliers = dataService.getSuppliers();
@@ -638,10 +644,11 @@ export const RecordPaymentModal = ({
       isOpen={isQuickCustomerOpen}
       onClose={() => setIsQuickCustomerOpen(false)}
       customer={null}
+      zIndex={1100}
       onSave={async (cData) => {
         const newC = await dataService.saveCustomer(cData, currentUser);
         if (newC?.id) {
-          setPartyId(newC.id);
+          handlePartyChange(newC.id);
           setIsQuickCustomerOpen(false);
         }
       }}
@@ -654,13 +661,14 @@ export const RecordPaymentModal = ({
       supplier={null}
       dataService={dataService}
       currentUser={currentUser}
+      zIndex={1100}
       onSave={async (sData, productIds) => {
         const newS = await dataService.saveSupplier(sData, currentUser);
         if (productIds && newS?.id) {
           await dataService.saveSupplierProducts(newS.id, productIds, currentUser);
         }
         if (newS?.id) {
-          setPartyId(newS.id);
+          handlePartyChange(newS.id);
           setIsQuickSupplierOpen(false);
         }
       }}

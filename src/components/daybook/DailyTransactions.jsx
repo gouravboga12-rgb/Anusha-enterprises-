@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import {
   Calendar, Printer, Filter, ArrowDownLeft, ArrowUpRight,
-  CheckCircle2, TrendingUp, BookOpen, Package, Users, Warehouse, Download
+  CheckCircle2, TrendingUp, BookOpen, Package, Users, Warehouse, Download, FileText
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTodayDateString } from '../../utils/formatters';
 import { exportElementToPdf } from '../../utils/pdfExport';
 import { RevenueProfitReport } from '../reports/RevenueProfitReport';
 
-export const DailyTransactions = ({ dataService }) => {
+export const DailyTransactions = ({ dataService, onViewInvoice }) => {
   const [dateMode, setDateMode] = useState('all'); // 'single' | 'range' | 'all' (default All as requested)
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [fromDate, setFromDate] = useState('');
@@ -105,6 +105,7 @@ export const DailyTransactions = ({ dataService }) => {
       });
       allEvents.push({
         id: s.id,
+        raw: s,
         date: s.date,
         time: s.time,
         type: 'Customer Sale',
@@ -132,6 +133,7 @@ export const DailyTransactions = ({ dataService }) => {
       });
       allEvents.push({
         id: p.id,
+        raw: p,
         date: p.date,
         time: p.time,
         type: 'Supplier Purchase',
@@ -583,6 +585,28 @@ export const DailyTransactions = ({ dataService }) => {
                             <span className={`badge ${evt.status === 'Paid' || evt.status === 'Settled' ? 'badge-paid' : 'badge-warning'}`} style={{ fontSize: '10px' }}>
                               {evt.status}
                             </span>
+                          )}
+                          {(evt.rawType === 'sale' || evt.rawType === 'purchase') && evt.raw && onViewInvoice && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm no-print"
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: '11px',
+                                color: '#0284c7',
+                                borderColor: '#bae6fd',
+                                background: '#f0f9ff',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                marginLeft: 'auto'
+                              }}
+                              onClick={() => onViewInvoice(evt.raw, evt.rawType)}
+                              title="View, Print & Download Invoice"
+                            >
+                              <FileText size={12} /> Invoice
+                            </button>
                           )}
                         </div>
                       </div>

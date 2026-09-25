@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 
-export const CustomerFormModal = ({ isOpen, onClose, customer, onSave }) => {
+export const CustomerFormModal = ({ isOpen, onClose, customer, onSave, zIndex = 1100 }) => {
   const [formData, setFormData] = useState({
     customer_id: '',
     name: '',
@@ -28,13 +28,15 @@ export const CustomerFormModal = ({ isOpen, onClose, customer, onSave }) => {
     }
   }, [customer, isOpen]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       alert('Please enter customer name');
       return;
     }
-    onSave(formData);
+    if (onSave) {
+      await onSave(formData);
+    }
     onClose();
   };
 
@@ -43,6 +45,7 @@ export const CustomerFormModal = ({ isOpen, onClose, customer, onSave }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={customer ? 'Edit Customer Account' : 'Add New Customer'}
+      zIndex={zIndex}
     >
       <form onSubmit={handleSubmit}>
         <div className="form-row">

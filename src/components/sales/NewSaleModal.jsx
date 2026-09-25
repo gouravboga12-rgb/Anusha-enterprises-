@@ -42,6 +42,12 @@ export const NewSaleModal = ({
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [isQuickCustomerOpen, setIsQuickCustomerOpen] = useState(false);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!dataService) return;
+    return dataService.subscribe(() => setTick((t) => t + 1));
+  }, [dataService]);
 
   useEffect(() => {
     if (isOpen) {
@@ -788,6 +794,7 @@ export const NewSaleModal = ({
         isOpen={isQuickCustomerOpen}
         onClose={() => setIsQuickCustomerOpen(false)}
         customer={null}
+        zIndex={1100}
         onSave={async (cData) => {
           const newC = await dataService.saveCustomer(cData, currentUser);
           if (newC?.id) {

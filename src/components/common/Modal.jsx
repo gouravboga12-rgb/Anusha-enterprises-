@@ -1,12 +1,21 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-export const Modal = ({ isOpen, onClose, title, children, maxWidth = '650px', closeOnBackdropClick = false }) => {
+export const Modal = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  maxWidth = '650px',
+  closeOnBackdropClick = false,
+  zIndex
+}) => {
   if (!isOpen) return null;
 
   return (
     <div
       className="modal-backdrop"
+      style={zIndex ? { zIndex } : undefined}
       onClick={(e) => {
         // Sticky modal: only close if closeOnBackdropClick is explicitly true
         if (closeOnBackdropClick && e.target === e.currentTarget) {

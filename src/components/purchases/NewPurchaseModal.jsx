@@ -3,6 +3,7 @@ import { Modal } from '../common/Modal';
 import { Plus, Trash2, AlertCircle, Warehouse, Sparkles, Building2, FileText, UserPlus } from 'lucide-react';
 import { formatCurrency, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 import { SupplierFormModal } from '../suppliers/SupplierFormModal';
+import { ProductFormModal } from '../products/ProductFormModal';
 
 export const NewPurchaseModal = ({
   isOpen,
@@ -18,12 +19,26 @@ export const NewPurchaseModal = ({
   const products = dataService.getProducts();
   const godowns = dataService.getGodowns();
 
-  // Helper to filter products for the selected supplier
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    return dataService.subscribe(() => setTick((t) => t + 1));
+  }, [dataService]);
+
+  // Helper to filter and prioritize products for the selected supplier
   const getSupplierFilteredProducts = (sId) => {
     if (!sId) return products;
-    const mapped = dataService.getSupplierProducts(sId);
-    if (!mapped || mapped.length === 0) return products;
-    return products.filter((p) => mapped.some((m) => m.product_id === p.id));
+    const mapped = dataService.getSupplierProducts(sId) || [];
+    if (mapped.length === 0) return products;
+    const mappedIds = new Set(mapped.map((m) => m.id));
+    const mappedList = products.filter((p) => mappedIds.has(p.id));
+    const otherList = products.filter((p) => !mappedIds.has(p.id));
+    return [...mappedList, ...otherList];
+  };
+
+  const getMappedProductIds = (sId) => {
+    if (!sId) return new Set();
+    const mapped = dataService.getSupplierProducts(sId) || [];
+    return new Set(mapped.map((m) => m.id));
   };
 
   const [supplierId, setSupplierId] = useState(initialSupplierId);
@@ -45,6 +60,7 @@ export const NewPurchaseModal = ({
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [isQuickSupplierOpen, setIsQuickSupplierOpen] = useState(false);
+  const [isQuickProductOpen, setIsQuickProductOpen] = useState(false);
 
   // Suppliers mapped to currently selected products
   const selectedProductIds = items.map((i) => i.product_id).filter(Boolean);
@@ -366,16 +382,27 @@ export const NewPurchaseModal = ({
 
           {/* Products Inward Line Items */}
           <div style={{ marginTop: '16px', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
               <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>Products Inward</label>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={addItemRow}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-              >
-                <Plus size={14} /> Add Product Line
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setIsQuickProductOpen(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
+                  title="Directly add a new product to catalog"
+                >
+                  <Plus size={14} /> + New Product
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={addItemRow}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                >
+                  <Plus size={14} /> Add Product Line
+                </button>
+              </div>
             </div>
 
             {/* Desktop Table View (>= 640px) */}
@@ -404,14 +431,41 @@ export const NewPurchaseModal = ({
                             value={item.product_id}
                             onChange={(e) => handleProductChange(idx, e.target.value)}
                           >
-                            {getSupplierFilteredProducts(supplierId).map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} (Total: {p.current_stock} {p.unit})
-                              </option>
-                            ))}
-                            {supplierId && dataService.getSupplierProducts(supplierId).length === 0 && (
-                              <option disabled value="">── All products (none mapped to this supplier) ──</option>
-                            )}
+                            {(() => {
+                              const sProds = getSupplierFilteredProducts(supplierId);
+                              const mappedIds = getMappedProductIds(supplierId);
+                              const mappedProds = sProds.filter((p) => mappedIds.has(p.id));
+                              const otherProds = sProds.filter((p) => !mappedIds.has(p.id));
+
+                              if (mappedIds.size > 0 && mappedProds.length > 0) {
+                                return (
+                                  <>
+                                    <optgroup label="✨ Mapped Products (Supplied by this Vendor)">
+                                      {mappedProds.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                          ★ {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                    {otherProds.length > 0 && (
+                                      <optgroup label="All Other Catalog Products">
+                                        {otherProds.map((p) => (
+                                          <option key={p.id} value={p.id}>
+                                            {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                  </>
+                                );
+                              }
+
+                              return sProds.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
+                                </option>
+                              ));
+                            })()}
                           </select>
                         </td>
                         <td>
@@ -543,11 +597,41 @@ export const NewPurchaseModal = ({
                         onChange={(e) => handleProductChange(idx, e.target.value)}
                         style={{ width: '100%', fontSize: '12px' }}
                       >
-                        {getSupplierFilteredProducts(supplierId).map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} (Total: {p.current_stock} {p.unit})
-                          </option>
-                        ))}
+                        {(() => {
+                          const sProds = getSupplierFilteredProducts(supplierId);
+                          const mappedIds = getMappedProductIds(supplierId);
+                          const mappedProds = sProds.filter((p) => mappedIds.has(p.id));
+                          const otherProds = sProds.filter((p) => !mappedIds.has(p.id));
+
+                          if (mappedIds.size > 0 && mappedProds.length > 0) {
+                            return (
+                              <>
+                                <optgroup label="✨ Mapped Products (Supplied by this Vendor)">
+                                  {mappedProds.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      ★ {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                {otherProds.length > 0 && (
+                                  <optgroup label="All Other Catalog Products">
+                                    {otherProds.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                              </>
+                            );
+                          }
+
+                          return sProds.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
+                            </option>
+                          ));
+                        })()}
                       </select>
                     </div>
 
@@ -813,6 +897,7 @@ export const NewPurchaseModal = ({
         supplier={null}
         dataService={dataService}
         currentUser={currentUser}
+        zIndex={1100}
         onSave={async (sData, prodIds) => {
           const newS = await dataService.saveSupplier(sData, currentUser);
           if (prodIds && newS?.id) {
@@ -821,6 +906,48 @@ export const NewPurchaseModal = ({
           if (newS?.id) {
             setSupplierId(newS.id);
             setIsQuickSupplierOpen(false);
+          }
+        }}
+      />
+
+      {/* Embedded Quick Add Product Modal */}
+      <ProductFormModal
+        isOpen={isQuickProductOpen}
+        onClose={() => setIsQuickProductOpen(false)}
+        product={null}
+        zIndex={1100}
+        onSave={async (pData) => {
+          const newP = await dataService.saveProduct(pData, currentUser);
+          if (newP?.id) {
+            // Also map it to selected supplier if present
+            if (supplierId) {
+              const currentMapped = (dataService.getSupplierProducts(supplierId) || []).map((p) => p.id);
+              if (!currentMapped.includes(newP.id)) {
+                await dataService.saveSupplierProducts(supplierId, [...currentMapped, newP.id], currentUser);
+              }
+            }
+            // Auto select this newly created product in the last item row
+            setItems((prev) => {
+              if (prev.length === 0) {
+                return [{
+                  product_id: newP.id,
+                  godown_id: godownId || godowns[0]?.id || '',
+                  quantity: 10,
+                  unit: newP.unit || 'Units',
+                  purchase_price: newP.purchase_price || 0
+                }];
+              }
+              const copy = [...prev];
+              const lastIdx = copy.length - 1;
+              copy[lastIdx] = {
+                ...copy[lastIdx],
+                product_id: newP.id,
+                unit: newP.unit || copy[lastIdx].unit || 'Units',
+                purchase_price: newP.purchase_price !== undefined ? newP.purchase_price : copy[lastIdx].purchase_price
+              };
+              return copy;
+            });
+            setIsQuickProductOpen(false);
           }
         }}
       />

@@ -27,7 +27,8 @@ export const CustomerProfile = ({
   onOpenPayment,
   onEditCustomer,
   onViewBillDetails,
-  onEditSale
+  onEditSale,
+  onViewInvoice
 }) => {
   const [activeTab, setActiveTab] = useState('ledger');
   const [isSavingPdf, setIsSavingPdf] = useState(false);
@@ -774,6 +775,14 @@ export const CustomerProfile = ({
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                             <button
                               className="btn btn-secondary btn-sm"
+                              style={{ padding: '3px 8px', fontSize: '11px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
+                              onClick={() => onViewInvoice && onViewInvoice(sale)}
+                              title="View, Print & Download Tax Invoice"
+                            >
+                              <FileText size={13} /> Invoice
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
                               style={{ padding: '3px 8px' }}
                               onClick={() => onViewBillDetails && onViewBillDetails(sale)}
                               title="View Bill & Payment History"
@@ -871,6 +880,14 @@ export const CustomerProfile = ({
                   </div>
 
                   <div className="card-action-bar">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
+                      onClick={() => onViewInvoice && onViewInvoice(sale)}
+                      title="View, Print & Download Tax Invoice"
+                    >
+                      <FileText size={13} /> Invoice
+                    </button>
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => onViewBillDetails && onViewBillDetails(sale)}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../common/Modal';
 import { Package, Search, CheckSquare, Square, Info, Plus, X } from 'lucide-react';
 
-export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataService, currentUser }) => {
+export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataService, currentUser, zIndex = 1100 }) => {
   const [formData, setFormData] = useState({
     supplier_id: '',
     company_name: '',
@@ -92,6 +92,7 @@ export const SupplierFormModal = ({ isOpen, onClose, supplier, onSave, dataServi
       onClose={onClose}
       title={supplier ? 'Edit Supplier Details' : 'Add New Supplier'}
       maxWidth="680px"
+      zIndex={zIndex}
     >
       <form onSubmit={handleSubmit}>
         <div className="form-row">

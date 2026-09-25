@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer, Download, Calendar } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer, Download, Calendar, FileText } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 import { exportElementToPdf } from '../../utils/pdfExport';
 
@@ -12,7 +12,8 @@ export const SupplierProfile = ({
   onOpenPayment,
   onEditSupplier,
   onViewPurchaseDetails,
-  onEditPurchase
+  onEditPurchase,
+  onViewInvoice
 }) => {
   const [activeTab, setActiveTab] = useState('ledger');
   const [isSavingPdf, setIsSavingPdf] = useState(false);
@@ -758,6 +759,14 @@ export const SupplierProfile = ({
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                             <button
                               className="btn btn-secondary btn-sm"
+                              style={{ padding: '3px 8px', fontSize: '11px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
+                              onClick={() => onViewInvoice && onViewInvoice(pur)}
+                              title="View, Print & Download Purchase Invoice"
+                            >
+                              <FileText size={13} /> Invoice
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
                               style={{ padding: '3px 8px' }}
                               onClick={() => onViewPurchaseDetails && onViewPurchaseDetails(pur)}
                               title="View Purchase & Payment History"
@@ -857,6 +866,14 @@ export const SupplierProfile = ({
                   </div>
 
                   <div className="card-action-bar">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
+                      onClick={() => onViewInvoice && onViewInvoice(pur)}
+                      title="View, Print & Download Purchase Invoice"
+                    >
+                      <FileText size={13} /> Invoice
+                    </button>
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => onViewPurchaseDetails && onViewPurchaseDetails(pur)}

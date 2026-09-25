@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { ImageUploader } from '../common/ImageUploader';
 
-export const ProductFormModal = ({ isOpen, onClose, product, onSave }) => {
+export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 1100 }) => {
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
@@ -35,19 +35,21 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave }) => {
     }
   }, [product, isOpen]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       alert('Please enter product name');
       return;
     }
-    onSave({
-      ...formData,
-      current_stock: formData.current_stock !== '' && formData.current_stock !== undefined ? Number(formData.current_stock) : 0,
-      min_stock_alert: formData.min_stock_alert !== '' && formData.min_stock_alert !== undefined ? Number(formData.min_stock_alert) : 0,
-      purchase_price: formData.purchase_price !== '' && formData.purchase_price !== undefined ? Number(formData.purchase_price) : 0,
-      selling_price: formData.selling_price !== '' && formData.selling_price !== undefined ? Number(formData.selling_price) : 0
-    });
+    if (onSave) {
+      await onSave({
+        ...formData,
+        current_stock: formData.current_stock !== '' && formData.current_stock !== undefined ? Number(formData.current_stock) : 0,
+        min_stock_alert: formData.min_stock_alert !== '' && formData.min_stock_alert !== undefined ? Number(formData.min_stock_alert) : 0,
+        purchase_price: formData.purchase_price !== '' && formData.purchase_price !== undefined ? Number(formData.purchase_price) : 0,
+        selling_price: formData.selling_price !== '' && formData.selling_price !== undefined ? Number(formData.selling_price) : 0
+      });
+    }
     onClose();
   };
 
@@ -56,6 +58,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave }) => {
       isOpen={isOpen}
       onClose={onClose}
       title={product ? 'Edit Product Details' : 'Add New Product to Catalog'}
+      zIndex={zIndex}
     >
       <form onSubmit={handleSubmit}>
         {/* Cloudinary Direct Image Uploader */}

@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { formatCurrency, formatDate, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
-import { Download, Printer, CheckCircle2, ShieldCheck, Building2, User, FileText, ArrowRight } from 'lucide-react';
+import { Download, Printer, CheckCircle2, ShieldCheck, Building2, User, FileText, ArrowRight, Edit } from 'lucide-react';
 import { exportElementToPdf } from '../../utils/pdfExport';
 
 export const InvoiceModal = ({
   isOpen,
   onClose,
   type = 'sale', // 'sale' | 'purchase'
-  doc,
-  dataService
+  doc: docProp,
+  document: documentProp,
+  dataService,
+  onEdit
 }) => {
   const [isExporting, setIsExporting] = useState(false);
 
+  const doc = docProp || documentProp;
   if (!doc) return null;
 
   const isSale = type === 'sale';
@@ -104,6 +107,30 @@ export const InvoiceModal = ({
               <Printer size={15} />
               <span>Print Invoice</span>
             </button>
+            {onEdit && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  onClose();
+                  onEdit(doc, type);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#fef3c7',
+                  color: '#b45309',
+                  border: '1px solid #fde68a',
+                  fontWeight: 700,
+                  padding: '6px 14px'
+                }}
+                title={isSale ? 'Edit this sale bill details and items' : 'Edit this purchase bill details and items'}
+              >
+                <Edit size={15} />
+                <span>{isSale ? 'Edit Sale' : 'Edit Purchase'}</span>
+              </button>
+            )}
           </div>
         </div>
 
