@@ -8,7 +8,7 @@ import { exportElementToPdf } from '../../utils/pdfExport';
 import { RevenueProfitReport } from '../reports/RevenueProfitReport';
 
 export const DailyTransactions = ({ dataService }) => {
-  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range' | 'all'
+  const [dateMode, setDateMode] = useState('all'); // 'single' | 'range' | 'all' (default All as requested)
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState(getTodayDateString());
@@ -98,8 +98,10 @@ export const DailyTransactions = ({ dataService }) => {
       totSales += Number(s.total_amount) || 0;
       const cust = dataService.getCustomerById(s.customer_id);
       const itemLines = (s.items || []).map((i) => {
+        const prod = dataService.getProductById(i.product_id);
+        const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
         const g = dataService.getGodownById(i.godown_id);
-        return `${i.product_name}: ${i.quantity} × ₹${Number(i.selling_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}${g ? ` [${g.name}]` : ''}`;
+        return `${i.product_name}: ${i.quantity} ${unit} × ₹${Number(i.selling_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}${g ? ` [${g.name}]` : ''}`;
       });
       allEvents.push({
         id: s.id,
@@ -123,9 +125,11 @@ export const DailyTransactions = ({ dataService }) => {
       totPurchases += Number(p.total_amount) || 0;
       const supp = dataService.getSupplierById(p.supplier_id);
       const godown = dataService.getGodownById(p.godown_id);
-      const itemLines = (p.items || []).map((i) =>
-        `${i.product_name}: ${i.quantity} × ₹${Number(i.purchase_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}`
-      );
+      const itemLines = (p.items || []).map((i) => {
+        const prod = dataService.getProductById(i.product_id);
+        const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+        return `${i.product_name}: ${i.quantity} ${unit} × ₹${Number(i.purchase_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}`;
+      });
       allEvents.push({
         id: p.id,
         date: p.date,

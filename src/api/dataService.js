@@ -1682,16 +1682,21 @@ class DataService {
     const advanceAmount = Math.max(0, initialPay - totalAmount);
     const paymentStatus = initialPay >= totalAmount ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
 
-    const cleanItems = saleData.items.map((i, idx) => ({
-      id: `item-${Date.now()}-${idx}`,
-      sale_id: saleId,
-      product_id: i.product_id,
-      product_name: i.product_name || this.getProductById(i.product_id)?.name || 'Product',
-      quantity: Number(i.quantity) || 0,
-      selling_price: Number(i.selling_price) || 0,
-      total: (Number(i.quantity) || 0) * (Number(i.selling_price) || 0),
-      godown_id: i.godown_id || null
-    }));
+    const cleanItems = saleData.items.map((i, idx) => {
+      const prod = this.getProductById(i.product_id);
+      const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+      return {
+        id: `item-${Date.now()}-${idx}`,
+        sale_id: saleId,
+        product_id: i.product_id,
+        product_name: i.product_name || prod?.name || 'Product',
+        quantity: Number(i.quantity) || 0,
+        unit: unit,
+        selling_price: Number(i.selling_price) || 0,
+        total: (Number(i.quantity) || 0) * (Number(i.selling_price) || 0),
+        godown_id: i.godown_id || null
+      };
+    });
 
     const newSale = {
       id: saleId,
@@ -1865,16 +1870,21 @@ class DataService {
       }
     }
 
-    const cleanItems = newItems.map((i, idx) => ({
-      id: i.id || `item-${Date.now()}-${idx}`,
-      sale_id: saleId,
-      product_id: i.product_id,
-      product_name: i.product_name || this.getProductById(i.product_id)?.name || 'Product',
-      quantity: Number(i.quantity) || 0,
-      selling_price: Number(i.selling_price) || 0,
-      total: (Number(i.quantity) || 0) * (Number(i.selling_price) || 0),
-      godown_id: i.godown_id || null
-    }));
+    const cleanItems = newItems.map((i, idx) => {
+      const prod = this.getProductById(i.product_id);
+      const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+      return {
+        id: i.id || `item-${Date.now()}-${idx}`,
+        sale_id: saleId,
+        product_id: i.product_id,
+        product_name: i.product_name || prod?.name || 'Product',
+        quantity: Number(i.quantity) || 0,
+        unit: unit,
+        selling_price: Number(i.selling_price) || 0,
+        total: (Number(i.quantity) || 0) * (Number(i.selling_price) || 0),
+        godown_id: i.godown_id || null
+      };
+    });
 
     const totalAmount = cleanItems.reduce((acc, i) => acc + i.total, 0);
     const linkedPayments = this.getSalePayments(saleId);
@@ -1958,16 +1968,21 @@ class DataService {
     const advanceAmount = Math.max(0, initialPay - totalAmount);
     const paymentStatus = initialPay >= totalAmount ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
 
-    const cleanItems = purData.items.map((i, idx) => ({
-      id: `pitem-${Date.now()}-${idx}`,
-      purchase_id: purId,
-      product_id: i.product_id,
-      product_name: i.product_name || this.getProductById(i.product_id)?.name || 'Product',
-      quantity: Number(i.quantity) || 0,
-      purchase_price: Number(i.purchase_price) || 0,
-      total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0),
-      godown_id: i.godown_id || godownId
-    }));
+    const cleanItems = purData.items.map((i, idx) => {
+      const prod = this.getProductById(i.product_id);
+      const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+      return {
+        id: `pitem-${Date.now()}-${idx}`,
+        purchase_id: purId,
+        product_id: i.product_id,
+        product_name: i.product_name || prod?.name || 'Product',
+        quantity: Number(i.quantity) || 0,
+        unit: unit,
+        purchase_price: Number(i.purchase_price) || 0,
+        total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0),
+        godown_id: i.godown_id || godownId
+      };
+    });
 
     const newPur = {
       id: purId,
@@ -2087,16 +2102,21 @@ class DataService {
       this.recordAuditEntry('supplier_purchases', purId, existingPur.purchase_no, changes, reason, currentUser?.name || 'Admin');
     }
 
-    const cleanItems = newItems.map((i, idx) => ({
-      id: i.id || `pitem-${Date.now()}-${idx}`,
-      purchase_id: purId,
-      product_id: i.product_id,
-      product_name: i.product_name || this.getProductById(i.product_id)?.name || 'Product',
-      quantity: Number(i.quantity) || 0,
-      purchase_price: Number(i.purchase_price) || 0,
-      total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0),
-      godown_id: i.godown_id || newGodownId
-    }));
+    const cleanItems = newItems.map((i, idx) => {
+      const prod = this.getProductById(i.product_id);
+      const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+      return {
+        id: i.id || `pitem-${Date.now()}-${idx}`,
+        purchase_id: purId,
+        product_id: i.product_id,
+        product_name: i.product_name || prod?.name || 'Product',
+        quantity: Number(i.quantity) || 0,
+        unit: unit,
+        purchase_price: Number(i.purchase_price) || 0,
+        total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0),
+        godown_id: i.godown_id || newGodownId
+      };
+    });
 
     // Stock delta per godown
     const defaultGodownId = this.getDefaultGodown()?.id || this.godowns[0]?.id || 'default';
@@ -2673,17 +2693,20 @@ class DataService {
     const entries = [];
 
     custSales.forEach((s) => {
-      const itemsDetail = s.items.map((i) => {
+      const itemsDetail = (s.items || []).map((i) => {
+        const prod = this.getProductById(i.product_id);
+        const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
         const g = this.getGodownById(i.godown_id);
         return {
-          product_name: i.product_name,
+          product_name: i.product_name || prod?.name || 'Product',
           quantity: i.quantity,
+          unit: unit,
           selling_price: i.selling_price,
           total: i.total,
           godown: g ? g.name : null
         };
       });
-      const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} × ₹${i.selling_price} = ₹${i.total}`).join(', ');
+      const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} ${i.unit} × ₹${i.selling_price} = ₹${i.total}`).join(', ');
       entries.push({
         id: s.id, date: s.date, time: s.time, type: 'SALE',
         reference: s.invoice_no, particulars: `Sales Invoice — ${summary}`,
@@ -2733,14 +2756,19 @@ class DataService {
 
     suppPurchases.forEach((p) => {
       const godown = this.getGodownById(p.godown_id);
-      const itemsDetail = p.items.map((i) => ({
-        product_name: i.product_name,
-        quantity: i.quantity,
-        purchase_price: i.purchase_price,
-        total: i.total,
-        godown: godown ? godown.name : null
-      }));
-      const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} × ₹${i.purchase_price} = ₹${i.total}`).join(', ');
+      const itemsDetail = (p.items || []).map((i) => {
+        const prod = this.getProductById(i.product_id);
+        const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+        return {
+          product_name: i.product_name || prod?.name || 'Product',
+          quantity: i.quantity,
+          unit: unit,
+          purchase_price: i.purchase_price,
+          total: i.total,
+          godown: godown ? godown.name : null
+        };
+      });
+      const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} ${i.unit} × ₹${i.purchase_price} = ₹${i.total}`).join(', ');
       entries.push({
         id: p.id, date: p.date, time: p.time, type: 'PURCHASE',
         reference: p.purchase_no, particulars: `Inward Purchase — ${summary}`,

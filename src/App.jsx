@@ -33,6 +33,7 @@ import { UserManagement } from './components/users/UserManagement';
 import { BottomNav } from './components/common/BottomNav';
 import { Footer } from './components/common/Footer';
 import { LoginPage } from './components/auth/LoginPage';
+import { InvoiceModal } from './components/common/InvoiceModal';
 import { Boxes, Warehouse } from 'lucide-react';
 
 import { dataService } from './api/dataService';
@@ -166,6 +167,17 @@ export const App = () => {
   const [isPurchaseDetailsOpen, setIsPurchaseDetailsOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState(null);
   const [isEditPurchaseOpen, setIsEditPurchaseOpen] = useState(false);
+
+  // Dedicated Invoice Preview & Print Modal
+  const [invoiceModalDoc, setInvoiceModalDoc] = useState(null);
+  const [invoiceModalType, setInvoiceModalType] = useState('sale');
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+
+  const openInvoice = (doc, type = 'sale') => {
+    setInvoiceModalDoc(doc);
+    setInvoiceModalType(type);
+    setIsInvoiceModalOpen(true);
+  };
 
   useEffect(() => {
     const unsubscribe = dataService.subscribe(() => {
@@ -410,6 +422,7 @@ export const App = () => {
                 setActiveTab('customers');
               }}
               onViewBillDetails={(sale) => openBillDetails(sale)}
+              onViewInvoice={(sale) => openInvoice(sale, 'sale')}
             />
           )}
 
@@ -424,6 +437,7 @@ export const App = () => {
                 setActiveTab('suppliers');
               }}
               onViewPurchaseDetails={(pur) => openPurchaseDetails(pur)}
+              onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
             />
           )}
 
@@ -493,6 +507,7 @@ export const App = () => {
         currentUser={currentUser}
         initialCustomerId={saleInitialCustId}
         onOpenPayment={(cId, type) => openPayment(cId, type)}
+        onViewInvoice={(sale) => openInvoice(sale, 'sale')}
       />
 
       <NewPurchaseModal
@@ -502,12 +517,14 @@ export const App = () => {
         currentUser={currentUser}
         initialSupplierId={purInitialSuppId}
         onOpenPayment={(sId, type) => openPayment(sId, type)}
+        onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
       />
 
       <RecordPaymentModal
         isOpen={isPaymentOpen}
         onClose={() => setIsPaymentOpen(false)}
         dataService={dataService}
+        currentUser={currentUser}
         initialPartyId={paymentInitialPartyId}
         initialPartyType={paymentInitialPartyType}
         initialDocId={paymentInitialDocId}
@@ -584,6 +601,7 @@ export const App = () => {
           setIsBillDetailsOpen(false);
           openEditSale(sale);
         }}
+        onViewInvoice={(sale) => openInvoice(sale, 'sale')}
       />
 
       <EditSaleModal
@@ -617,6 +635,7 @@ export const App = () => {
           setIsPurchaseDetailsOpen(false);
           openEditPurchase(pur);
         }}
+        onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
       />
 
       <EditPurchaseModal
@@ -632,6 +651,18 @@ export const App = () => {
           setIsEditPurchaseOpen(false);
           setEditingPurchase(null);
         }}
+      />
+
+      {/* Printable GST / Commercial Invoice Modal */}
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => {
+          setIsInvoiceModalOpen(false);
+          setInvoiceModalDoc(null);
+        }}
+        document={invoiceModalDoc}
+        type={invoiceModalType}
+        dataService={dataService}
       />
 
       {/* Touch-Friendly Mobile Bottom Navigation Bar */}

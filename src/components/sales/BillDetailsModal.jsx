@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal } from '../common/Modal';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { PlusCircle, Edit, Trash2, Calendar, Receipt, CreditCard, Clock, User } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Calendar, Receipt, CreditCard, Clock, User, FileText } from 'lucide-react';
 
 export const BillDetailsModal = ({
   isOpen,
@@ -9,7 +9,8 @@ export const BillDetailsModal = ({
   sale,
   dataService,
   onAddPayment,
-  onEditBill
+  onEditBill,
+  onViewInvoice
 }) => {
   if (!sale) return null;
 
@@ -107,7 +108,17 @@ export const BillDetailsModal = ({
           </div>
 
           {/* Dedicated Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
+              onClick={() => {
+                if (onViewInvoice) onViewInvoice(sale);
+              }}
+              title="View and Print Official GST/Sales Invoice"
+            >
+              <FileText size={14} /> View Invoice
+            </button>
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => {
@@ -141,7 +152,7 @@ export const BillDetailsModal = ({
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th style={{ textAlign: 'right' }}>Quantity</th>
+                  <th style={{ textAlign: 'right' }}>Quantity & Unit</th>
                   <th style={{ textAlign: 'right' }}>Rate (₹)</th>
                   <th style={{ textAlign: 'right' }}>Total (₹)</th>
                 </tr>
@@ -150,9 +161,9 @@ export const BillDetailsModal = ({
                 {sale.items.map((item, idx) => (
                   <tr key={idx}>
                     <td style={{ fontWeight: 600 }}>{item.product_name}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{item.quantity}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{item.quantity} {item.unit || 'Units'}</td>
                     <td style={{ textAlign: 'right' }}>{formatCurrency(item.selling_price)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(item.total)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(item.total || (item.quantity * item.selling_price))}</td>
                   </tr>
                 ))}
               </tbody>

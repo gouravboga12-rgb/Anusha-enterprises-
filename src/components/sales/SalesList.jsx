@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Search, ShoppingCart, Receipt, Eye } from 'lucide-react';
+import { PlusCircle, Search, ShoppingCart, Receipt, Eye, FileText } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 export const SalesList = ({
@@ -8,7 +8,8 @@ export const SalesList = ({
   onOpenNewSale,
   onOpenPayment,
   onSelectCustomer,
-  onViewBillDetails
+  onViewBillDetails,
+  onViewInvoice
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -119,7 +120,7 @@ export const SalesList = ({
                       <td>
                         {sale.items.map((i, idx) => (
                           <div key={idx} style={{ fontSize: '12px' }}>
-                            {i.product_name} <span style={{ color: '#64748b' }}>({i.quantity} × {formatCurrency(i.selling_price)})</span>
+                            {i.product_name} <span style={{ color: '#64748b' }}>({i.quantity} {i.unit || 'Units'} × {formatCurrency(i.selling_price)})</span>
                           </div>
                         ))}
                       </td>
@@ -146,6 +147,14 @@ export const SalesList = ({
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '4px 8px', fontSize: '11px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff' }}
+                            onClick={() => onViewInvoice && onViewInvoice(sale)}
+                            title="View / Print Tax Invoice"
+                          >
+                            <FileText size={13} /> Invoice
+                          </button>
                           <button
                             className="btn btn-secondary btn-sm"
                             style={{ padding: '4px 8px', fontSize: '11px' }}

@@ -5,16 +5,12 @@ import { jsPDF } from 'jspdf';
 /**
  * Export an HTML element directly as a downloaded PDF file.
  *
- * Direct html2canvas + jsPDF engine (bypasses legacy html2pdf.js wrapper):
- * 1. Zero negative coordinates: Staging container is positioned at (0, 0) with 794px width.
- * 2. Mobile-safe canvas scaling (1.2x on mobile, 2x on desktop) to strictly stay below
- *    iOS Safari and Android Chrome canvas memory limits.
- * 3. Removes all hiding classes (.desktop-table-view, .customer-ledger-panel, .supplier-ledger-panel)
- *    so mobile media queries cannot hide the statement records.
- * 4. Slices tall multi-page canvases cleanly into individual portrait A4 pages in jsPDF.
- * 5. iOS Safari compatibility: iOS Safari blocks <a download> on async blobs. We open the
- *    blob URL directly in iOS Safari so users can view and save via native Share/Save to Files.
- * 6. Shows a loading overlay while compiling so users get immediate visual feedback.
+ * Mobile-Safe html2canvas + jsPDF engine:
+ * 1. windowWidth: 1200 in html2canvas so @media (max-width: 1024px) CSS rules do NOT hide tables or panels.
+ * 2. Injects explicit print/desktop styles inside staging container so nothing is hidden by media queries.
+ * 3. Positioned absolutely at top 0 with window scroll normalized to avoid canvas clipping.
+ * 4. Uses native jsPDF pdf.save() to avoid Android Chrome premature blob revocation.
+ * 5. iOS Safari fallback with direct blob window preview.
  *
  * @param {Object} options
  * @param {string|HTMLElement} options.element - Element or selector to export
@@ -53,7 +49,7 @@ export const exportElementToPdf = async ({ element, filename, title }) => {
   loadingOverlay.id = 'pdf-export-loading-overlay';
   loadingOverlay.style.position = 'fixed';
   loadingOverlay.style.inset = '0';
-  loadingOverlay.style.background = 'rgba(15, 23, 42, 0.8)';
+  loadingOverlay.style.background = 'rgba(15, 23, 42, 0.85)';
   loadingOverlay.style.backdropFilter = 'blur(4px)';
   loadingOverlay.style.zIndex = '999999';
   loadingOverlay.style.display = 'flex';
@@ -66,29 +62,73 @@ export const exportElementToPdf = async ({ element, filename, title }) => {
   loadingOverlay.innerHTML = `
     <div style="width: 44px; height: 44px; border: 3.5px solid rgba(255,255,255,0.25); border-top-color: #38bdf8; border-radius: 50%; animation: pdfSpin 0.75s linear infinite;"></div>
     <div style="font-size: 15px; font-weight: 700; letter-spacing: -0.01em;">Generating Statement PDF...</div>
-    <div style="font-size: 12px; color: #94a3b8;">Compiling records into portrait A4 document</div>
+    <div style="font-size: 12px; color: #94a3b8;">Compiling high-resolution portrait A4 document</div>
     <style>@keyframes pdfSpin { to { transform: rotate(360deg); } }</style>
   `;
   document.body.appendChild(loadingOverlay);
 
-  // 2. Positive-coordinate staging container at (0, 0)
-  // Sits below loadingOverlay (z-index 99990 vs 999999), perfectly in-bounds for html2canvas
+  // Preserve previous scroll
+  const prevScrollX = window.scrollX || window.pageXOffset || 0;
+  const prevScrollY = window.scrollY || window.pageYOffset || 0;
+
+  // 2. High-z-index staging container positioned at top: 0, left: 0
   const stagingContainer = document.createElement('div');
   stagingContainer.id = 'pdf-export-staging-container';
-  stagingContainer.style.position = 'fixed';
+  stagingContainer.style.position = 'absolute';
   stagingContainer.style.top = '0';
   stagingContainer.style.left = '0';
   stagingContainer.style.width = '794px'; // Standard A4 portrait width at 96 DPI
   stagingContainer.style.maxWidth = '794px';
+  stagingContainer.style.minWidth = '794px';
   stagingContainer.style.minHeight = '1000px';
   stagingContainer.style.background = '#ffffff';
   stagingContainer.style.color = '#0f172a';
   stagingContainer.style.padding = '20px 24px';
   stagingContainer.style.margin = '0';
   stagingContainer.style.boxSizing = 'border-box';
-  stagingContainer.style.zIndex = '99990';
+  stagingContainer.style.zIndex = '10000000';
   stagingContainer.style.overflow = 'visible';
   stagingContainer.style.pointerEvents = 'none';
+
+  // Inject CSS override to defeat @media (max-width: 1024px) hiding
+  const overrideStyle = document.createElement('style');
+  overrideStyle.textContent = `
+    #pdf-export-staging-container * {
+      box-sizing: border-box !important;
+    }
+    #pdf-export-staging-container .desktop-table-view,
+    #pdf-export-staging-container .customer-ledger-panel,
+    #pdf-export-staging-container .supplier-ledger-panel,
+    #pdf-export-staging-container .table-responsive,
+    #pdf-export-staging-container table,
+    #pdf-export-staging-container .data-table {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+    #pdf-export-staging-container table,
+    #pdf-export-staging-container .data-table {
+      display: table !important;
+      width: 100% !important;
+      border-collapse: collapse !important;
+    }
+    #pdf-export-staging-container thead { display: table-header-group !important; }
+    #pdf-export-staging-container tbody { display: table-row-group !important; }
+    #pdf-export-staging-container tr { display: table-row !important; }
+    #pdf-export-staging-container th,
+    #pdf-export-staging-container td { display: table-cell !important; }
+    #pdf-export-staging-container .mobile-cards-view,
+    #pdf-export-staging-container .no-print {
+      display: none !important;
+    }
+    #pdf-export-staging-container .print-header {
+      display: block !important;
+      visibility: visible !important;
+    }
+  `;
+  stagingContainer.appendChild(overrideStyle);
 
   // 3. Deep clone target element
   const clone = target.cloneNode(true);
@@ -104,7 +144,7 @@ export const exportElementToPdf = async ({ element, filename, title }) => {
     h.style.setProperty('visibility', 'visible', 'important');
   });
 
-  // Strip all hiding classes so mobile media queries cannot hide tables or cards
+  // Strip all hiding classes
   const hideClasses = ['desktop-table-view', 'customer-ledger-panel', 'supplier-ledger-panel', 'mobile-hide'];
   hideClasses.forEach((cls) => {
     clone.classList.remove(cls);
@@ -171,20 +211,27 @@ export const exportElementToPdf = async ({ element, filename, title }) => {
   document.body.appendChild(stagingContainer);
 
   try {
-    // Delay 120ms to allow fonts, SVGs, and cloned styles to settle in the DOM
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    // Normalise scroll before capture so html2canvas doesn't produce blank canvas
+    if (window.scrollTo) {
+      window.scrollTo(0, 0);
+    }
 
-    // Render directly with html2canvas
+    // Delay 250ms to allow fonts, SVGs, and cloned styles to settle in the DOM
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Render directly with html2canvas (windowWidth: 1200 defeats mobile media query hiding)
     const canvas = await html2canvas(stagingContainer, {
-      scale: isMobile ? 1.2 : 2, // 1.2 on mobile prevents canvas memory limit drops
+      scale: isMobile ? 1.5 : 2,
       useCORS: true,
+      allowTaint: true,
+      foreignObjectRendering: false,
       logging: false,
       scrollY: 0,
       scrollX: 0,
       x: 0,
       y: 0,
       width: 794,
-      windowWidth: 794,
+      windowWidth: 1200, // Forces desktop layout inside html2canvas
       backgroundColor: '#ffffff'
     });
 
@@ -240,33 +287,25 @@ export const exportElementToPdf = async ({ element, filename, title }) => {
       pageIndex++;
     }
 
-    // Trigger download or native preview
-    const blob = pdf.output('blob');
-    const blobUrl = URL.createObjectURL(blob);
-
     if (isIOS) {
-      // iOS Safari does not support <a download> on blobs reliably.
-      // Open the blob URL directly so Safari displays the native PDF reader with Save/Share.
+      // iOS Safari handles blob preview best
+      const blob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
       const win = window.open(blobUrl, '_blank');
       if (!win) {
         window.location.href = blobUrl;
       }
     } else {
-      // Android Chrome & Desktop: Standard download link
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = cleanFilename;
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => {
-        if (link.parentNode) link.parentNode.removeChild(link);
-        URL.revokeObjectURL(blobUrl);
-      }, 1500);
+      // Built-in pdf.save handles Android Chrome, mobile WebViews, and Desktop reliably
+      pdf.save(cleanFilename);
     }
   } catch (err) {
     console.error('PDF export failed, falling back to window.print()', err);
     window.print();
   } finally {
+    if (window.scrollTo) {
+      window.scrollTo(prevScrollX, prevScrollY);
+    }
     if (stagingContainer.parentNode) {
       stagingContainer.parentNode.removeChild(stagingContainer);
     }

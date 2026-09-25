@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Search, ShoppingBag, Receipt, Eye } from 'lucide-react';
+import { PlusCircle, Search, ShoppingBag, Receipt, Eye, FileText } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 export const PurchasesList = ({
@@ -8,7 +8,8 @@ export const PurchasesList = ({
   onOpenNewPurchase,
   onOpenPayment,
   onSelectSupplier,
-  onViewPurchaseDetails
+  onViewPurchaseDetails,
+  onViewInvoice
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -119,7 +120,7 @@ export const PurchasesList = ({
                       <td>
                         {pur.items.map((i, idx) => (
                           <div key={idx} style={{ fontSize: '12px' }}>
-                            {i.product_name} <span style={{ color: '#64748b' }}>({i.quantity} × {formatCurrency(i.purchase_price)})</span>
+                            {i.product_name} <span style={{ color: '#64748b' }}>({i.quantity} {i.unit || 'Units'} × {formatCurrency(i.purchase_price)})</span>
                           </div>
                         ))}
                       </td>
@@ -146,6 +147,14 @@ export const PurchasesList = ({
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '4px 8px', fontSize: '11px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff' }}
+                            onClick={() => onViewInvoice && onViewInvoice(pur)}
+                            title="View / Print Inward Purchase Invoice"
+                          >
+                            <FileText size={13} /> Invoice
+                          </button>
                           <button
                             className="btn btn-secondary btn-sm"
                             style={{ padding: '4px 8px', fontSize: '11px' }}

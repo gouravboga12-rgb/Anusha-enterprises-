@@ -50,7 +50,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
       names.add(currentUser.name.trim());
     }
     transactions.forEach((t) => {
-      const recordedBy = t.created_by || t.user_name;
+      const recordedBy = t.recorded_by || t.created_by || t.user_name;
       if (recordedBy && recordedBy.trim()) names.add(recordedBy.trim());
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b));
@@ -59,9 +59,9 @@ export const WalletPage = ({ dataService, currentUser }) => {
   const filteredTransactions = useMemo(() => {
     let list = transactions;
     if (filterStaff !== 'all') {
-      const fs = filterStaff.toLowerCase();
+      const fs = filterStaff.toLowerCase().trim();
       list = list.filter((t) => {
-        const creator = (t.created_by || t.user_name || '').toLowerCase();
+        const creator = (t.recorded_by || t.created_by || t.user_name || '').toLowerCase().trim();
         return creator === fs;
       });
     }

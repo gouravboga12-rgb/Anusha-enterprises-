@@ -3,6 +3,8 @@ import { Modal } from '../common/Modal';
 import { Plus, Trash2, Warehouse, History, ShieldAlert } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
+const UNIT_OPTIONS = ['Units', 'Boxes', 'Packets', 'Meters', 'Pieces', 'Kg', 'Custom'];
+
 export const EditPurchaseModal = ({
   isOpen,
   onClose,
@@ -35,6 +37,7 @@ export const EditPurchaseModal = ({
           product_id: i.product_id,
           godown_id: i.godown_id || purchase.godown_id || godowns[0]?.id || '',
           quantity: i.quantity,
+          unit: i.unit || 'Units',
           purchase_price: i.purchase_price
         }))
       );
@@ -52,6 +55,7 @@ export const EditPurchaseModal = ({
     updated[index] = {
       ...updated[index],
       product_id: prodId,
+      unit: prod?.unit || updated[index].unit || 'Units',
       purchase_price: prod ? prod.purchase_price : 0
     };
     setItems(updated);
@@ -65,9 +69,16 @@ export const EditPurchaseModal = ({
 
   const addItemRow = () => {
     if (products.length === 0) return;
+    const defProd = products[0];
     setItems([
       ...items,
-      { product_id: products[0].id, godown_id: godownId || godowns[0]?.id || '', quantity: 10, purchase_price: products[0].purchase_price || 0 }
+      {
+        product_id: defProd.id,
+        godown_id: godownId || godowns[0]?.id || '',
+        quantity: 10,
+        unit: defProd.unit || 'Units',
+        purchase_price: defProd.purchase_price || 0
+      }
     ]);
   };
 
@@ -236,11 +247,11 @@ export const EditPurchaseModal = ({
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: '32%' }}>Product</th>
-                  <th style={{ width: '26%' }}>Destination Godown</th>
-                  <th style={{ width: '13%' }}>Quantity</th>
-                  <th style={{ width: '15%' }}>Cost (₹)</th>
-                  <th style={{ width: '14%', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: '30%' }}>Product</th>
+                  <th style={{ width: '22%' }}>Destination Godown</th>
+                  <th style={{ width: '22%' }}>Quantity & Unit</th>
+                  <th style={{ width: '13%' }}>Cost (₹)</th>
+                  <th style={{ width: '13%', textAlign: 'right' }}>Total</th>
                   <th></th>
                 </tr>
               </thead>
@@ -284,13 +295,39 @@ export const EditPurchaseModal = ({
                         </select>
                       </td>
                       <td>
-                        <input
-                          type="number"
-                          className="form-input"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                        />
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <input
+                            type="number"
+                            className="form-input"
+                            min="1"
+                            style={{ width: '65px' }}
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                          />
+                          <select
+                            className="form-select"
+                            value={UNIT_OPTIONS.includes(item.unit) ? item.unit : 'Custom'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === 'Custom') {
+                                const customVal = prompt('Enter custom quantity unit type (e.g. Rolls, Bags, Bundles):', item.unit || '');
+                                handleItemChange(idx, 'unit', customVal?.trim() || 'Units');
+                              } else {
+                                handleItemChange(idx, 'unit', val);
+                              }
+                            }}
+                            style={{ width: '85px', fontSize: '11px', padding: '4px 6px' }}
+                          >
+                            {UNIT_OPTIONS.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {item.unit && !UNIT_OPTIONS.includes(item.unit) && (
+                          <div style={{ fontSize: '10.5px', color: '#0284c7', marginTop: '2px', fontWeight: 600 }}>
+                            Custom: {item.unit}
+                          </div>
+                        )}
                         {oldQty > 0 && (
                           <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
                             Original: {oldQty} {delta !== 0 && `(${delta > 0 ? '+' : ''}${delta})`}

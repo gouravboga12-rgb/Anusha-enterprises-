@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { formatCurrency, formatDate, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
-import { Receipt, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, DollarSign, Calendar, Clock } from 'lucide-react';
+import { Receipt, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, DollarSign, Calendar, Clock, UserPlus } from 'lucide-react';
+import { CustomerFormModal } from '../customers/CustomerFormModal';
+import { SupplierFormModal } from '../suppliers/SupplierFormModal';
 
 export const RecordPaymentModal = ({
   isOpen,
   onClose,
   dataService,
+  currentUser,
   initialPartyId = '',
   initialPartyType = 'customer',
   initialDocId = '',
@@ -22,6 +25,8 @@ export const RecordPaymentModal = ({
   const [time, setTime] = useState(getCurrentTimeString());
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
+  const [isQuickCustomerOpen, setIsQuickCustomerOpen] = useState(false);
+  const [isQuickSupplierOpen, setIsQuickSupplierOpen] = useState(false);
 
   const customers = dataService.getCustomers();
   const suppliers = dataService.getSuppliers();
@@ -72,6 +77,15 @@ export const RecordPaymentModal = ({
 
   // When partyId changes in dropdown, auto-select their first pending bill
   const handlePartyChange = (newPartyId) => {
+    if (newPartyId === '__CREATE_NEW__') {
+      if (partyType === 'customer') {
+        setIsQuickCustomerOpen(true);
+      } else {
+        setIsQuickSupplierOpen(true);
+      }
+      return;
+    }
+
     setPartyId(newPartyId);
     setError('');
 
@@ -134,6 +148,7 @@ export const RecordPaymentModal = ({
     }
 
     try {
+      const recordedBy = currentUser?.name || currentUser?.username || 'Staff';
       if (partyType === 'customer') {
         const pay = dataService.recordCustomerPayment({
           customer_id: partyId,
@@ -143,6 +158,7 @@ export const RecordPaymentModal = ({
           reference_no: referenceNo,
           date,
           time,
+          recorded_by: recordedBy,
           notes: notes || (selectedSale ? `Installment payment for ${selectedSale.invoice_no}` : 'Account payment')
         });
         if (onPaymentRecorded) onPaymentRecorded(pay);
@@ -155,6 +171,7 @@ export const RecordPaymentModal = ({
           reference_no: referenceNo,
           date,
           time,
+          recorded_by: recordedBy,
           notes: notes || (selectedPurchase ? `Payout installment for ${selectedPurchase.purchase_no}` : 'Account payout')
         });
         if (onPaymentRecorded) onPaymentRecorded(pay);
@@ -169,83 +186,114 @@ export const RecordPaymentModal = ({
   const docItems = selectedSale?.items || selectedPurchase?.items || [];
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={partyType === 'customer' ? 'Collect Customer Payment / Installment' : 'Record Supplier Payout / Installment'}
-      maxWidth="680px"
-    >
-      <form onSubmit={handleSubmit}>
-        {error && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={16} />
-            <span>{error}</span>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={partyType === 'customer' ? 'Collect Customer Payment / Installment' : 'Record Supplier Payout / Installment'}
+        maxWidth="680px"
+      >
+        <form onSubmit={handleSubmit}>
+          {error && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Mode Toggle (Customer Collection vs Supplier Payout) */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${partyType === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flex: 1, padding: '8px', fontWeight: 700 }}
+              onClick={() => {
+                setPartyType('customer');
+                setPartyId('');
+                setDocId('');
+                setAmount('');
+              }}
+            >
+              Customer Payment (Money Inward)
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${partyType === 'supplier' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ flex: 1, padding: '8px', fontWeight: 700 }}
+              onClick={() => {
+                setPartyType('supplier');
+                setPartyId('');
+                setDocId('');
+                setAmount('');
+              }}
+            >
+              Supplier Payout (Money Outward)
+            </button>
           </div>
-        )}
 
-        {/* Mode Toggle (Customer Collection vs Supplier Payout) */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          <button
-            type="button"
-            className={`btn btn-sm ${partyType === 'customer' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flex: 1, padding: '8px' }}
-            onClick={() => {
-              setPartyType('customer');
-              setPartyId('');
-              setDocId('');
-              setAmount('');
-            }}
-          >
-            Customer Payment (Money Inward)
-          </button>
-          <button
-            type="button"
-            className={`btn btn-sm ${partyType === 'supplier' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ flex: 1, padding: '8px' }}
-            onClick={() => {
-              setPartyType('supplier');
-              setPartyId('');
-              setDocId('');
-              setAmount('');
-            }}
-          >
-            Supplier Payout (Money Outward)
-          </button>
-        </div>
-
-        {/* Party Selector with Total Balance Indicator */}
-        <div className="form-group" style={{ marginBottom: '16px' }}>
-          <label className="form-label" style={{ fontWeight: 700 }}>
-            {partyType === 'customer' ? 'Select Customer *' : 'Select Supplier *'}
-          </label>
-          <select
-            className="form-select"
-            required
-            value={partyId}
-            onChange={(e) => handlePartyChange(e.target.value)}
-            style={{ fontSize: '14px', padding: '10px 12px' }}
-          >
-            <option value="">-- Choose Party --</option>
-            {partyType === 'customer'
-              ? customers.map((c) => {
-                  const l = dataService.getCustomerLedger(c.id);
-                  const dueTag = l.pendingBalance > 0 ? ` [DUE: ${formatCurrency(l.pendingBalance)}]` : ' [Settled]';
-                  return (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.customer_id}) - {c.area || 'Nandipet'}{dueTag}
-                    </option>
-                  );
-                })
-              : suppliers.map((s) => {
-                  const l = dataService.getSupplierLedger(s.id);
-                  const dueTag = l.pendingBalance > 0 ? ` [PAYABLE: ${formatCurrency(l.pendingBalance)}]` : ' [Settled]';
-                  return (
-                    <option key={s.id} value={s.id}>
-                      {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}{dueTag}
-                    </option>
-                  );
-                })}
-          </select>
+          {/* Party Selector with Direct Add New Option */}
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>
+                {partyType === 'customer' ? 'Select Customer *' : 'Select Supplier *'}
+              </label>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                style={{
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  color: '#0284c7',
+                  borderColor: '#bae6fd',
+                  background: '#f0f9ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontWeight: 700
+                }}
+                onClick={() => {
+                  if (partyType === 'customer') {
+                    setIsQuickCustomerOpen(true);
+                  } else {
+                    setIsQuickSupplierOpen(true);
+                  }
+                }}
+                title={partyType === 'customer' ? 'Quick add a new customer' : 'Quick add a new supplier'}
+              >
+                <UserPlus size={12} /> + Add New {partyType === 'customer' ? 'Customer' : 'Supplier'}
+              </button>
+            </div>
+            <select
+              className="form-select"
+              required
+              value={partyId}
+              onChange={(e) => handlePartyChange(e.target.value)}
+              style={{ fontSize: '14px', padding: '10px 12px' }}
+            >
+              <option value="">-- Choose Party --</option>
+              <option value="__CREATE_NEW__" style={{ fontWeight: 700, color: '#0284c7', background: '#f0f9ff' }}>
+                ➕ + Add New {partyType === 'customer' ? 'Customer' : 'Supplier'}...
+              </option>
+              {partyType === 'customer'
+                ? customers.map((c) => {
+                    const l = dataService.getCustomerLedger(c.id);
+                    const dueTag = l.pendingBalance > 0 ? ` [DUE: ${formatCurrency(l.pendingBalance)}]` : ' [Settled]';
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.customer_id}) - {c.area || 'Nandipet'}{dueTag}
+                      </option>
+                    );
+                  })
+                : suppliers.map((s) => {
+                    const l = dataService.getSupplierLedger(s.id);
+                    const dueTag = l.pendingBalance > 0 ? ` [PAYABLE: ${formatCurrency(l.pendingBalance)}]` : ' [Settled]';
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}{dueTag}
+                      </option>
+                    );
+                  })}
+            </select>
 
           {partyId && (
             <div style={{
@@ -282,7 +330,7 @@ export const RecordPaymentModal = ({
               {partyType === 'customer'
                 ? partySales.map((s) => {
                     const isSelected = docId === s.id;
-                    const itemsStr = s.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
+                    const itemsStr = (s.items || []).map((i) => `${i.product_name} (${i.quantity} ${i.unit || 'Units'})`).join(', ');
                     return (
                       <div
                         key={s.id}
@@ -323,7 +371,7 @@ export const RecordPaymentModal = ({
                   })
                 : partyPurchases.map((p) => {
                     const isSelected = docId === p.id;
-                    const itemsStr = p.items.map((i) => `${i.product_name} (${i.quantity})`).join(', ');
+                    const itemsStr = (p.items || []).map((i) => `${i.product_name} (${i.quantity} ${i.unit || 'Units'})`).join(', ');
                     return (
                       <div
                         key={p.id}
@@ -393,7 +441,7 @@ export const RecordPaymentModal = ({
                 {docItems.map((i, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#334155', marginBottom: '2px' }}>
                     <span>• {i.product_name}</span>
-                    <span>{i.quantity} × {formatCurrency(i.selling_price || i.purchase_price)} = {formatCurrency(i.total || (i.quantity * (i.selling_price || i.purchase_price)))}</span>
+                    <span>{i.quantity} {i.unit || 'Units'} × {formatCurrency(i.selling_price || i.purchase_price)} = {formatCurrency(i.total || (i.quantity * (i.selling_price || i.purchase_price)))}</span>
                   </div>
                 ))}
               </div>
@@ -584,5 +632,39 @@ export const RecordPaymentModal = ({
         </div>
       </form>
     </Modal>
+
+    {/* Embedded Quick Add Customer Modal */}
+    <CustomerFormModal
+      isOpen={isQuickCustomerOpen}
+      onClose={() => setIsQuickCustomerOpen(false)}
+      customer={null}
+      onSave={async (cData) => {
+        const newC = await dataService.saveCustomer(cData, currentUser);
+        if (newC?.id) {
+          setPartyId(newC.id);
+          setIsQuickCustomerOpen(false);
+        }
+      }}
+    />
+
+    {/* Embedded Quick Add Supplier Modal */}
+    <SupplierFormModal
+      isOpen={isQuickSupplierOpen}
+      onClose={() => setIsQuickSupplierOpen(false)}
+      supplier={null}
+      dataService={dataService}
+      currentUser={currentUser}
+      onSave={async (sData, productIds) => {
+        const newS = await dataService.saveSupplier(sData, currentUser);
+        if (productIds && newS?.id) {
+          await dataService.saveSupplierProducts(newS.id, productIds, currentUser);
+        }
+        if (newS?.id) {
+          setPartyId(newS.id);
+          setIsQuickSupplierOpen(false);
+        }
+      }}
+    />
+  </>
   );
 };

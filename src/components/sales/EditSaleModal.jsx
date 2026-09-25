@@ -3,6 +3,8 @@ import { Modal } from '../common/Modal';
 import { Plus, Trash2, AlertCircle, Warehouse, History, ShieldAlert } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
+const UNIT_OPTIONS = ['Units', 'Boxes', 'Packets', 'Meters', 'Pieces', 'Kg', 'Custom'];
+
 export const EditSaleModal = ({
   isOpen,
   onClose,
@@ -33,6 +35,7 @@ export const EditSaleModal = ({
           product_id: i.product_id,
           godown_id: i.godown_id || godowns[0]?.id || '',
           quantity: i.quantity,
+          unit: i.unit || 'Units',
           selling_price: i.selling_price
         }))
       );
@@ -51,6 +54,7 @@ export const EditSaleModal = ({
       ...updated[index],
       product_id: prodId,
       godown_id: updated[index].godown_id || godowns[0]?.id || '',
+      unit: prod?.unit || updated[index].unit || 'Units',
       selling_price: prod ? prod.selling_price : 0
     };
     setItems(updated);
@@ -71,6 +75,7 @@ export const EditSaleModal = ({
         product_id: defProd.id,
         godown_id: godowns[0]?.id || '',
         quantity: 1,
+        unit: defProd.unit || 'Units',
         selling_price: defProd.selling_price || 0
       }
     ]);
@@ -229,11 +234,11 @@ export const EditSaleModal = ({
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: '32%' }}>Product</th>
-                  <th style={{ width: '26%' }}>Source Godown</th>
-                  <th style={{ width: '13%' }}>Quantity</th>
-                  <th style={{ width: '15%' }}>Price (₹)</th>
-                  <th style={{ width: '14%', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: '30%' }}>Product</th>
+                  <th style={{ width: '22%' }}>Source Godown</th>
+                  <th style={{ width: '22%' }}>Quantity & Unit</th>
+                  <th style={{ width: '13%' }}>Price (₹)</th>
+                  <th style={{ width: '13%', textAlign: 'right' }}>Total</th>
                   <th></th>
                 </tr>
               </thead>
@@ -278,17 +283,43 @@ export const EditSaleModal = ({
                         </select>
                       </td>
                       <td>
-                        <input
-                          type="number"
-                          className="form-input"
-                          min="1"
-                          style={{
-                            borderColor: isExceeding ? '#ef4444' : undefined,
-                            background: isExceeding ? '#fef2f2' : undefined
-                          }}
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                        />
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <input
+                            type="number"
+                            className="form-input"
+                            min="1"
+                            style={{
+                              width: '65px',
+                              borderColor: isExceeding ? '#ef4444' : undefined,
+                              background: isExceeding ? '#fef2f2' : undefined
+                            }}
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                          />
+                          <select
+                            className="form-select"
+                            value={UNIT_OPTIONS.includes(item.unit) ? item.unit : 'Custom'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === 'Custom') {
+                                const customVal = prompt('Enter custom quantity unit type (e.g. Rolls, Bags, Bundles):', item.unit || '');
+                                handleItemChange(idx, 'unit', customVal?.trim() || 'Units');
+                              } else {
+                                handleItemChange(idx, 'unit', val);
+                              }
+                            }}
+                            style={{ width: '85px', fontSize: '11px', padding: '4px 6px' }}
+                          >
+                            {UNIT_OPTIONS.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {item.unit && !UNIT_OPTIONS.includes(item.unit) && (
+                          <div style={{ fontSize: '10.5px', color: '#0284c7', marginTop: '2px', fontWeight: 600 }}>
+                            Custom: {item.unit}
+                          </div>
+                        )}
                         {oldQty > 0 && (
                           <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>
                             Original: {oldQty} {delta !== 0 && `(${delta > 0 ? '+' : ''}${delta})`}
