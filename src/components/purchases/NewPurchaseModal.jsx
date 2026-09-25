@@ -321,7 +321,8 @@ export const NewPurchaseModal = ({
             </button>
           </div>
 
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+          {/* Desktop Table View (>= 640px) */}
+          <div className="desktop-table-view" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
@@ -350,7 +351,6 @@ export const NewPurchaseModal = ({
                               {p.name} (Total: {p.current_stock} {p.unit})
                             </option>
                           ))}
-                          {/* If supplier has no mapped products, show all as fallback */}
                           {supplierId && dataService.getSupplierProducts(supplierId).length === 0 && (
                             <option disabled value="">── All products (none mapped to this supplier) ──</option>
                           )}
@@ -411,6 +411,106 @@ export const NewPurchaseModal = ({
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Touch-Friendly Item Cards (< 640px) */}
+          <div className="mobile-cards-view" style={{ flexDirection: 'column', gap: '10px' }}>
+            {items.map((item, idx) => {
+              const lineTotal = (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0);
+
+              return (
+                <div key={idx} style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>ITEM #{idx + 1}</span>
+                    {items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItemRow(idx)}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 }}
+                      >
+                        <Trash2 size={13} /> Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Product</label>
+                    <select
+                      className="form-select"
+                      value={item.product_id}
+                      onChange={(e) => handleProductChange(idx, e.target.value)}
+                      style={{ width: '100%', fontSize: '12px' }}
+                    >
+                      {getSupplierFilteredProducts(supplierId).map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (Total: {p.current_stock} {p.unit})
+                        </option>
+                      ))}
+                      {supplierId && dataService.getSupplierProducts(supplierId).length === 0 && (
+                        <option disabled value="">── All products (none mapped to this supplier) ──</option>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Destination Godown</label>
+                    <select
+                      className="form-select"
+                      value={item.godown_id || godownId}
+                      onChange={(e) => handleItemChange(idx, 'godown_id', e.target.value)}
+                      style={{ width: '100%', fontSize: '12px' }}
+                    >
+                      {godowns.map((g) => {
+                        const inG = dataService.getProductStockInGodown(item.product_id, g.id);
+                        return (
+                          <option key={g.id} value={g.id}>
+                            {g.name} ({inG} in stock)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Quantity</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        min="1"
+                        style={{ width: '100%' }}
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Purchase Price (₹)</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        min="0"
+                        style={{ width: '100%' }}
+                        value={item.purchase_price}
+                        onChange={(e) => handleItemChange(idx, 'purchase_price', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px dashed #cbd5e1' }}>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>Item Total:</span>
+                    <strong style={{ fontSize: '15px', color: '#0284c7' }}>{formatCurrency(lineTotal)}</strong>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

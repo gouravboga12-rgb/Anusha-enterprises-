@@ -72,7 +72,7 @@ export const CustomerProfile = ({
       : '_All_Records';
     await exportElementToPdf({
       element,
-      filename: `${cleanName}_Khata_${customer.customer_id || 'Statement'}${dateSuffix}.pdf`,
+      filename: `${cleanName}_Ledger_${customer.customer_id || 'Statement'}${dateSuffix}.pdf`,
       title: `${customer.name} - Customer Ledger`
     });
     setIsSavingPdf(false);
@@ -326,7 +326,7 @@ export const CustomerProfile = ({
                     Main Road, Nandipet, Nizamabad Dist. • Telangana • Ph: 96409 12521
                   </p>
                   <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    CUSTOMER KHATA PASSBOOK & ACCOUNT STATEMENT
+                    CUSTOMER LEDGER & ACCOUNT STATEMENT
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', fontSize: '11px', color: '#334155', lineHeight: 1.5 }}>
@@ -382,7 +382,7 @@ export const CustomerProfile = ({
 
             <div className="card-header no-print" style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
               <div>
-                <h3 className="card-title">Digital Ledger (Khata / Passbook)</h3>
+                <h3 className="card-title">Digital Customer Ledger</h3>
                 <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                   Chronological debit (sales) and credit (payments) with automatic running balance.
                 </p>
@@ -403,8 +403,10 @@ export const CustomerProfile = ({
                     cursor: isSavingPdf ? 'wait' : 'pointer',
                     background: '#f0fdf4',
                     color: '#16a34a',
-                    border: '1px solid #bbf7d0'
+                    border: '1px solid #bbf7d0',
+                    touchAction: 'manipulation'
                   }}
+                  onTouchEnd={(e) => { e.preventDefault(); if (!isSavingPdf) handleSavePdf(); }}
                   title="Download Ledger Statement as PDF File"
                 >
                   <Download size={15} /> {isSavingPdf ? 'Generating PDF...' : 'Save PDF'}
@@ -413,6 +415,7 @@ export const CustomerProfile = ({
                   type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={handlePrint}
+                  onTouchEnd={(e) => { e.preventDefault(); handlePrint(); }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -420,7 +423,8 @@ export const CustomerProfile = ({
                     fontWeight: 600,
                     fontSize: '13px',
                     padding: '6px 14px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    touchAction: 'manipulation'
                   }}
                   title="Print or Save PDF Statement"
                 >
@@ -883,7 +887,7 @@ export const CustomerProfile = ({
                     )}
                     <button
                       className="btn btn-secondary btn-sm"
-                      style={{ flex: 0.6 }}
+                      style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={() => onEditSale && onEditSale(sale)}
                       title="Edit Bill"
                     >
@@ -891,7 +895,7 @@ export const CustomerProfile = ({
                     </button>
                     <button
                       className="btn btn-danger btn-sm"
-                      style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                      style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={() => handleDeleteSale(sale)}
                       title="Delete Bill"
                     >

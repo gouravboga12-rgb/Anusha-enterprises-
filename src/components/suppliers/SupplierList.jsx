@@ -42,14 +42,32 @@ export const SupplierList = ({
     <div>
       <div className="card-header" style={{ marginBottom: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '20px' }}>Supplier Management</h1>
+          <h1 style={{ fontSize: '20px' }}>Suppliers & Ledger</h1>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
             Suppliers, inward product inventory, and balance payables.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={onAddSupplier}>
-          <PlusCircle size={16} /> Add New Supplier
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            className="btn"
+            style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}
+            onClick={() => onOpenPayment && onOpenPayment('', 'supplier')}
+            title="Record Vendor Payment"
+          >
+            <Receipt size={15} /> Pay (Record Payment)
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => onOpenNewPurchase && onOpenNewPurchase()}
+            style={{ fontWeight: 700 }}
+            title="Create New Inward Purchase Bill"
+          >
+            <ShoppingBag size={15} /> + Buy (New Purchase)
+          </button>
+          <button className="btn btn-secondary" onClick={onAddSupplier}>
+            <PlusCircle size={15} /> Add New Supplier
+          </button>
+        </div>
       </div>
 
       <div className="card" style={{ padding: '14px 18px', marginBottom: '18px' }}>
@@ -282,11 +300,11 @@ export const SupplierList = ({
                   </div>
                 </div>
 
-                <div className="card-action-bar">
+                <div className="card-action-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                   {ledger.pendingBalance > 0 && (
                     <button
                       className="btn btn-sm"
-                      style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}
+                      style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700, flex: '1 1 auto', minWidth: '90px' }}
                       onClick={() => {
                         const pendingPurchases = dataService.getPurchases().filter((p) => p.supplier_id === supp.id && p.pending_amount > 0);
                         const firstPurchaseId = pendingPurchases.length > 0 ? pendingPurchases[0].id : '';
@@ -298,12 +316,14 @@ export const SupplierList = ({
                   )}
                   <button
                     className="btn btn-secondary btn-sm"
+                    style={{ flex: '1 1 auto', minWidth: '70px' }}
                     onClick={() => onSelectSupplier(supp.id)}
                   >
                     <Eye size={14} /> Ledger
                   </button>
                   <button
                     className="btn btn-primary btn-sm"
+                    style={{ flex: '1 1 auto', minWidth: '60px' }}
                     onClick={() => onOpenNewPurchase(supp.id)}
                   >
                     <ShoppingBag size={14} /> Buy
@@ -311,15 +331,17 @@ export const SupplierList = ({
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={() => onEditSupplier(supp)}
-                    style={{ flex: 0.6 }}
+                    style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Edit Supplier Details"
                   >
                     <Edit size={14} />
                   </button>
                   {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
                     <button
                       className="btn btn-danger btn-sm"
-                      style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                      style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={() => handleDeleteSupplier(supp)}
+                      title="Delete Supplier Account"
                     >
                       <Trash2 size={14} />
                     </button>

@@ -293,7 +293,8 @@ export const NewSaleModal = ({
             </button>
           </div>
 
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+          {/* Desktop Table View (>= 640px) */}
+          <div className="desktop-table-view" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
@@ -391,6 +392,114 @@ export const NewSaleModal = ({
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Touch-Friendly Item Cards (< 640px) */}
+          <div className="mobile-cards-view" style={{ flexDirection: 'column', gap: '10px' }}>
+            {items.map((item, idx) => {
+              const lineTotal = (Number(item.quantity) || 0) * (Number(item.selling_price) || 0);
+              const stockInGodown = dataService.getProductStockInGodown(item.product_id, item.godown_id);
+              const isExceeding = Number(item.quantity) > stockInGodown;
+
+              return (
+                <div key={idx} style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>ITEM #{idx + 1}</span>
+                    {items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItemRow(idx)}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600 }}
+                      >
+                        <Trash2 size={13} /> Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Product</label>
+                    <select
+                      className="form-select"
+                      value={item.product_id}
+                      onChange={(e) => handleProductChange(idx, e.target.value)}
+                      style={{ width: '100%', fontSize: '12px' }}
+                    >
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (Total: {p.current_stock} {p.unit})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Source Godown</label>
+                    <select
+                      className="form-select"
+                      value={item.godown_id}
+                      onChange={(e) => handleItemChange(idx, 'godown_id', e.target.value)}
+                      style={{ width: '100%', fontSize: '12px' }}
+                    >
+                      {godowns.map((g) => {
+                        const gStock = dataService.getProductStockInGodown(item.product_id, g.id);
+                        return (
+                          <option key={g.id} value={g.id} disabled={gStock <= 0}>
+                            {g.name} ({gStock} available) {gStock <= 0 ? '— Empty' : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Quantity</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        min="1"
+                        style={{
+                          width: '100%',
+                          borderColor: isExceeding ? '#ef4444' : undefined,
+                          background: isExceeding ? '#fef2f2' : undefined
+                        }}
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                      />
+                      {isExceeding && (
+                        <div style={{ color: '#ef4444', fontSize: '10.5px', marginTop: '2px', fontWeight: 600 }}>
+                          Max: {stockInGodown}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Price (₹)</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        min="0"
+                        style={{ width: '100%' }}
+                        value={item.selling_price}
+                        onChange={(e) => handleItemChange(idx, 'selling_price', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px dashed #cbd5e1' }}>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>Item Total:</span>
+                    <strong style={{ fontSize: '15px', color: '#0284c7' }}>{formatCurrency(lineTotal)}</strong>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

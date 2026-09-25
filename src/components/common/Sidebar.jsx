@@ -33,8 +33,8 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
 
   const navItems = [
     { id: 'dashboard', label: 'Home / Day Summary', icon: LayoutDashboard },
-    { id: 'customers', label: 'Customers & Khata', icon: Users },
-    { id: 'suppliers', label: 'Suppliers & Khata', icon: Truck },
+    { id: 'customers', label: 'Customers & Ledger', icon: Users },
+    { id: 'suppliers', label: 'Suppliers & Ledger', icon: Truck },
     { id: 'products', label: 'Products & Stock', icon: Boxes, badge: lowStockCount ? `${lowStockCount} Low` : null, alert: lowStockCount > 0 },
     { id: 'daybook', label: 'Day Book & Reports', icon: CalendarCheck }
   ];

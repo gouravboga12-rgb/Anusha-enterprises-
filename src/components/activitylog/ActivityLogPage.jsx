@@ -9,6 +9,7 @@ import { formatDate, getTodayDateString } from '../../utils/formatters';
 
 export const ActivityLogPage = ({ dataService, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [staffFilter, setStaffFilter] = useState('all');
   const [moduleFilter, setModuleFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
@@ -30,8 +31,29 @@ export const ActivityLogPage = ({ dataService, currentUser }) => {
     return dataService.getActivityLog();
   }, [dataService]);
 
+  // Dynamically populated staff list from registered CRM users, currentUser, and logs
+  const staffList = useMemo(() => {
+    const names = new Set();
+    if (dataService?.getCrmUsers) {
+      dataService.getCrmUsers().forEach((u) => {
+        if (u.name && u.name.trim()) names.add(u.name.trim());
+      });
+    }
+    if (currentUser?.name) {
+      names.add(currentUser.name.trim());
+    }
+    logs.forEach((l) => {
+      if (l.user_name && l.user_name.trim()) names.add(l.user_name.trim());
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [dataService, currentUser, logs]);
+
   const filteredLogs = useMemo(() => {
     let list = logs;
+    if (staffFilter !== 'all') {
+      const sf = staffFilter.toLowerCase();
+      list = list.filter((l) => l.user_name && l.user_name.toLowerCase() === sf);
+    }
     if (moduleFilter !== 'all') list = list.filter((l) => l.module === moduleFilter);
     if (actionFilter !== 'all') list = list.filter((l) => l.action === actionFilter);
     if (dateFilter) {
@@ -60,7 +82,7 @@ export const ActivityLogPage = ({ dataService, currentUser }) => {
       );
     }
     return list;
-  }, [logs, moduleFilter, actionFilter, dateFilter, quickDate, searchTerm]);
+  }, [logs, staffFilter, moduleFilter, actionFilter, dateFilter, quickDate, searchTerm]);
 
   const targetDateLogsCount = useMemo(() => {
     if (!targetClearDate) return 0;
@@ -177,6 +199,19 @@ export const ActivityLogPage = ({ dataService, currentUser }) => {
 
         {/* Dropdowns */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          <select
+            className="form-select"
+            style={{ flex: 1, minWidth: '150px', fontSize: '12px', padding: '6px 8px' }}
+            value={staffFilter}
+            onChange={(e) => setStaffFilter(e.target.value)}
+          >
+            <option value="all">All Staff Members ({staffList.length})</option>
+            {staffList.map((name) => (
+              <option key={name} value={name}>
+                👤 {name}
+              </option>
+            ))}
+          </select>
           <select className="form-select" style={{ flex: 1, minWidth: '130px', fontSize: '12px', padding: '6px 8px' }}
             value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
             <option value="all">All Modules</option>

@@ -9,6 +9,7 @@ import { formatCurrency, formatDate, getTodayDateString, getCurrentTimeString } 
 export const WalletPage = ({ dataService, currentUser }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [editingTxn, setEditingTxn] = useState(null);
+  const [filterStaff, setFilterStaff] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterDate, setFilterDate] = useState('');
@@ -37,8 +38,33 @@ export const WalletPage = ({ dataService, currentUser }) => {
     ? dataService.getWalletTransactions()
     : [];
 
+  // Dynamically populated staff list from registered CRM users, currentUser, and transactions
+  const staffList = useMemo(() => {
+    const names = new Set();
+    if (dataService?.getCrmUsers) {
+      dataService.getCrmUsers().forEach((u) => {
+        if (u.name && u.name.trim()) names.add(u.name.trim());
+      });
+    }
+    if (currentUser?.name) {
+      names.add(currentUser.name.trim());
+    }
+    transactions.forEach((t) => {
+      const recordedBy = t.created_by || t.user_name;
+      if (recordedBy && recordedBy.trim()) names.add(recordedBy.trim());
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [dataService, currentUser, transactions]);
+
   const filteredTransactions = useMemo(() => {
     let list = transactions;
+    if (filterStaff !== 'all') {
+      const fs = filterStaff.toLowerCase();
+      list = list.filter((t) => {
+        const creator = (t.created_by || t.user_name || '').toLowerCase();
+        return creator === fs;
+      });
+    }
     if (filterType !== 'all') list = list.filter((t) => t.type === filterType);
     if (filterCategory !== 'all') list = list.filter((t) => t.category === filterCategory);
     if (filterDate) {
@@ -64,7 +90,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
       );
     }
     return list;
-  }, [transactions, filterType, filterCategory, filterDate, quickDate, searchTerm]);
+  }, [transactions, filterStaff, filterType, filterCategory, filterDate, quickDate, searchTerm]);
 
   const handleOpenBudgetModal = () => {
     setEditingTxn(null); setAmount(''); setReason('');
@@ -181,6 +207,19 @@ export const WalletPage = ({ dataService, currentUser }) => {
 
         {/* Dropdowns */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          <select
+            className="form-select"
+            style={{ flex: 1, minWidth: '150px', fontSize: '12px', padding: '6px 8px' }}
+            value={filterStaff}
+            onChange={(e) => setFilterStaff(e.target.value)}
+          >
+            <option value="all">All Staff Members ({staffList.length})</option>
+            {staffList.map((name) => (
+              <option key={name} value={name}>
+                👤 {name}
+              </option>
+            ))}
+          </select>
           <select className="form-select" style={{ flex: 1, minWidth: '130px', fontSize: '12px', padding: '6px 8px' }}
             value={filterType} onChange={(e) => setFilterType(e.target.value)}>
             <option value="all">All Flow Types</option>

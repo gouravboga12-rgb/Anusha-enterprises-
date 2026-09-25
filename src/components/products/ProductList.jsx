@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PlusCircle, Search, Boxes, History, Edit, Sliders, AlertTriangle, CheckCircle2, Trash2, BookOpen } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 import { ProductLedger } from './ProductLedger';
+import { RecentStockActivity } from '../common/RecentStockActivity';
 
 export const ProductList = ({
   products,
@@ -338,16 +339,17 @@ export const ProductList = ({
                   </div>
                 </div>
 
-                <div className="card-action-bar">
+                <div className="card-action-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                   <button
                     className="btn btn-secondary btn-sm"
-                    style={{ color: '#3b82f6' }}
+                    style={{ color: '#3b82f6', flex: '1 1 auto', minWidth: '70px' }}
                     onClick={() => setSelectedProductForLedger(prod)}
                   >
                     <BookOpen size={14} /> Ledger
                   </button>
                   <button
                     className="btn btn-secondary btn-sm"
+                    style={{ flex: '1 1 auto', minWidth: '80px' }}
                     onClick={() => onViewStockHistory(prod)}
                   >
                     <History size={14} /> Stock Trail
@@ -355,17 +357,19 @@ export const ProductList = ({
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={() => onEditProduct(prod)}
-                    style={{ flex: 0.8 }}
+                    style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Edit Product"
                   >
-                    <Edit size={14} /> Edit
+                    <Edit size={14} />
                   </button>
                   {canDelete && (
                     <button
                       className="btn btn-danger btn-sm"
-                      style={{ flex: 0.8, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                      style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={() => handleDeleteProduct(prod)}
+                      title="Delete Product"
                     >
-                      <Trash2 size={14} /> Delete
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>
@@ -374,6 +378,13 @@ export const ProductList = ({
           })
         )}
       </div>
+
+      {/* Embedded Recent Stock & Godown Activity Section */}
+      <RecentStockActivity
+        dataService={dataService}
+        title="Recent Stock & Godown Activity"
+        subtitle="Live audit trail of purchases (stock-in), sales (stock-out), transfers & adjustments"
+      />
 
       {/* Unified Product Stock Ledger Modal */}
       {selectedProductForLedger && (

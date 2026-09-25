@@ -924,6 +924,14 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-color);
 }
 
+/* Base Desktop Table View vs Mobile Cards View */
+.desktop-table-view {
+  display: block;
+}
+.mobile-cards-view {
+  display: none;
+}
+
 /* ==========================================================================
    MOBILE & TABLET RESPONSIVE SYSTEM
    ========================================================================== */
@@ -1187,11 +1195,16 @@ h1, h2, h3, h4, h5, h6 {
   /* Dashboard banner buttons on mobile */
   .banner-action-btns {
     width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
   }
 
   .banner-action-btns .btn {
-    flex: 1 1 130px !important;
+    width: 100% !important;
     justify-content: center !important;
+    padding: 10px 14px !important;
+    font-size: 13px !important;
   }
 
   /* Subnav Tabs Bar on Mobile (e.g. Day Book vs Profit Reports) */
@@ -1336,6 +1349,60 @@ h1, h2, h3, h4, h5, h6 {
   .data-table th, .data-table td {
     padding: 10px 12px;
     font-size: 12.5px;
+  }
+
+  /* Responsive Item Table vs Cards on mobile / tablet */
+  .desktop-table-view {
+    display: none !important;
+  }
+
+  .mobile-cards-view {
+    display: flex !important;
+  }
+
+  /* Godown Overview Stat Cards on Mobile */
+  .godown-stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .godown-stat-card {
+    padding: 10px 8px !important;
+    border-radius: 8px !important;
+  }
+
+  .godown-stat-card:last-child {
+    grid-column: span 2 !important;
+  }
+
+  .godown-stat-value {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+  }
+
+  .godown-stat-label {
+    font-size: 10.5px !important;
+    margin-top: 3px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* Day Book 5 Summary Cards on Mobile */
+  .daybook-metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .daybook-metrics-grid > div {
+    padding: 10px 12px !important;
+  }
+
+  .daybook-metrics-grid > div:last-child {
+    grid-column: span 2 !important;
   }
 }
 
@@ -1724,6 +1791,35 @@ h1, h2, h3, h4, h5, h6 {
   .print-document {
     display: block !important;
     width: 100% !important;
+  }
+
+  /* 5 Financial Metric Cards in Portrait A4 Print & PDF Statement */
+  .daybook-metrics-grid {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .daybook-metrics-grid > div {
+    padding: 6px 8px !important;
+    border-radius: 4px !important;
+    border: 0.5pt solid #cbd5e1 !important;
+    background: #f8fafc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .daybook-metrics-grid > div span {
+    font-size: 7pt !important;
+  }
+
+  .daybook-metrics-grid > div div {
+    font-size: 10pt !important;
+  }
+
+  .daybook-metrics-grid > div p {
+    font-size: 6.5pt !important;
   }
 
   /* Clean print table */

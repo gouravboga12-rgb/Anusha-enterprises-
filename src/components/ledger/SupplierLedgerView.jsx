@@ -59,10 +59,25 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-secondary" onClick={handlePrint} title="Print statement">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handlePrint}
+            onTouchEnd={(e) => { e.preventDefault(); handlePrint(); }}
+            style={{ touchAction: 'manipulation' }}
+            title="Print statement"
+          >
             <Printer size={15} /> Print
           </button>
-          <button className="btn btn-primary" onClick={handleSavePdf} disabled={isSavingPdf} title="Download Statement PDF">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSavePdf}
+            onTouchEnd={(e) => { e.preventDefault(); if (!isSavingPdf) handleSavePdf(); }}
+            disabled={isSavingPdf}
+            style={{ touchAction: 'manipulation' }}
+            title="Download Statement PDF"
+          >
             <Download size={15} /> {isSavingPdf ? 'Saving PDF...' : 'Save PDF'}
           </button>
         </div>

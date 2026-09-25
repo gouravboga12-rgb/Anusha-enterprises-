@@ -2848,31 +2848,6 @@ class DataService {
       }
     });
 
-    dayAdjustments.forEach((adj) => {
-      const prod = this.getProductById(adj.product_id);
-      const godown = this.getGodownById(adj.godown_id);
-      events.push({
-        id: adj.id, time: adj.time,
-        type: `Stock ${adj.adjustment_type === 'increase' ? 'Addition' : 'Reduction'}`,
-        badgeClass: 'badge-neutral',
-        party: prod ? prod.name : 'Product',
-        details: `${adj.adjustment_type.toUpperCase()}: ${adj.quantity} ${prod?.unit || 'units'}${godown ? ` in ${godown.name}` : ''} — ${adj.reason}`,
-        amount: null, amountType: 'none', reference: 'ADJ', status: 'Audit Log'
-      });
-    });
-
-    dayTransfers.forEach((t) => {
-      const prod = this.getProductById(t.product_id);
-      const fromG = this.getGodownById(t.from_godown_id);
-      const toG = this.getGodownById(t.to_godown_id);
-      events.push({
-        id: t.id, time: t.time, type: 'Stock Transfer', badgeClass: 'badge-info',
-        party: prod ? prod.name : 'Product',
-        details: `${t.quantity} ${prod?.unit || 'units'} from ${fromG?.name || '?'} → ${toG?.name || '?'}${t.reason ? ` — ${t.reason}` : ''}`,
-        amount: null, amountType: 'none', reference: t.transfer_no, status: 'Completed'
-      });
-    });
-
     events.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
 
     return {

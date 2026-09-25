@@ -309,7 +309,7 @@ export const SupplierProfile = ({
                     Main Road, Nandipet, Nizamabad Dist. • Telangana • Ph: 96409 12521
                   </p>
                   <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    SUPPLIER ACCOUNT LEDGER (PURCHASE & PAYMENT KHATA)
+                    SUPPLIER ACCOUNT LEDGER & STATEMENT
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', fontSize: '11px', color: '#334155', lineHeight: 1.5 }}>
@@ -366,7 +366,7 @@ export const SupplierProfile = ({
 
             <div className="card-header no-print" style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
               <div>
-                <h3 className="card-title">Supplier Ledger (Khata)</h3>
+                <h3 className="card-title">Supplier Ledger & Statement</h3>
                 <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                   Chronological purchases (credit) and payment vouchers (debit) with automatic running balance.
                 </p>
@@ -376,6 +376,7 @@ export const SupplierProfile = ({
                   type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={handleSavePdf}
+                  onTouchEnd={(e) => { e.preventDefault(); if (!isSavingPdf) handleSavePdf(); }}
                   disabled={isSavingPdf}
                   style={{
                     display: 'flex',
@@ -387,7 +388,8 @@ export const SupplierProfile = ({
                     cursor: isSavingPdf ? 'wait' : 'pointer',
                     background: '#f0fdf4',
                     color: '#16a34a',
-                    border: '1px solid #bbf7d0'
+                    border: '1px solid #bbf7d0',
+                    touchAction: 'manipulation'
                   }}
                   title="Download Ledger Statement as PDF File"
                 >
@@ -397,6 +399,7 @@ export const SupplierProfile = ({
                   type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={handlePrint}
+                  onTouchEnd={(e) => { e.preventDefault(); handlePrint(); }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -404,7 +407,8 @@ export const SupplierProfile = ({
                     fontWeight: 600,
                     fontSize: '13px',
                     padding: '6px 14px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    touchAction: 'manipulation'
                   }}
                   title="Print or Save PDF Statement"
                 >
@@ -869,7 +873,7 @@ export const SupplierProfile = ({
                     )}
                     <button
                       className="btn btn-secondary btn-sm"
-                      style={{ flex: 0.6 }}
+                      style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={() => onEditPurchase && onEditPurchase(pur)}
                       title="Edit Purchase"
                     >
@@ -878,7 +882,7 @@ export const SupplierProfile = ({
                     {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
                       <button
                         className="btn btn-danger btn-sm"
-                        style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                        style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                         onClick={() => handleDeletePurchase(pur)}
                         title="Delete Purchase"
                       >

@@ -66,9 +66,6 @@ export const Dashboard = ({
           <h1 style={{ color: '#ffffff', fontSize: '24px', marginTop: '8px', fontWeight: 800 }}>
             Welcome, Anusha Enterprises
           </h1>
-          <p style={{ color: '#e0f2fe', fontSize: '13px', marginTop: '4px' }}>
-            Nandipet, Nizamabad • 12 Years of Business Experience • Digital Ledger & Stock Control
-          </p>
         </div>
 
         <div className="banner-action-btns" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -77,11 +74,18 @@ export const Dashboard = ({
             style={{ background: '#ffffff', color: '#0284c7', fontWeight: 700 }}
             onClick={onOpenNewSale}
           >
-            <PlusCircle size={16} /> New Sale Bill
+            <PlusCircle size={16} /> + New Sale Bill
           </button>
           <button
             className="btn"
-            style={{ background: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)' }}
+            style={{ background: '#0284c7', color: '#ffffff', border: '1px solid rgba(255,255,255,0.4)', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+            onClick={onOpenNewPurchase}
+          >
+            <ShoppingBag size={16} /> + New Purchase Bill
+          </button>
+          <button
+            className="btn"
+            style={{ background: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600 }}
             onClick={onOpenPayment}
           >
             <Receipt size={16} /> Record Payment

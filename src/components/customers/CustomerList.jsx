@@ -50,14 +50,23 @@ export const CustomerList = ({
     <div>
       <div className="card-header" style={{ marginBottom: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '20px' }}>Customer Directory & Accounts</h1>
+          <h1 style={{ fontSize: '20px' }}>Customers & Ledger</h1>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
             Manage registered clients, sales ledgers, and pending payment collections.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={onAddCustomer}>
-          <PlusCircle size={16} /> Add New Customer
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => onOpenNewSale && onOpenNewSale()}
+            style={{ fontWeight: 700 }}
+          >
+            <PlusCircle size={16} /> + Direct Bill
+          </button>
+          <button className="btn btn-secondary" onClick={onAddCustomer}>
+            <PlusCircle size={16} /> Add New Customer
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -184,7 +193,7 @@ export const CustomerList = ({
                                 const firstSaleId = pendingSales.length > 0 ? pendingSales[0].id : '';
                                 onOpenPayment && onOpenPayment(cust.id, 'customer', firstSaleId);
                               }}
-                              title="Collect / Update Pending Khata Balance"
+                              title="Collect / Update Pending Ledger Balance"
                             >
                               <Receipt size={13} /> Collect
                             </button>
@@ -305,11 +314,11 @@ export const CustomerList = ({
                   </div>
                 </div>
 
-                <div className="card-action-bar">
+                <div className="card-action-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                   {ledger.pendingBalance > 0 && (
                     <button
                       className="btn btn-sm"
-                      style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}
+                      style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700, flex: '1 1 auto', minWidth: '90px' }}
                       onClick={() => {
                         const pendingSales = dataService.getSales().filter((s) => s.customer_id === cust.id && s.pending_amount > 0);
                         const firstSaleId = pendingSales.length > 0 ? pendingSales[0].id : '';
@@ -321,12 +330,14 @@ export const CustomerList = ({
                   )}
                   <button
                     className="btn btn-secondary btn-sm"
+                    style={{ flex: '1 1 auto', minWidth: '70px' }}
                     onClick={() => onSelectCustomer(cust.id)}
                   >
                     <Eye size={14} /> Ledger
                   </button>
                   <button
                     className="btn btn-primary btn-sm"
+                    style={{ flex: '1 1 auto', minWidth: '60px' }}
                     onClick={() => onOpenNewSale(cust.id)}
                   >
                     <PlusCircle size={14} /> Bill
@@ -334,14 +345,15 @@ export const CustomerList = ({
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={() => onEditCustomer(cust)}
-                    style={{ flex: 0.6 }}
+                    style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Edit Customer Details"
                   >
                     <Edit size={14} />
                   </button>
                   {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
                     <button
                       className="btn btn-danger btn-sm"
-                      style={{ flex: 0.6, background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                      style={{ minWidth: '38px', width: '38px', padding: '6px 0', flex: '0 0 38px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                       onClick={() => handleDeleteCustomer(cust)}
                       title="Delete Customer Account"
                     >

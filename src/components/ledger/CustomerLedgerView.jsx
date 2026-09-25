@@ -53,16 +53,31 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
       {/* Non-Printable Header Actions */}
       <div className="card-header no-print" style={{ marginBottom: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '20px' }}>Customer Ledger (Digital Khata Book)</h1>
+          <h1 style={{ fontSize: '20px' }}>Customer Ledger (Statement of Accounts)</h1>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
             Complete chronological record of sales bills, installment payments, and live running balance.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-secondary" onClick={handlePrint} title="Print ledger statement">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handlePrint}
+            onTouchEnd={(e) => { e.preventDefault(); handlePrint(); }}
+            style={{ touchAction: 'manipulation' }}
+            title="Print ledger statement"
+          >
             <Printer size={15} /> Print
           </button>
-          <button className="btn btn-primary" onClick={handleSavePdf} disabled={isSavingPdf} title="Download Statement PDF">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSavePdf}
+            onTouchEnd={(e) => { e.preventDefault(); if (!isSavingPdf) handleSavePdf(); }}
+            disabled={isSavingPdf}
+            style={{ touchAction: 'manipulation' }}
+            title="Download Statement PDF"
+          >
             <Download size={15} /> {isSavingPdf ? 'Saving PDF...' : 'Save PDF'}
           </button>
         </div>
@@ -226,7 +241,7 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
                 Main Road, Nandipet, Nizamabad Dist. • Ph: 96409 12521
               </p>
               <div style={{ marginTop: '8px', fontSize: '14px', fontWeight: 700, color: '#0284c7' }}>
-                CUSTOMER KHATA PASSBOOK STATEMENT
+                CUSTOMER ACCOUNT LEDGER STATEMENT
               </div>
             </div>
             <div style={{ textAlign: 'right', fontSize: '12px', color: '#334155' }}>
