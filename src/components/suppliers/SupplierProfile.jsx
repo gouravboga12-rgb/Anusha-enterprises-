@@ -299,7 +299,7 @@ export const SupplierProfile = ({
       {activeTab === 'ledger' && (
         <>
           {/* Desktop Supplier Ledger Table */}
-          <div id="supplier-profile-ledger-document" className="card print-document desktop-table-view" style={{ padding: '16px' }}>
+          <div id="supplier-profile-ledger-document" className="card print-document supplier-ledger-panel" style={{ padding: '16px' }}>
             {/* Printable Statement Document Header (visible only on print) */}
             <div className="print-header" style={{ display: 'none', borderBottom: '2px solid #0f172a', paddingBottom: '14px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

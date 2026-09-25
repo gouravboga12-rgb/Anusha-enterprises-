@@ -1352,7 +1352,9 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* Responsive Item Table vs Cards on mobile / tablet */
-  .desktop-table-view {
+  .desktop-table-view,
+  .customer-ledger-panel,
+  .supplier-ledger-panel {
     display: none !important;
   }
 
@@ -1776,7 +1778,9 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* Always show structured table and hide mobile card view on print */
-  .desktop-table-view {
+  .desktop-table-view,
+  .customer-ledger-panel,
+  .supplier-ledger-panel {
     display: block !important;
   }
   .mobile-cards-view {

@@ -316,7 +316,7 @@ export const CustomerProfile = ({
       {activeTab === 'ledger' && (
         <>
           {/* Desktop Ledger Table */}
-          <div id="customer-profile-ledger-document" className="card print-document desktop-table-view" style={{ padding: '16px' }}>
+          <div id="customer-profile-ledger-document" className="card print-document customer-ledger-panel" style={{ padding: '16px' }}>
             {/* Printable Statement Document Header (visible only on print) */}
             <div className="print-header" style={{ display: 'none', borderBottom: '2px solid #0f172a', paddingBottom: '14px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
