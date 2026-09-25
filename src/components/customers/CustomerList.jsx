@@ -57,6 +57,22 @@ export const CustomerList = ({
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           <button
+            className="btn"
+            style={{
+              background: '#ecfdf5',
+              color: '#047857',
+              border: '1px solid #a7f3d0',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onClick={() => onOpenPayment && onOpenPayment('', 'customer')}
+            title="Collect payment from any customer (select from dropdown)"
+          >
+            <Receipt size={16} /> Collect Payment
+          </button>
+          <button
             className="btn btn-primary"
             onClick={() => onOpenNewSale && onOpenNewSale()}
             style={{ fontWeight: 700 }}
