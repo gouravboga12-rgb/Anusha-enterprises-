@@ -135,103 +135,101 @@ export const InvoiceModal = ({
         </div>
 
         {/* Printable / Downloadable Invoice Document */}
-        <div
-          id="invoice-printable-content"
-          className="print-document"
-          style={{
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '12px',
-            padding: '24px 28px',
-            color: '#0f172a',
-            fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
-          }}
-        >
-          {/* Header Banner */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            borderBottom: '2.5px solid #0284c7',
-            paddingBottom: '16px',
-            marginBottom: '20px',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="invoice-scroll-wrapper">
+          <div
+            id="invoice-printable-content"
+            className="print-document invoice-sheet"
+          >
+            {/* Header Banner */}
+            <div className="invoice-header-banner" style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              borderBottom: '2.5px solid #0284c7',
+              paddingBottom: '16px',
+              marginBottom: '20px',
+              flexWrap: 'wrap',
+              gap: '16px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 900,
+                    fontSize: '18px'
+                  }}>
+                    A
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: '22px', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                      ANUSHA ENTERPRISES
+                    </h2>
+                    <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: '#64748b' }}>
+                      Electricals, Electronics & General Hardware Trading
+                    </p>
+                  </div>
+                </div>
+                <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#475569', lineHeight: 1.4 }}>
+                  Main Road, Nandipet, Nizamabad Dist. • Telangana - 503212<br />
+                  <strong>Mobile:</strong> 96409 12521 • <strong>GST / Trade:</strong> Verified Digital Ledger
+                </p>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
                 <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 900,
-                  fontSize: '18px'
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  color: isSale ? '#0284c7' : '#d97706',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  marginBottom: '4px'
                 }}>
-                  A
+                  {isSale ? 'TAX INVOICE / SALES BILL' : 'SUPPLIER PURCHASE BILL'}
                 </div>
-                <div>
-                  <h2 style={{ fontSize: '22px', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                    ANUSHA ENTERPRISES
-                  </h2>
-                  <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: '#64748b' }}>
-                    Electricals, Electronics & General Hardware Trading
-                  </p>
+                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                  {docNo}
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#475569', marginTop: '3px' }}>
+                  <strong>Date:</strong> {formatDate(doc.date)}
+                </div>
+                {doc.time && (
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>
+                    <strong>Time:</strong> {doc.time}
+                  </div>
+                )}
+                {doc.vehicle_no && (
+                  <div style={{ fontSize: '11.5px', color: '#0369a1', marginTop: '4px', background: '#f0f9ff', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bae6fd', display: 'inline-block', fontWeight: 600 }}>
+                    🚗 <strong>Vehicle No:</strong> {doc.vehicle_no}
+                  </div>
+                )}
+                <div style={{ marginTop: '5px' }}>
+                  <span className={`badge ${
+                    paymentStatus === 'Paid' ? 'badge-paid' : paymentStatus === 'Partially Paid' ? 'badge-partial' : 'badge-pending'
+                  }`} style={{ fontSize: '10.5px' }}>
+                    Status: {paymentStatus}
+                  </span>
                 </div>
               </div>
-              <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#475569', lineHeight: 1.4 }}>
-                Main Road, Nandipet, Nizamabad Dist. • Telangana - 503212<br />
-                <strong>Mobile:</strong> 96409 12521 • <strong>GST / Trade:</strong> Verified Digital Ledger
-              </p>
             </div>
 
-            <div style={{ textAlign: 'right' }}>
-              <div style={{
-                fontSize: '14px',
-                fontWeight: 800,
-                color: isSale ? '#0284c7' : '#d97706',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                marginBottom: '4px'
-              }}>
-                {isSale ? 'TAX INVOICE / SALES BILL' : 'SUPPLIER PURCHASE BILL'}
-              </div>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                {docNo}
-              </div>
-              <div style={{ fontSize: '11.5px', color: '#475569', marginTop: '3px' }}>
-                <strong>Date:</strong> {formatDate(doc.date)}
-              </div>
-              {doc.time && (
-                <div style={{ fontSize: '11px', color: '#64748b' }}>
-                  <strong>Time:</strong> {doc.time}
-                </div>
-              )}
-              <div style={{ marginTop: '5px' }}>
-                <span className={`badge ${
-                  paymentStatus === 'Paid' ? 'badge-paid' : paymentStatus === 'Partially Paid' ? 'badge-partial' : 'badge-pending'
-                }`} style={{ fontSize: '10.5px' }}>
-                  Status: {paymentStatus}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Party Details: From & To */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: '16px',
-            marginBottom: '20px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            padding: '14px 18px'
-          }}>
+            {/* Party Details: From & To */}
+            <div className="invoice-parties-grid" style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: '16px',
+              marginBottom: '20px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '14px 18px'
+            }}>
             {/* Left Box: Seller / Dispatcher */}
             <div>
               <span style={{ fontSize: '10px', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -322,8 +320,15 @@ export const InvoiceModal = ({
           </div>
 
           {/* Products Billed Table with Quantity & Quantity Type Multiplied by Price */}
-          <div style={{ marginBottom: '20px' }}>
-            <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-responsive" style={{
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            width: '100%',
+            marginBottom: '20px',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px'
+          }}>
+            <table className="data-table" style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
                   <th style={{ width: '40px', padding: '10px', textAlign: 'center', fontSize: '11px' }}>#</th>
@@ -376,7 +381,7 @@ export const InvoiceModal = ({
           </div>
 
           {/* Bottom Split: Notes & Payment Summary */}
-          <div style={{
+          <div className="invoice-totals-grid" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
             gap: '16px',
@@ -394,8 +399,13 @@ export const InvoiceModal = ({
             }}>
               <div>
                 <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                  {isSale ? 'Delivery Reference / Notes' : 'Transport LR# / Delivery Reference'}
+                  {isSale ? 'Delivery Reference & Transport' : 'Transport LR# / Delivery Reference'}
                 </span>
+                {doc.vehicle_no && (
+                  <p style={{ margin: '4px 0 2px', fontSize: '12px', color: '#0369a1', fontWeight: 700 }}>
+                    🚗 Vehicle / Transport No: {doc.vehicle_no}
+                  </p>
+                )}
                 <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#334155', fontStyle: doc.notes ? 'normal' : 'italic' }}>
                   {doc.notes || 'No special delivery instructions recorded.'}
                 </p>
@@ -468,6 +478,7 @@ export const InvoiceModal = ({
             </div>
           </div>
         </div>
+      </div>
 
         {/* Modal Bottom Close */}
         <div className="modal-footer" style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>

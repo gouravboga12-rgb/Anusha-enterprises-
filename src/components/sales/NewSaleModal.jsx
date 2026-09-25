@@ -39,6 +39,7 @@ export const NewSaleModal = ({
   const [initialPayment, setInitialPayment] = useState('');
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [referenceNo, setReferenceNo] = useState('');
+  const [vehicleNo, setVehicleNo] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [isQuickCustomerOpen, setIsQuickCustomerOpen] = useState(false);
@@ -68,6 +69,7 @@ export const NewSaleModal = ({
       setInitialPayment('');
       setPaymentMode('Cash');
       setReferenceNo('');
+      setVehicleNo('');
       setNotes('');
       setError('');
     }
@@ -176,6 +178,7 @@ export const NewSaleModal = ({
         initial_payment: initialPayment,
         payment_mode: paymentMode,
         reference_no: referenceNo,
+        vehicle_no: vehicleNo,
         notes
       }, currentUser);
 
@@ -750,15 +753,27 @@ export const NewSaleModal = ({
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '16px' }}>
-            <label className="form-label">Notes / Delivery Reference</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="e.g. Auto freight transport, driver receipt #12"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+          <div className="form-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>Vehicle Number / Transport (Optional)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. TS 08 AB 1234 / Auto / Lorry"
+                value={vehicleNo}
+                onChange={(e) => setVehicleNo(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ flex: 2 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>Notes / Delivery Reference</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. Auto freight transport, driver receipt #12"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="modal-footer" style={{ margin: '16px -24px -24px', padding: '16px 24px', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>

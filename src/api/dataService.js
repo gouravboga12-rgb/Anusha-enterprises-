@@ -1710,6 +1710,7 @@ class DataService {
       pending_amount: pendingAmount,
       advance_amount: advanceAmount,
       payment_status: paymentStatus,
+      vehicle_no: saleData.vehicle_no || saleData.vehicleNo || '',
       notes: saleData.notes || '',
       recorded_by: currentUser?.name || 'Admin',
       created_at: new Date().toISOString()
@@ -1789,7 +1790,9 @@ class DataService {
     return newSale;
   }
 
-  updateSale(saleId, updatedData, currentUser, reason) {
+  updateSale(saleId, updatedData, p3, p4) {
+    const currentUser = (p3 && typeof p3 === 'object' && p3.name) ? p3 : (p4 && typeof p4 === 'object' && p4.name) ? p4 : null;
+    const reason = typeof p3 === 'string' ? p3 : typeof p4 === 'string' ? p4 : '';
     const existingSale = this.getSaleById(saleId);
     if (!existingSale) throw new Error('Sale invoice not found');
 
@@ -1894,6 +1897,7 @@ class DataService {
 
     const updatedSale = {
       ...existingSale, ...updatedData, items: cleanItems,
+      vehicle_no: updatedData.vehicle_no !== undefined ? updatedData.vehicle_no : (existingSale.vehicle_no || ''),
       total_amount: totalAmount, paid_amount: paidAmount,
       pending_amount: pendingAmount, payment_status: paymentStatus,
       updated_at: new Date().toISOString()
@@ -1907,7 +1911,8 @@ class DataService {
 
     supabase.from('customer_sales').update({
       total_amount: totalAmount, paid_amount: paidAmount, pending_amount: pendingAmount,
-      payment_status: paymentStatus, date: updatedSale.date, time: updatedSale.time, notes: updatedSale.notes
+      payment_status: paymentStatus, date: updatedSale.date, time: updatedSale.time,
+      vehicle_no: updatedSale.vehicle_no, notes: updatedSale.notes
     }).eq('id', saleId).then(async () => {
       await supabase.from('customer_sale_items').delete().eq('sale_id', saleId);
       await supabase.from('customer_sale_items').insert(

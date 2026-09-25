@@ -28,12 +28,19 @@ export const CustomerProfile = ({
   onEditCustomer,
   onViewBillDetails,
   onEditSale,
-  onViewInvoice
+  onViewInvoice,
+  initialTab = 'ledger'
 }) => {
-  const [activeTab, setActiveTab] = useState('ledger');
+  const [activeTab, setActiveTab] = useState(initialTab || 'ledger');
   const [isSavingPdf, setIsSavingPdf] = useState(false);
   const [ledgerStartDate, setLedgerStartDate] = useState('');
   const [ledgerEndDate, setLedgerEndDate] = useState('');
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   const customer = dataService.getCustomerById(customerId);
   if (!customer) {
@@ -303,7 +310,7 @@ export const CustomerProfile = ({
           className={`btn btn-sm ${activeTab === 'sales' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveTab('sales')}
         >
-          <FileText size={15} /> Sales History ({sales.length})
+          <FileText size={15} /> All Invoices & Orders ({sales.length})
         </button>
         <button
           className={`btn btn-sm ${activeTab === 'payments' ? 'btn-primary' : 'btn-secondary'}`}
@@ -747,7 +754,14 @@ export const CustomerProfile = ({
                   ) : (
                     sales.map((sale) => (
                       <tr key={sale.id}>
-                        <td style={{ fontWeight: 700, color: '#0284c7' }}>{sale.invoice_no}</td>
+                        <td style={{ fontWeight: 700, color: '#0284c7' }}>
+                          <div>{sale.invoice_no}</div>
+                          {sale.vehicle_no && (
+                            <div style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600, background: '#eff6ff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #bfdbfe', display: 'inline-block', marginTop: '3px' }}>
+                              🚗 {sale.vehicle_no}
+                            </div>
+                          )}
+                        </td>
                         <td style={{ fontSize: '12px' }}>
                           {formatDate(sale.date)} <span style={{ color: '#64748b' }}>{sale.time}</span>
                         </td>
@@ -850,6 +864,11 @@ export const CustomerProfile = ({
                       <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
                         {formatDate(sale.date)} • {sale.time}
                       </div>
+                      {sale.vehicle_no && (
+                        <div style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600, marginTop: '2px' }}>
+                          🚗 Vehicle: {sale.vehicle_no}
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ textAlign: 'right' }}>

@@ -21,6 +21,7 @@ export const EditSaleModal = ({
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [items, setItems] = useState([]);
+  const [vehicleNo, setVehicleNo] = useState('');
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -39,6 +40,7 @@ export const EditSaleModal = ({
           selling_price: i.selling_price
         }))
       );
+      setVehicleNo(sale.vehicle_no || sale.transport_no || '');
       setReason('');
       setNotes(sale.notes || '');
       setError('');
@@ -147,6 +149,7 @@ export const EditSaleModal = ({
         items,
         date,
         time,
+        vehicle_no: vehicleNo,
         notes
       }, reason.trim(), currentUser);
 
@@ -405,15 +408,27 @@ export const EditSaleModal = ({
           />
         </div>
 
-        <div className="form-group" style={{ marginBottom: '20px' }}>
-          <label className="form-label">Notes / Remarks</label>
-          <input
-            type="text"
-            className="form-input"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Revised order after customer call..."
-          />
+        <div className="form-row">
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label" style={{ fontWeight: 600 }}>Vehicle Number / Transport (Optional)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={vehicleNo}
+              onChange={(e) => setVehicleNo(e.target.value)}
+              placeholder="e.g. TS 08 AB 1234 / Auto / Lorry"
+            />
+          </div>
+          <div className="form-group" style={{ flex: 2 }}>
+            <label className="form-label" style={{ fontWeight: 600 }}>Notes / Remarks</label>
+            <input
+              type="text"
+              className="form-input"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Revised order after customer call..."
+            />
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

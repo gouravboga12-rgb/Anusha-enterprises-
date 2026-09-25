@@ -130,6 +130,7 @@ export const App = () => {
 
   // Selection states
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [customerInitialTab, setCustomerInitialTab] = useState('ledger');
   const [selectedSupplierId, setSelectedSupplierId] = useState(null);
 
   // Modal open states
@@ -304,9 +305,13 @@ export const App = () => {
             selectedCustomerId ? (
               <CustomerProfile
                 customerId={selectedCustomerId}
+                initialTab={customerInitialTab}
                 dataService={dataService}
                 currentUser={currentUser}
-                onBack={() => setSelectedCustomerId(null)}
+                onBack={() => {
+                  setSelectedCustomerId(null);
+                  setCustomerInitialTab('ledger');
+                }}
                 onOpenNewSale={(cId) => openNewSale(cId)}
                 onOpenPayment={(cId, type, docId) => openPayment(cId, type, docId)}
                 onEditCustomer={(c) => {
@@ -322,7 +327,10 @@ export const App = () => {
                 customers={dataService.getCustomers()}
                 dataService={dataService}
                 currentUser={currentUser}
-                onSelectCustomer={(id) => setSelectedCustomerId(id)}
+                onSelectCustomer={(id, tab = 'ledger') => {
+                  setSelectedCustomerId(id);
+                  setCustomerInitialTab(tab);
+                }}
                 onEditCustomer={(c) => {
                   setEditingCustomer(c);
                   setIsCustomerFormOpen(true);
@@ -421,9 +429,11 @@ export const App = () => {
               onOpenPayment={(cId, type, saleId) => openPayment(cId, type, saleId)}
               onSelectCustomer={(cId) => {
                 setSelectedCustomerId(cId);
+                setCustomerInitialTab('sales');
                 setActiveTab('customers');
               }}
               onViewBillDetails={(sale) => openBillDetails(sale)}
+              onEditSale={(sale) => openEditSale(sale)}
               onViewInvoice={(sale) => openInvoice(sale, 'sale')}
             />
           )}

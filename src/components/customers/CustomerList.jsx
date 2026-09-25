@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, PlusCircle, User, Phone, MapPin, Eye, Edit, Receipt, Trash2 } from 'lucide-react';
+import { Search, PlusCircle, User, Phone, MapPin, Eye, Edit, Receipt, Trash2, FileText } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
 export const CustomerList = ({
@@ -202,9 +202,17 @@ export const CustomerList = ({
                             className="btn btn-secondary btn-sm"
                             style={{ padding: '4px 8px' }}
                             onClick={() => onSelectCustomer(cust.id)}
-                            title="View Ledger & Profile"
+                            title="View Ledger & Statement"
                           >
                             <Eye size={13} /> Ledger
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '4px 8px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
+                            onClick={() => onSelectCustomer(cust.id, 'sales')}
+                            title="View all invoices / bills for this customer"
+                          >
+                            <FileText size={13} /> Invoices ({dataService.getSales().filter((s) => s.customer_id === cust.id).length})
                           </button>
                           <button
                             className="btn btn-primary btn-sm"
@@ -212,7 +220,7 @@ export const CustomerList = ({
                             onClick={() => onOpenNewSale(cust.id)}
                             title="New Sale Bill"
                           >
-                            <PlusCircle size={13} /> Bill
+                            <PlusCircle size={13} /> + Bill
                           </button>
                           <button
                             className="btn btn-secondary btn-sm"
@@ -336,11 +344,19 @@ export const CustomerList = ({
                     <Eye size={14} /> Ledger
                   </button>
                   <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: '1 1 auto', minWidth: '85px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
+                    onClick={() => onSelectCustomer(cust.id, 'sales')}
+                    title="View all invoices / bills of this customer"
+                  >
+                    <FileText size={14} /> Invoices ({dataService.getSales().filter((s) => s.customer_id === cust.id).length})
+                  </button>
+                  <button
                     className="btn btn-primary btn-sm"
                     style={{ flex: '1 1 auto', minWidth: '60px' }}
                     onClick={() => onOpenNewSale(cust.id)}
                   >
-                    <PlusCircle size={14} /> Bill
+                    <PlusCircle size={14} /> + Bill
                   </button>
                   <button
                     className="btn btn-secondary btn-sm"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Search, ShoppingCart, Receipt, Eye, FileText } from 'lucide-react';
+import { PlusCircle, Search, ShoppingCart, Receipt, Eye, FileText, Edit2 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 export const SalesList = ({
@@ -9,7 +9,8 @@ export const SalesList = ({
   onOpenPayment,
   onSelectCustomer,
   onViewBillDetails,
-  onViewInvoice
+  onViewInvoice,
+  onEditSale
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -155,6 +156,16 @@ export const SalesList = ({
                           >
                             <FileText size={13} /> Invoice
                           </button>
+                          {onEditSale && (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '4px 8px', fontSize: '11px', color: '#d97706', borderColor: '#fde68a', background: '#fffbeb' }}
+                              onClick={() => onEditSale(sale)}
+                              title="Edit Sale / Vehicle No / Details"
+                            >
+                              <Edit2 size={13} /> Edit
+                            </button>
+                          )}
                           <button
                             className="btn btn-secondary btn-sm"
                             style={{ padding: '4px 8px', fontSize: '11px' }}
