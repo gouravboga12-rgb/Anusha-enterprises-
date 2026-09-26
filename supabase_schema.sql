@@ -123,6 +123,17 @@ CREATE TABLE IF NOT EXISTS public.supplier_purchase_items (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure all columns exist for existing tables
+ALTER TABLE public.supplier_purchases ADD COLUMN IF NOT EXISTS godown_id TEXT;
+ALTER TABLE public.supplier_purchases ADD COLUMN IF NOT EXISTS vehicle_no VARCHAR(100);
+ALTER TABLE public.supplier_purchase_items ADD COLUMN IF NOT EXISTS godown_id TEXT;
+ALTER TABLE public.supplier_purchase_items ADD COLUMN IF NOT EXISTS unit VARCHAR(50);
+ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS godown_id TEXT;
+ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS vehicle_no VARCHAR(100);
+ALTER TABLE public.customer_sale_items ADD COLUMN IF NOT EXISTS godown_id TEXT;
+ALTER TABLE public.customer_sale_items ADD COLUMN IF NOT EXISTS unit VARCHAR(50);
+ALTER TABLE public.stock_transfers ADD COLUMN IF NOT EXISTS vehicle_no VARCHAR(100);
+
 -- 9. CUSTOMER PAYMENTS
 CREATE TABLE IF NOT EXISTS public.customer_payments (
     id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,

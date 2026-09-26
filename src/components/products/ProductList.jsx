@@ -382,6 +382,7 @@ export const ProductList = ({
       {/* Embedded Recent Stock & Godown Activity Section */}
       <RecentStockActivity
         dataService={dataService}
+        currentUser={currentUser}
         title="Recent Stock & Godown Activity"
         subtitle="Live audit trail of purchases (stock-in), sales (stock-out), transfers & adjustments"
       />

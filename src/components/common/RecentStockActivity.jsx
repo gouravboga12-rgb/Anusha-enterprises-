@@ -2,17 +2,58 @@ import React, { useState, useMemo } from 'react';
 import {
   Activity, ExternalLink, Calendar, X, AlertCircle,
   Warehouse, PackagePlus, ShoppingCart, ArrowLeftRight,
-  Sliders, Package
+  Sliders, Package, Trash2
 } from 'lucide-react';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, getTodayDateString } from '../../utils/formatters';
 import { GodownActivityModal } from '../godowns/GodownActivityModal';
 
-export const RecentStockActivity = ({ dataService, title = "Recent Stock & Godown Activity", subtitle = "Live audit trail of purchases (stock-in), sales (stock-out), transfers & adjustments" }) => {
+export const RecentStockActivity = ({ dataService, title = "Recent Stock & Godown Activity", subtitle = "Live audit trail of purchases (stock-in), sales (stock-out), transfers & adjustments", currentUser }) => {
   // Activity filter state
   const [activityQuickDate, setActivityQuickDate] = useState('all'); // 'all' | 'today' | 'yesterday' | 'week'
   const [activitySpecificDate, setActivitySpecificDate] = useState('');
   const [activityType, setActivityType] = useState('all');
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+
+  // Clear activities modal state
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [clearMode, setClearMode] = useState('range'); // 'range' | 'all'
+  const [clearFromDate, setClearFromDate] = useState(getTodayDateString());
+  const [clearToDate, setClearToDate] = useState(getTodayDateString());
+  const [isClearing, setIsClearing] = useState(false);
+
+  const handleExecuteClear = async () => {
+    if (clearMode === 'all') {
+      if (!window.confirm('Are you sure you want to permanently delete ALL stock & activity logs? This action cannot be undone.')) {
+        return;
+      }
+    } else {
+      if (!clearFromDate) {
+        alert('Please specify a From Date');
+        return;
+      }
+      if (!window.confirm(`Delete activity logs from ${clearFromDate} to ${clearToDate || 'today'}?`)) {
+        return;
+      }
+    }
+
+    setIsClearing(true);
+    try {
+      if (clearMode === 'all') {
+        await dataService.clearActivities({ all: true }, currentUser);
+      } else {
+        await dataService.clearActivities({
+          fromDate: clearFromDate,
+          toDate: clearToDate || clearFromDate
+        }, currentUser);
+      }
+      setIsClearModalOpen(false);
+      alert('Activities cleared successfully.');
+    } catch (err) {
+      alert(err.message || 'Failed to clear activities');
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   // Real, accurate stock & godown activities (purchases, sales, transfers, adjustments, godowns)
   const allActivities = useMemo(() => {
@@ -69,8 +110,28 @@ export const RecentStockActivity = ({ dataService, title = "Recent Stock & Godow
             >
               <ExternalLink size={12} /> View Full History
             </button>
+            <button
+              onClick={() => setIsClearModalOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '6px 12px',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#dc2626',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+              title="Clear old activities or logs by date"
+            >
+              <Trash2 size={12} /> Clear Activities
+            </button>
           </div>
         </div>
+
 
         {/* Filter Toolbar */}
         <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -337,14 +398,166 @@ export const RecentStockActivity = ({ dataService, title = "Recent Stock & Godow
         )}
       </div>
 
+      {/* Clear Activities Modal */}
+      {isClearModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isClearing) setIsClearModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '460px',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Trash2 size={16} color="#dc2626" />
+                </div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                  Clear Recent Activities
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsClearModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                disabled={isClearing}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '12.5px', color: '#64748b' }}>
+              Choose whether to clear all recent stock activities or purge activities within a specific date range.
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setClearMode('range')}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid',
+                  borderColor: clearMode === 'range' ? '#dc2626' : '#e2e8f0',
+                  background: clearMode === 'range' ? '#fef2f2' : '#ffffff',
+                  color: clearMode === 'range' ? '#dc2626' : '#475569',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
+                📅 By Date Range
+              </button>
+              <button
+                type="button"
+                onClick={() => setClearMode('all')}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid',
+                  borderColor: clearMode === 'all' ? '#dc2626' : '#e2e8f0',
+                  background: clearMode === 'all' ? '#fef2f2' : '#ffffff',
+                  color: clearMode === 'all' ? '#dc2626' : '#475569',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
+                🗑️ Clear All
+              </button>
+            </div>
+
+            {clearMode === 'range' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>From Date</label>
+                    <input
+                      type="date"
+                      value={clearFromDate}
+                      onChange={(e) => setClearFromDate(e.target.value)}
+                      className="form-input"
+                      style={{ padding: '6px 8px', fontSize: '12px', width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>To Date</label>
+                    <input
+                      type="date"
+                      value={clearToDate}
+                      onChange={(e) => setClearToDate(e.target.value)}
+                      className="form-input"
+                      style={{ padding: '6px 8px', fontSize: '12px', width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  Activities logged between these dates will be removed.
+                </span>
+              </div>
+            ) : (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '10px', color: '#b91c1c', fontSize: '12px' }}>
+                ⚠️ <strong>Warning:</strong> This will erase all recent stock and godown activity audit logs completely across the entire CRM.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsClearModalOpen(false)}
+                disabled={isClearing}
+                style={{ fontSize: '12px', padding: '7px 14px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleExecuteClear}
+                disabled={isClearing}
+                style={{ fontSize: '12px', padding: '7px 14px', background: '#dc2626', color: '#fff' }}
+              >
+                {isClearing ? 'Clearing...' : 'Confirm & Clear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Full Activity Modal */}
       {isActivityModalOpen && (
         <GodownActivityModal
           isOpen={isActivityModalOpen}
           onClose={() => setIsActivityModalOpen(false)}
           dataService={dataService}
+          currentUser={currentUser}
         />
       )}
     </>
   );
 };
+

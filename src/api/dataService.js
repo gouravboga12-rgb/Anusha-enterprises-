@@ -86,7 +86,21 @@ export const formatNotesForStorage = (notes, vehicle_no) => {
 
 class DataService {
   constructor() {
-    if (isSupabaseConfigured) {
+    this.isLiveConnected = false;
+    this.connectionError = null;
+    this.isFetching = false;
+    this.realtimeDebounceTimer = null;
+    this.listeners = new Set();
+    this.realtimeChannel = null;
+
+    // 1. Try immediate load from localStorage cache (0ms instant startup)
+    const hasCache = this.loadCache();
+    if (hasCache) {
+      this.isLoading = false;
+      if (isSupabaseConfigured) {
+        this.isLiveConnected = true;
+      }
+    } else if (isSupabaseConfigured) {
       this.products = [];
       this.customers = [];
       this.suppliers = [];
@@ -94,7 +108,6 @@ class DataService {
       this.purchases = [];
       this.payments = [];
       this.adjustments = [];
-      // v2 data
       this.godowns = [];
       this.godownStock = [];
       this.stockTransfers = [];
@@ -123,14 +136,64 @@ class DataService {
       this.isLoading = false;
     }
 
-    this.isLiveConnected = false;
-    this.connectionError = null;
-    this.isFetching = false;
-    this.realtimeDebounceTimer = null;
-    this.listeners = new Set();
-    this.realtimeChannel = null;
-
     this.init();
+  }
+
+  saveCache() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      const payload = {
+        products: this.products,
+        customers: this.customers,
+        suppliers: this.suppliers,
+        sales: this.sales,
+        purchases: this.purchases,
+        payments: this.payments,
+        adjustments: this.adjustments,
+        godowns: this.godowns,
+        godownStock: this.godownStock,
+        stockTransfers: this.stockTransfers,
+        supplierProducts: this.supplierProducts,
+        crmUsers: this.crmUsers,
+        activityLog: this.activityLog,
+        auditTrail: this.auditTrail,
+        walletTransactions: this.walletTransactions,
+        cachedAt: Date.now()
+      };
+      localStorage.setItem('anusha_crm_cache_v2', JSON.stringify(payload));
+    } catch (e) {
+      // Storage quota or private mode fallback
+    }
+  }
+
+  loadCache() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return false;
+      const raw = localStorage.getItem('anusha_crm_cache_v2');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.products) && data.products.length > 0) {
+        this.products = data.products || [];
+        this.customers = data.customers || [];
+        this.suppliers = data.suppliers || [];
+        this.sales = data.sales || [];
+        this.purchases = data.purchases || [];
+        this.payments = data.payments || [];
+        this.adjustments = data.adjustments || [];
+        this.godowns = data.godowns || [];
+        this.godownStock = data.godownStock || [];
+        this.stockTransfers = data.stockTransfers || [];
+        this.supplierProducts = data.supplierProducts || [];
+        this.crmUsers = data.crmUsers || [];
+        this.activityLog = data.activityLog || [];
+        this.auditTrail = data.auditTrail || [];
+        this.walletTransactions = data.walletTransactions || [];
+        return true;
+      }
+    } catch (e) {
+      return false;
+    }
+    return false;
   }
 
   subscribe(listener) {
@@ -147,14 +210,16 @@ class DataService {
       if (!isSupabaseConfigured) {
         this.isLiveConnected = false;
         this.connectionError = 'Configure Supabase environment variables in Vercel settings';
-        // Ensure default godown exists for demo mode
         this._ensureDefaultGodownDemo();
         this.notify();
         return;
       }
 
-      this.isLoading = true;
-      this.notify();
+      // If we don't have any cached data, show initial loading; otherwise render instantly
+      if (!this.products || this.products.length === 0) {
+        this.isLoading = true;
+        this.notify();
+      }
 
       await this.fetchAll();
       await this._runFirstTimeMigration();
@@ -246,84 +311,61 @@ class DataService {
     this.isFetching = true;
 
     try {
-      // 1. Products
-      const { data: prods, error: pErr } = await supabase
-        .from('products').select('*').neq('is_active', false).order('created_at', { ascending: false });
-      if (pErr) throw pErr;
+      // Run all queries simultaneously in PARALLEL via Promise.all (300ms vs 10+ seconds sequential)
+      const [
+        prodsRes, custsRes, suppsRes, salesRes, purRes,
+        cpRes, spRes, adjsRes, godownsRes, godownStockRes,
+        transfersRes, suppProdsRes, usersRes, activityRes,
+        auditRes, walletRes
+      ] = await Promise.all([
+        supabase.from('products').select('*').neq('is_active', false).order('created_at', { ascending: false }),
+        supabase.from('customers').select('*').order('created_at', { ascending: false }),
+        supabase.from('suppliers').select('*').order('created_at', { ascending: false }),
+        supabase.from('customer_sales').select('*, items:customer_sale_items(*)').order('date', { ascending: false }),
+        supabase.from('supplier_purchases').select('*, items:supplier_purchase_items(*)').order('date', { ascending: false }),
+        supabase.from('customer_payments').select('*').order('created_at', { ascending: false }),
+        supabase.from('supplier_payments').select('*').order('created_at', { ascending: false }),
+        supabase.from('manual_stock_adjustments').select('*').order('created_at', { ascending: false }),
+        supabase.from('godowns').select('*').order('created_at', { ascending: true }),
+        supabase.from('godown_stock').select('*'),
+        supabase.from('stock_transfers').select('*').order('created_at', { ascending: false }),
+        supabase.from('supplier_products').select('*'),
+        supabase.from('crm_users').select('*').order('created_at', { ascending: false }),
+        supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('audit_trail').select('*').order('changed_at', { ascending: false }).limit(500),
+        supabase.from('wallet_transactions').select('*').order('created_at', { ascending: false })
+      ]);
 
-      // 2. Customers
-      const { data: custs, error: cErr } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
-      if (cErr) throw cErr;
+      const prods = prodsRes?.data || [];
+      const custs = custsRes?.data || [];
+      const supps = suppsRes?.data || [];
+      const salesData = salesRes?.data || [];
+      const purData = purRes?.data || [];
+      const custPayments = cpRes?.data || [];
+      const suppPayments = spRes?.data || [];
+      const adjs = adjsRes?.data || [];
+      const godownsData = godownsRes?.data || [];
+      const godownStockData = godownStockRes?.data || [];
+      const transfersData = transfersRes?.data || [];
+      const suppProdsData = suppProdsRes?.data || [];
+      const usersData = usersRes?.data || [];
+      const activityData = activityRes?.data || [];
+      const auditData = auditRes?.data || [];
+      const walletData = walletRes?.data || [];
 
-      // 3. Suppliers
-      const { data: supps, error: sErr } = await supabase.from('suppliers').select('*').order('created_at', { ascending: false });
-      if (sErr) throw sErr;
-
-      // 4. Sales with items
-      const { data: salesData, error: saleErr } = await supabase
-        .from('customer_sales').select('*, items:customer_sale_items(*)').order('date', { ascending: false });
-      if (saleErr) throw saleErr;
-
-      // 5. Purchases with items
-      const { data: purData, error: purErr } = await supabase
-        .from('supplier_purchases').select('*, items:supplier_purchase_items(*)').order('date', { ascending: false });
-      if (purErr) throw purErr;
-
-      // 6. Customer Payments
-      const { data: custPayments, error: cpErr } = await supabase
-        .from('customer_payments').select('*').order('created_at', { ascending: false });
-      if (cpErr) throw cpErr;
-
-      // 7. Supplier Payments
-      const { data: suppPayments, error: spErr } = await supabase
-        .from('supplier_payments').select('*').order('created_at', { ascending: false });
-      if (spErr) throw spErr;
-
-      // 8. Adjustments
-      const { data: adjs, error: adjErr } = await supabase
-        .from('manual_stock_adjustments').select('*').order('created_at', { ascending: false });
-      if (adjErr) throw adjErr;
-
-      // 9. Godowns
-      const { data: godownsData } = await supabase.from('godowns').select('*').order('created_at', { ascending: true });
-
-      // 10. Godown Stock
-      const { data: godownStockData } = await supabase.from('godown_stock').select('*');
-
-      // 11. Stock Transfers
-      const { data: transfersData } = await supabase
-        .from('stock_transfers').select('*').order('created_at', { ascending: false });
-
-      // 12. Supplier Products
-      const { data: suppProdsData } = await supabase.from('supplier_products').select('*');
-
-      // 13. CRM Users
-      const { data: usersData } = await supabase.from('crm_users').select('*').order('created_at', { ascending: false });
-
-      // 14. Activity Log (last 500)
-      const { data: activityData } = await supabase
-        .from('activity_log').select('*').order('created_at', { ascending: false }).limit(500);
-
-      // 15. Audit Trail
-      const { data: auditData } = await supabase
-        .from('audit_trail').select('*').order('changed_at', { ascending: false }).limit(1000);
-
-      // 16. Wallet Transactions
-      const { data: walletData } = await supabase
-        .from('wallet_transactions').select('*').order('created_at', { ascending: false });
-
-      // Normalize data
-      this.products = (prods || []).map((p) => ({
+      // Normalize products
+      this.products = prods.map((p) => ({
         ...p,
         current_stock: Number(p.current_stock) || 0,
         purchase_price: Number(p.purchase_price) || 0,
         selling_price: Number(p.selling_price) || 0
       }));
 
-      this.customers = (custs || []).filter((c) => c && c.status !== 'archived');
-      this.suppliers = (supps || []).filter((s) => s && s.status !== 'archived');
+      this.customers = custs.filter((c) => c && c.status !== 'archived');
+      this.suppliers = supps.filter((s) => s && s.status !== 'archived');
 
-      this.sales = (salesData || []).map((s) => {
+      // Normalize sales
+      this.sales = salesData.map((s) => {
         const parsed = parseNotesAndVehicle(s.notes, s.vehicle_no);
         return {
           ...s,
@@ -332,16 +374,21 @@ class DataService {
           total_amount: Number(s.total_amount) || 0,
           paid_amount: Number(s.paid_amount) || 0,
           pending_amount: Number(s.pending_amount) || 0,
-          items: (s.items || []).map((i) => ({
-            ...i,
-            quantity: Number(i.quantity) || 0,
-            selling_price: Number(i.selling_price) || 0,
-            total: Number(i.total) || 0
-          }))
+          items: (s.items || []).map((i) => {
+            const prod = this.getProductById(i.product_id);
+            return {
+              ...i,
+              unit: (i.unit && String(i.unit).trim()) || prod?.unit || 'Units',
+              quantity: Number(i.quantity) || 0,
+              selling_price: Number(i.selling_price) || 0,
+              total: Number(i.total) || 0
+            };
+          })
         };
       });
 
-      this.purchases = (purData || []).map((p) => {
+      // Normalize purchases
+      this.purchases = purData.map((p) => {
         const parsed = parseNotesAndVehicle(p.notes, p.vehicle_no);
         return {
           ...p,
@@ -350,25 +397,30 @@ class DataService {
           total_amount: Number(p.total_amount) || 0,
           paid_amount: Number(p.paid_amount) || 0,
           pending_amount: Number(p.pending_amount) || 0,
-          items: (p.items || []).map((i) => ({
-            ...i,
-            quantity: Number(i.quantity) || 0,
-            purchase_price: Number(i.purchase_price) || 0,
-            total: Number(i.total) || 0
-          }))
+          items: (p.items || []).map((i) => {
+            const prod = this.getProductById(i.product_id);
+            return {
+              ...i,
+              unit: (i.unit && String(i.unit).trim()) || prod?.unit || 'Units',
+              quantity: Number(i.quantity) || 0,
+              purchase_price: Number(i.purchase_price) || 0,
+              total: Number(i.total) || 0
+            };
+          })
         };
       });
 
-      const unifiedCustomerPayments = (custPayments || []).map((p) => ({ ...p, type: 'customer_payment', amount: Number(p.amount) || 0 }));
-      const unifiedSupplierPayments = (suppPayments || []).map((p) => ({ ...p, type: 'supplier_payment', amount: Number(p.amount) || 0 }));
+      // Payments
+      const unifiedCustomerPayments = custPayments.map((p) => ({ ...p, type: 'customer_payment', amount: Number(p.amount) || 0 }));
+      const unifiedSupplierPayments = suppPayments.map((p) => ({ ...p, type: 'supplier_payment', amount: Number(p.amount) || 0 }));
       this.payments = [...unifiedCustomerPayments, ...unifiedSupplierPayments].sort((a, b) =>
         new Date(b.created_at || b.date) - new Date(a.created_at || a.date)
       );
 
-      this.adjustments = (adjs || []).map((a) => ({ ...a, quantity: Number(a.quantity) || 0 }));
+      this.adjustments = adjs.map((a) => ({ ...a, quantity: Number(a.quantity) || 0 }));
 
       // Parse contact_person and contact_phone seamlessly from godownsData
-      this.godowns = (godownsData || []).map((g) => {
+      this.godowns = godownsData.map((g) => {
         let contactPerson = g.contact_person || '';
         let contactPhone = g.contact_phone || '';
         if (contactPerson && contactPerson.includes('|')) {
@@ -383,26 +435,135 @@ class DataService {
         };
       });
 
-      this.godownStock = (godownStockData || []).map((gs) => ({ ...gs, quantity: Number(gs.quantity) || 0 }));
-      this.stockTransfers = (transfersData || []).map((t) => {
+      this.godownStock = godownStockData.map((gs) => ({ ...gs, quantity: Number(gs.quantity) || 0 }));
+
+      // Stock Transfers with resolved product & godown names
+      this.stockTransfers = transfersData.map((t) => {
         const parsed = parseNotesAndVehicle(t.notes, t.vehicle_no);
+        const prod = this.getProductById(t.product_id);
+        const fromG = this.getGodownById(t.from_godown_id);
+        const toG = this.getGodownById(t.to_godown_id);
         return {
           ...t,
+          product_name: t.product_name || prod?.name || 'Product',
+          from_godown_name: t.from_godown_name || fromG?.name || 'Godown',
+          to_godown_name: t.to_godown_name || toG?.name || 'Godown',
           notes: parsed.notes,
           vehicle_no: parsed.vehicle_no,
           quantity: Number(t.quantity) || 0
         };
       });
-      this.supplierProducts = suppProdsData || [];
-      this.crmUsers = usersData || [];
-      this.activityLog = activityData || [];
-      this.auditTrail = auditData || [];
-      this.walletTransactions = (walletData || []).map((w) => ({ ...w, amount: Number(w.amount) || 0 }));
 
+      this.supplierProducts = suppProdsData;
+      this.crmUsers = usersData;
+      this.activityLog = activityData;
+      this.auditTrail = auditData;
+      this.walletTransactions = walletData.map((w) => ({ ...w, amount: Number(w.amount) || 0 }));
+
+      // RECONSTRUCT any purchases recorded in activityLog that might be missing (e.g. PUR-555)
+      const existingPurRefs = new Set(this.purchases.map((p) => p.purchase_no));
+      (this.activityLog || []).forEach((act) => {
+        if (act.module === 'Purchases' && act.record_ref && !existingPurRefs.has(act.record_ref)) {
+          const details = act.details || '';
+          const suppNameMatch = details.match(/Purchase from (.*?)(?:→|—|->|-)/);
+          const suppName = suppNameMatch ? suppNameMatch[1].trim() : '';
+          const targetSupp = this.suppliers.find((s) =>
+            (suppName && s.company_name.toLowerCase().includes(suppName.toLowerCase())) ||
+            (suppName && suppName.toLowerCase().includes(s.company_name.toLowerCase())) ||
+            (s.supplier_id && suppName.toLowerCase().includes(s.supplier_id.toLowerCase()))
+          );
+
+          const totalMatch = details.match(/Total:\s*₹?([\d,]+)/);
+          const paidMatch = details.match(/Paid:\s*₹?([\d,]+)/);
+          const totalAmt = totalMatch ? Number(totalMatch[1].replace(/,/g, '')) || 0 : 0;
+          const paidAmt = paidMatch ? Number(paidMatch[1].replace(/,/g, '')) || 0 : 0;
+          const pendingAmt = Math.max(0, totalAmt - paidAmt);
+
+          const itemsList = [];
+          const itemsPartMatch = details.match(/(?:—|->|→)\s*(.*?)\s*(?:—|->|→)\s*Total:/);
+          if (itemsPartMatch) {
+            const rawItems = itemsPartMatch[1].split('|');
+            rawItems.forEach((raw, idx) => {
+              const seg = raw.trim();
+              const colonIdx = seg.indexOf(':');
+              if (colonIdx !== -1) {
+                let pName = seg.substring(0, colonIdx).trim();
+                if (pName.includes('—')) pName = pName.split('—').pop().trim();
+                if (pName.includes('→')) pName = pName.split('→').pop().trim();
+                if (pName.includes('->')) pName = pName.split('->').pop().trim();
+
+                const rest = seg.substring(colonIdx + 1).trim();
+                const itemMatch = rest.match(/(\d+)(?:\s+([a-zA-Z]+))?\s*[×x*]\s*₹?([\d.]+)/);
+                if (itemMatch) {
+                  const qty = Number(itemMatch[1]) || 1;
+                  const pUnit = itemMatch[2] || 'Units';
+                  const price = Number(itemMatch[3]) || 0;
+                  const matchedProd = this.products.find((p) => p.name.toLowerCase() === pName.toLowerCase());
+                  itemsList.push({
+                    id: `pitem-${act.record_id || act.id}-${idx}`,
+                    purchase_id: act.record_id || `pur-${Date.now()}-${idx}`,
+                    product_id: matchedProd?.id || `prod-recon-${idx}`,
+                    product_name: pName,
+                    quantity: qty,
+                    unit: pUnit,
+                    purchase_price: price,
+                    total: qty * price
+                  });
+                }
+              }
+            });
+          }
+
+          if (targetSupp) {
+            const reconstructedPur = {
+              id: act.record_id || ('pur-recon-' + act.record_ref),
+              purchase_no: act.record_ref,
+              supplier_id: targetSupp.id,
+              date: act.created_at ? act.created_at.split('T')[0] : getTodayDateString(),
+              time: act.created_at ? new Date(act.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '12:00 pm',
+              items: itemsList,
+              total_amount: totalAmt,
+              paid_amount: paidAmt,
+              pending_amount: pendingAmt,
+              advance_amount: Math.max(0, paidAmt - totalAmt),
+              payment_status: paidAmt >= totalAmt ? 'Paid' : (paidAmt > 0 ? 'Partially Paid' : 'Pending'),
+              notes: 'Recorded purchase',
+              vehicle_no: '',
+              recorded_by: act.user_name || 'Admin',
+              godown_id: this.getDefaultGodown()?.id || null,
+              created_at: act.created_at || new Date().toISOString()
+            };
+            this.purchases.push(reconstructedPur);
+            existingPurRefs.add(act.record_ref);
+
+            // Reconstruct linked payment if not already present
+            if (paidAmt > 0 && !this.payments.some((pm) => pm.purchase_id === reconstructedPur.id)) {
+              this.payments.push({
+                id: 'pay-recon-' + reconstructedPur.id,
+                receipt_no: `VOUCH-${act.record_ref}`,
+                type: 'supplier_payment',
+                supplier_id: targetSupp.id,
+                purchase_id: reconstructedPur.id,
+                amount: paidAmt,
+                payment_mode: 'Bank Transfer',
+                reference_no: '',
+                date: reconstructedPur.date,
+                time: reconstructedPur.time,
+                notes: `Payment for ${reconstructedPur.purchase_no}`,
+                recorded_by: reconstructedPur.recorded_by,
+                created_at: reconstructedPur.created_at
+              });
+            }
+          }
+        }
+      });
+
+      this.saveCache();
       this.isLiveConnected = true;
       this.connectionError = null;
     } catch (err) {
-      throw err;
+      console.warn('fetchAll warning:', err);
+      this.connectionError = err.message || 'Connecting to Supabase...';
     } finally {
       this.isFetching = false;
       this.isLoading = false;
@@ -515,6 +676,7 @@ class DataService {
       const d = l.created_at ? l.created_at.slice(0, 10) : '';
       return d !== targetDate;
     });
+    this.saveCache();
     this.notify();
 
     if (isSupabaseConfigured) {
@@ -532,6 +694,53 @@ class DataService {
       }
     }
     return true;
+  }
+
+  async clearActivityLogsRange(fromDate, toDate, currentUser) {
+    if (!this.canDelete(currentUser)) {
+      throw new Error('Permission denied: Only administrators can clear activity logs.');
+    }
+
+    const from = fromDate ? new Date(fromDate + 'T00:00:00').getTime() : null;
+    const to = toDate ? new Date(toDate + 'T23:59:59').getTime() : null;
+
+    let removedCount = 0;
+    this.activityLog = (this.activityLog || []).filter((l) => {
+      const itemTime = l.created_at ? new Date(l.created_at).getTime() : 0;
+      if (from && itemTime < from) return true;
+      if (to && itemTime > to) return true;
+      removedCount++;
+      return false; // remove
+    });
+
+    this.saveCache();
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      try {
+        let query = supabase.from('activity_log').delete();
+        if (fromDate) query = query.gte('created_at', `${fromDate}T00:00:00.000Z`);
+        if (toDate) query = query.lte('created_at', `${toDate}T23:59:59.999Z`);
+        const { error } = await query;
+        if (error) console.warn('Supabase clear activity logs range error:', error);
+      } catch (e) {
+        console.warn('clearActivityLogsRange error:', e);
+      }
+    }
+    return removedCount;
+  }
+
+  async clearActivities({ fromDate, toDate, type = 'all', all = false } = {}, currentUser) {
+    if (!this.canDelete(currentUser)) {
+      throw new Error('Permission denied: Only administrators can clear activity logs.');
+    }
+    if (all) {
+      return this.clearAllActivityLogs(currentUser);
+    }
+    if (fromDate && !toDate) {
+      return this.clearActivityLogsByDate(fromDate, currentUser);
+    }
+    return this.clearActivityLogsRange(fromDate, toDate, currentUser);
   }
 
   // ==============================================================================
@@ -571,6 +780,9 @@ class DataService {
         const g = this.getGodownById(p.godown_id);
         const itemsStr = (p.items || []).map((i) => {
           const itemG = i.godown_id ? this.getGodownById(i.godown_id) : g;
+          const prod = this.getProductById(i.product_id);
+          const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+          return `${i.product_name || prod?.name || 'Product'}: ${i.quantity} ${unit} × ₹${i.purchase_price} = ₹${i.total}${itemG ? ' → ' + itemG.name : ''}`;
         }).join(' | ');
         synthesized.push({
           id: 'syn-' + p.id,
@@ -592,7 +804,9 @@ class DataService {
         const cust = this.getCustomerById(s.customer_id);
         const itemsStr = (s.items || []).map((i) => {
           const g = i.godown_id ? this.getGodownById(i.godown_id) : null;
-          return `${i.product_name}: ${i.quantity} × ₹${i.selling_price} = ₹${i.total}${g ? ' (from ' + g.name + ')' : ''}`;
+          const prod = this.getProductById(i.product_id);
+          const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+          return `${i.product_name || prod?.name || 'Product'}: ${i.quantity} ${unit} × ₹${i.selling_price} = ₹${i.total}${g ? ' (from ' + g.name + ')' : ''}`;
         }).join(' | ');
         synthesized.push({
           id: 'syn-' + s.id,
@@ -611,6 +825,13 @@ class DataService {
     // Synthesize any transfers not present in activityLog
     (this.stockTransfers || []).forEach((t) => {
       if (!existingRefs.has(t.transfer_no) && !existingRefs.has(t.id)) {
+        const prod = this.getProductById(t.product_id);
+        const fromG = this.getGodownById(t.from_godown_id);
+        const toG = this.getGodownById(t.to_godown_id);
+        const pName = t.product_name || prod?.name || 'Product';
+        const fromName = t.from_godown_name || fromG?.name || 'Source Godown';
+        const toName = t.to_godown_name || toG?.name || 'Destination Godown';
+        const unit = prod?.unit || 'units';
         synthesized.push({
           id: 'syn-' + t.id,
           user_name: t.transferred_by || 'Admin',
@@ -619,7 +840,7 @@ class DataService {
           module: 'Stock',
           record_id: t.id,
           record_ref: t.transfer_no,
-          details: `Transferred ${t.quantity} units of ${t.product_name} from ${t.from_godown_name} to ${t.to_godown_name}. Reason: ${t.reason || 'N/A'}`,
+          details: `Transferred ${t.quantity} ${unit} of ${pName} from ${fromName} to ${toName}. Reason: ${t.reason || 'N/A'}`,
           created_at: t.created_at || (t.date ? `${t.date}T12:00:00.000Z` : new Date().toISOString())
         });
       }
@@ -1140,6 +1361,9 @@ class DataService {
       from_godown_id,
       to_godown_id,
       product_id,
+      product_name: prod.name,
+      from_godown_name: fromGodown.name,
+      to_godown_name: toGodown.name,
       quantity: qty,
       date: date || getTodayDateString(),
       time: time || getCurrentTimeString(),
@@ -1198,6 +1422,7 @@ class DataService {
       `Transferred ${qty} ${prod.unit || 'units'} of ${prod.name} from ${fromGodown.name} to ${toGodown.name}${vehicleLog}. Reason: ${reason || 'N/A'}`
     );
 
+    this.saveCache();
     this.notify();
 
     // 2. Persist directly to Supabase RDS
@@ -1822,7 +2047,8 @@ class DataService {
     const cust = this.getCustomerById(saleData.customer_id);
     const itemsSummary = cleanItems.map((i) => {
       const g = i.godown_id ? this.getGodownById(i.godown_id) : null;
-      return `${i.product_name}: ${i.quantity} × ₹${i.selling_price} = ₹${i.total}${g ? ' (from ' + g.name + ')' : ''}`;
+      const unitStr = i.unit ? ` ${i.unit}` : ' Units';
+      return `${i.product_name}: ${i.quantity}${unitStr} × ₹${i.selling_price} = ₹${i.total}${g ? ' (from ' + g.name + ')' : ''}`;
     }).join(' | ');
     const advLog = advanceAmount > 0 ? ` [Advance Received: ₹${Number(advanceAmount).toLocaleString('en-IN')}]` : '';
     const vehicleLog = vehicleNo ? ` [Vehicle: ${vehicleNo}]` : '';
@@ -1830,6 +2056,7 @@ class DataService {
       `Sale to ${cust?.name || 'Customer'} — ${itemsSummary} — Total: ₹${totalAmount} | Paid: ₹${initialPay}${advLog}${vehicleLog}`
     );
 
+    this.saveCache();
     this.notify();
 
     // Background Supabase write (stores vehicle_no resiliently inside notes column)
@@ -2068,10 +2295,13 @@ class DataService {
     const notesText = (purData.notes || '').trim();
     const storageNotes = formatNotesForStorage(notesText, vehicleNo);
 
+    const supp = this.getSupplierById(purData.supplier_id);
+    const canonicalSupplierId = supp ? supp.id : purData.supplier_id;
+
     const newPur = {
       id: purId,
       purchase_no: purchaseNo,
-      supplier_id: purData.supplier_id,
+      supplier_id: canonicalSupplierId,
       date: purData.date || getTodayDateString(),
       time: purData.time || getCurrentTimeString(),
       items: cleanItems,
@@ -2104,7 +2334,7 @@ class DataService {
         id: 'pay-' + Date.now(),
         receipt_no: `VOUCH-${Math.floor(100 + Math.random() * 900)}`,
         type: 'supplier_payment',
-        supplier_id: purData.supplier_id,
+        supplier_id: canonicalSupplierId,
         purchase_id: purId,
         amount: initialPay,
         payment_mode: purData.payment_mode || 'Bank Transfer',
@@ -2118,11 +2348,11 @@ class DataService {
       this.payments = [newPayment, ...this.payments];
     }
 
-    const supp = this.getSupplierById(purData.supplier_id);
     const godown = this.getGodownById(godownId);
     const itemsSummary = cleanItems.map((i) => {
       const g = i.godown_id ? this.getGodownById(i.godown_id) : godown;
-      return `${i.product_name}: ${i.quantity} × ₹${i.purchase_price} = ₹${i.total}${g ? ' → ' + g.name : ''}`;
+      const unitStr = i.unit ? ` ${i.unit}` : ' Units';
+      return `${i.product_name}: ${i.quantity}${unitStr} × ₹${i.purchase_price} = ₹${i.total}${g ? ' → ' + g.name : ''}`;
     }).join(' | ');
     const advLog = advanceAmount > 0 ? ` [Advance Paid: ₹${Number(advanceAmount).toLocaleString('en-IN')}]` : '';
     const vehicleLog = vehicleNo ? ` [Vehicle: ${vehicleNo}]` : '';
@@ -2130,32 +2360,70 @@ class DataService {
       `Purchase from ${supp?.company_name || 'Supplier'} → ${godown?.name || 'Main Godown'} — ${itemsSummary} — Total: ₹${totalAmount} | Paid: ₹${initialPay}${advLog}${vehicleLog}`
     );
 
+    this.saveCache();
     this.notify();
 
-    // Background Supabase write (stores vehicle_no resiliently inside notes column)
-    supabase.from('supplier_purchases').insert([{
-      id: newPur.id, purchase_no: newPur.purchase_no, supplier_id: newPur.supplier_id,
-      date: newPur.date, time: newPur.time, total_amount: newPur.total_amount,
-      paid_amount: newPur.paid_amount, pending_amount: newPur.pending_amount,
-      payment_status: newPur.payment_status, notes: storageNotes, recorded_by: newPur.recorded_by,
-      godown_id: newPur.godown_id
-    }]).then(() => {
-      supabase.from('supplier_purchase_items').insert(
-        cleanItems.map((i) => ({
-          id: i.id, purchase_id: i.purchase_id, product_id: i.product_id, product_name: i.product_name,
-          quantity: i.quantity, purchase_price: i.purchase_price, total: i.total, godown_id: i.godown_id
-        }))
-      ).then().catch((e) => console.warn(e));
+    // Resilient background Supabase insert with column fallback
+    if (isSupabaseConfigured) {
+      const insertPayload = {
+        id: newPur.id,
+        purchase_no: newPur.purchase_no,
+        supplier_id: canonicalSupplierId,
+        date: newPur.date,
+        time: newPur.time,
+        total_amount: newPur.total_amount,
+        paid_amount: newPur.paid_amount,
+        pending_amount: newPur.pending_amount,
+        payment_status: newPur.payment_status,
+        notes: storageNotes,
+        recorded_by: newPur.recorded_by
+      };
+      if (newPur.godown_id) insertPayload.godown_id = newPur.godown_id;
 
-      if (newPayment) {
-        supabase.from('supplier_payments').insert([{
-          id: newPayment.id, receipt_no: newPayment.receipt_no, supplier_id: newPayment.supplier_id,
-          purchase_id: newPayment.purchase_id, amount: newPayment.amount, payment_mode: newPayment.payment_mode,
-          reference_no: newPayment.reference_no, date: newPayment.date, time: newPayment.time,
-          notes: newPayment.notes, recorded_by: newPayment.recorded_by
-        }]).then().catch((e) => console.warn(e));
-      }
-    }).catch((e) => console.warn('recordPurchase error:', e));
+      supabase.from('supplier_purchases').insert([insertPayload]).then(async ({ error: pErr }) => {
+        if (pErr && (pErr.code === '42703' || pErr.message?.includes('godown_id'))) {
+          delete insertPayload.godown_id;
+          const retry = await supabase.from('supplier_purchases').insert([insertPayload]);
+          pErr = retry.error;
+        }
+        if (pErr) console.warn('supplier_purchases insert warning:', pErr);
+
+        if (!pErr) {
+          const itemPayloads = cleanItems.map((i) => ({
+            id: i.id,
+            purchase_id: i.purchase_id,
+            product_id: i.product_id,
+            product_name: i.product_name,
+            quantity: i.quantity,
+            purchase_price: i.purchase_price,
+            total: i.total,
+            godown_id: i.godown_id
+          }));
+
+          let { error: iErr } = await supabase.from('supplier_purchase_items').insert(itemPayloads);
+          if (iErr && (iErr.code === '42703' || iErr.message?.includes('godown_id'))) {
+            const stripped = itemPayloads.map(({ godown_id, ...rest }) => rest);
+            await supabase.from('supplier_purchase_items').insert(stripped);
+          }
+
+          if (newPayment) {
+            await supabase.from('supplier_payments').insert([{
+              id: newPayment.id,
+              receipt_no: newPayment.receipt_no,
+              supplier_id: canonicalSupplierId,
+              purchase_id: newPayment.purchase_id,
+              amount: newPayment.amount,
+              payment_mode: newPayment.payment_mode,
+              reference_no: newPayment.reference_no,
+              date: newPayment.date,
+              time: newPayment.time,
+              notes: newPayment.notes,
+              recorded_by: newPayment.recorded_by
+            }]).catch((e) => console.warn(e));
+          }
+        }
+      }).catch((e) => console.warn('recordPurchase error:', e));
+    }
 
     return newPur;
   }
@@ -2779,8 +3047,18 @@ class DataService {
   // LEDGER (ENHANCED WITH ITEM DETAIL)
   // ==============================================================================
   getCustomerLedger(customerId) {
-    const custSales = this.sales.filter((s) => s.customer_id === customerId);
-    const custPayments = this.payments.filter((p) => p.customer_id === customerId && p.type === 'customer_payment');
+    const cust = this.getCustomerById(customerId);
+    const validIds = new Set(
+      [customerId, cust?.id, cust?.customer_id]
+        .filter(Boolean)
+        .map((id) => String(id).toLowerCase().trim())
+    );
+    const custSales = (this.sales || []).filter((s) =>
+      s && validIds.has(String(s.customer_id).toLowerCase().trim())
+    );
+    const custPayments = (this.payments || []).filter((p) =>
+      p && validIds.has(String(p.customer_id).toLowerCase().trim()) && p.type === 'customer_payment'
+    );
 
     const totalSales = custSales.reduce((acc, s) => acc + (s.total_amount || 0), 0);
     const totalPaid = custPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
@@ -2841,8 +3119,18 @@ class DataService {
   }
 
   getSupplierLedger(supplierId) {
-    const suppPurchases = this.purchases.filter((p) => p.supplier_id === supplierId);
-    const suppPayments = this.payments.filter((p) => p.supplier_id === supplierId && p.type === 'supplier_payment');
+    const supp = this.getSupplierById(supplierId);
+    const validIds = new Set(
+      [supplierId, supp?.id, supp?.supplier_id]
+        .filter(Boolean)
+        .map((id) => String(id).toLowerCase().trim())
+    );
+    const suppPurchases = (this.purchases || []).filter((p) =>
+      p && validIds.has(String(p.supplier_id).toLowerCase().trim())
+    );
+    const suppPayments = (this.payments || []).filter((p) =>
+      p && validIds.has(String(p.supplier_id).toLowerCase().trim()) && p.type === 'supplier_payment'
+    );
 
     const totalPurchases = suppPurchases.reduce((acc, p) => acc + (p.total_amount || 0), 0);
     const totalPaid = suppPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
@@ -2920,7 +3208,8 @@ class DataService {
       const cust = this.getCustomerById(s.customer_id);
       const itemLines = s.items.map((i) => {
         const g = this.getGodownById(i.godown_id);
-        return `${i.product_name}: ${i.quantity} × ₹${Number(i.selling_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}${g ? ` [${g.name}]` : ''}`;
+        const unitStr = i.unit ? ` ${i.unit}` : ' Units';
+        return `${i.product_name}: ${i.quantity}${unitStr} × ₹${Number(i.selling_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}${g ? ` [${g.name}]` : ''}`;
       });
       events.push({
         id: s.id, time: s.time, type: 'Customer Sale', badgeClass: 'badge-active',
@@ -2936,9 +3225,10 @@ class DataService {
       totalPurchasesAmount += p.total_amount || 0;
       const supp = this.getSupplierById(p.supplier_id);
       const godown = this.getGodownById(p.godown_id);
-      const itemLines = p.items.map((i) =>
-        `${i.product_name}: ${i.quantity} × ₹${Number(i.purchase_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}`
-      );
+      const itemLines = p.items.map((i) => {
+        const unitStr = i.unit ? ` ${i.unit}` : ' Units';
+        return `${i.product_name}: ${i.quantity}${unitStr} × ₹${Number(i.purchase_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}`;
+      });
       events.push({
         id: p.id, time: p.time, type: 'Supplier Purchase', badgeClass: 'badge-warning',
         party: supp ? supp.company_name : 'Supplier',

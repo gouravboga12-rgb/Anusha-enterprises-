@@ -302,7 +302,7 @@ export const GodownList = ({ dataService, currentUser }) => {
       )}
 
       {/* Recent Stock & Godown Activity Section */}
-      <RecentStockActivity dataService={dataService} />
+      <RecentStockActivity dataService={dataService} currentUser={currentUser} />
 
       {/* Modals */}
       {isFormOpen && (

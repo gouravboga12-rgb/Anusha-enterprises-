@@ -3,15 +3,21 @@ import {
   X, Activity, Search, Calendar, Filter, ArrowLeftRight,
   TrendingDown, TrendingUp, Warehouse, Package, Sliders,
   Clock, User, Download, Printer, ChevronRight, CheckCircle2,
-  PackagePlus, ShoppingCart, Truck, AlertCircle
+  PackagePlus, ShoppingCart, Truck, AlertCircle, Trash2
 } from 'lucide-react';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 
-export const GodownActivityModal = ({ isOpen, onClose, dataService }) => {
+export const GodownActivityModal = ({ isOpen, onClose, dataService, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [quickDate, setQuickDate] = useState('all'); // 'all' | 'today' | 'yesterday' | 'week'
   const [specificDate, setSpecificDate] = useState('');
   const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'purchases' | 'sales' | 'transfers' | 'adjustments' | 'godowns_products'
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [clearMode, setClearMode] = useState('range'); // 'range' | 'all'
+  const [clearFromDate, setClearFromDate] = useState('');
+  const [clearToDate, setClearToDate] = useState('');
+  const [isClearing, setIsClearing] = useState(false);
+  const [renderTick, setRenderTick] = useState(0);
 
   if (!isOpen) return null;
 
@@ -23,7 +29,7 @@ export const GodownActivityModal = ({ isOpen, onClose, dataService }) => {
       type: typeFilter,
       search: searchTerm
     });
-  }, [dataService, quickDate, specificDate, typeFilter, searchTerm]);
+  }, [dataService, quickDate, specificDate, typeFilter, searchTerm, renderTick]);
 
   // Quick stats from filtered results
   const stats = useMemo(() => {
@@ -62,6 +68,40 @@ ${'='.repeat(90)}
 </pre>`);
       win.print();
       win.close();
+    }
+  };
+
+  const canClear = dataService ? dataService.canDelete(currentUser) : true;
+
+  const handleClearActivities = async () => {
+    if (!dataService?.clearActivities) return;
+
+    if (clearMode === 'range' && !clearFromDate) {
+      alert('Please select a From Date.');
+      return;
+    }
+
+    const confirmMsg = clearMode === 'all'
+      ? 'Are you sure you want to permanently clear ALL stock & godown activity records from the database? This cannot be undone.'
+      : `Are you sure you want to delete activity records from ${clearFromDate} to ${clearToDate || 'Today'}?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsClearing(true);
+    try {
+      await dataService.clearActivities({
+        all: clearMode === 'all',
+        fromDate: clearMode === 'range' ? clearFromDate : null,
+        toDate: clearMode === 'range' ? (clearToDate || clearFromDate) : null,
+        type: typeFilter
+      }, currentUser);
+
+      setIsClearModalOpen(false);
+      setRenderTick(t => t + 1);
+    } catch (err) {
+      alert('Failed to clear activities: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -194,6 +234,27 @@ ${'='.repeat(90)}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {canClear && (
+              <button
+                onClick={() => setIsClearModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#dc2626',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+                title="Clear activity log records"
+              >
+                <Trash2 size={14} /> Clear
+              </button>
+            )}
             <button
               onClick={handlePrint}
               style={{
@@ -612,6 +673,176 @@ ${'='.repeat(90)}
           </button>
         </div>
       </div>
+
+      {/* Clear Activities Modal */}
+      {isClearModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 1200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isClearing) setIsClearModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '480px',
+              padding: '24px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Trash2 size={18} color="#dc2626" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Clear Activity Log</h3>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0' }}>Delete stock activity history records</p>
+                </div>
+              </div>
+              <button
+                disabled={isClearing}
+                onClick={() => setIsClearModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Mode Selector */}
+            <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+              <button
+                onClick={() => setClearMode('range')}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: clearMode === 'range' ? '#ffffff' : 'transparent',
+                  color: clearMode === 'range' ? '#0f172a' : '#64748b',
+                  boxShadow: clearMode === 'range' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                }}
+              >
+                By Date Range
+              </button>
+              <button
+                onClick={() => setClearMode('all')}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: clearMode === 'all' ? '#fee2e2' : 'transparent',
+                  color: clearMode === 'all' ? '#dc2626' : '#64748b',
+                  boxShadow: clearMode === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                }}
+              >
+                Clear All Activities
+              </button>
+            </div>
+
+            {clearMode === 'range' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                    From Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={clearFromDate}
+                    onChange={(e) => setClearFromDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                    To Date (Leave empty for single day)
+                  </label>
+                  <input
+                    type="date"
+                    value={clearToDate}
+                    onChange={(e) => setClearToDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '13px'
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#991b1b' }}>
+                <strong>Warning:</strong> This will delete all logged stock events from the activity log table in Supabase. Physical product stock quantities and ledgers will not be altered.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+              <button
+                disabled={isClearing}
+                onClick={() => setIsClearModalOpen(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isClearing}
+                onClick={handleClearActivities}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#dc2626',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: '#ffffff',
+                  cursor: isClearing ? 'not-allowed' : 'pointer',
+                  opacity: isClearing ? 0.7 : 1
+                }}
+              >
+                {isClearing ? 'Clearing...' : (clearMode === 'all' ? 'Delete All Activities' : 'Delete Selected Range')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

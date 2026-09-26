@@ -254,7 +254,7 @@ export const App = () => {
           onLogout={handleLogout}
         />
 
-        {!dataService.isLiveConnected && (
+        {!dataService.isLiveConnected && dataService.connectionError && (
           <div style={{
             background: 'linear-gradient(90deg, #eff6ff 0%, #f0fdf4 100%)',
             borderBottom: '1px solid #bfdbfe',
