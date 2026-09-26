@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer, Download, Calendar, FileText } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, ShoppingBag, Receipt, BookMarked, Trash2, Edit, PlusCircle, Printer, Download, Calendar, FileText, Package } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 import { exportElementToPdf } from '../../utils/pdfExport';
 
@@ -37,6 +37,7 @@ export const SupplierProfile = ({
   const payments = dataService.getPayments().filter((p) => p.supplier_id === supplierId && p.type === 'supplier_payment');
   const pendingPurchases = purchases.filter((p) => p.pending_amount > 0);
   const firstPurchaseId = pendingPurchases.length > 0 ? pendingPurchases[0].id : '';
+  const assignedProducts = dataService.getSupplierProducts ? dataService.getSupplierProducts(supplierId) : [];
 
   const filteredLedgerEntries = useMemo(() => {
     if (!ledgerData?.entries) return [];
@@ -169,6 +170,29 @@ export const SupplierProfile = ({
               <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
                 Note: {supplier.notes}
               </p>
+            )}
+            {assignedProducts.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Package size={12} color="#0284c7" /> Supplied Products ({assignedProducts.length}):
+                </span>
+                {assignedProducts.map((p) => (
+                  <span
+                    key={p.id}
+                    style={{
+                      fontSize: '11.5px',
+                      background: '#f0f9ff',
+                      color: '#0369a1',
+                      border: '1px solid #bae6fd',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontWeight: 600
+                    }}
+                  >
+                    {p.name}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
 

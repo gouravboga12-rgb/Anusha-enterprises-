@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
-import { Plus, Trash2, AlertCircle, Warehouse, Sparkles, Building2, FileText, UserPlus } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, Warehouse, Sparkles, Building2, FileText, UserPlus, Package } from 'lucide-react';
 import { formatCurrency, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 import { SupplierFormModal } from '../suppliers/SupplierFormModal';
 import { ProductFormModal } from '../products/ProductFormModal';
@@ -24,15 +24,19 @@ export const NewPurchaseModal = ({
     return dataService.subscribe(() => setTick((t) => t + 1));
   }, [dataService]);
 
+  const [showAllProducts, setShowAllProducts] = useState(false);
+
   // Helper to filter and prioritize products for the selected supplier
-  const getSupplierFilteredProducts = (sId) => {
+  const getSupplierFilteredProducts = (sId, allowAll = showAllProducts) => {
     if (!sId) return products;
     const mapped = dataService.getSupplierProducts(sId) || [];
     if (mapped.length === 0) return products;
-    const mappedIds = new Set(mapped.map((m) => m.id));
-    const mappedList = products.filter((p) => mappedIds.has(p.id));
-    const otherList = products.filter((p) => !mappedIds.has(p.id));
-    return [...mappedList, ...otherList];
+    if (allowAll) {
+      const mappedIds = new Set(mapped.map((m) => m.id));
+      const otherList = products.filter((p) => !mappedIds.has(p.id));
+      return [...mapped, ...otherList];
+    }
+    return mapped;
   };
 
   const getMappedProductIds = (sId) => {
@@ -70,14 +74,41 @@ export const NewPurchaseModal = ({
     supps.forEach((s) => suggestedSupplierIds.add(s.id));
   });
 
+  const handleSupplierChange = (newSupplierId) => {
+    setSupplierId(newSupplierId);
+    setShowAllProducts(false);
+    if (!newSupplierId) return;
+
+    const mapped = dataService.getSupplierProducts(newSupplierId) || [];
+    if (mapped.length > 0) {
+      const mappedIds = new Set(mapped.map((m) => m.id));
+      setItems((prevItems) => {
+        const needsUpdate = prevItems.some((item) => !mappedIds.has(item.product_id));
+        if (!needsUpdate) return prevItems;
+
+        const firstMapped = mapped[0];
+        return prevItems.map((item) => {
+          if (mappedIds.has(item.product_id)) return item;
+          return {
+            ...item,
+            product_id: firstMapped.id,
+            unit: firstMapped.unit || 'Units',
+            purchase_price: firstMapped.purchase_price || 0
+          };
+        });
+      });
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       const sid = initialSupplierId || '';
       setSupplierId(sid);
+      setShowAllProducts(false);
       setGodownId(godowns[0]?.id || '');
       setDate(getTodayDateString());
       setTime(getCurrentTimeString());
-      const availableProds = getSupplierFilteredProducts(sid);
+      const availableProds = getSupplierFilteredProducts(sid, false);
       setItems(
         availableProds.length > 0
           ? [{
@@ -116,7 +147,7 @@ export const NewPurchaseModal = ({
   };
 
   const addItemRow = () => {
-    const availableProds = getSupplierFilteredProducts(supplierId);
+    const availableProds = getSupplierFilteredProducts(supplierId, showAllProducts);
     if (availableProds.length === 0) return;
     const defProd = availableProds[0];
     setItems([
@@ -254,7 +285,7 @@ export const NewPurchaseModal = ({
                   if (e.target.value === '__CREATE_NEW__') {
                     setIsQuickSupplierOpen(true);
                   } else {
-                    setSupplierId(e.target.value);
+                    handleSupplierChange(e.target.value);
                   }
                 }}
               >
@@ -383,8 +414,50 @@ export const NewPurchaseModal = ({
           {/* Products Inward Line Items */}
           <div style={{ marginTop: '16px', marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-              <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>Products Inward</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>Products Inward</label>
+                {supplierId && (() => {
+                  const mapped = dataService.getSupplierProducts(supplierId) || [];
+                  if (mapped.length === 0) return null;
+                  return (
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        background: showAllProducts ? '#f1f5f9' : '#e0f2fe',
+                        color: showAllProducts ? '#475569' : '#0369a1',
+                        border: showAllProducts ? '1px solid #cbd5e1' : '1px solid #bae6fd',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Package size={11} color={showAllProducts ? '#64748b' : '#0284c7'} />
+                      {showAllProducts
+                        ? `Showing all catalog products (${products.length})`
+                        : `Filtered to ${mapped.length} assigned product${mapped.length > 1 ? 's' : ''}`}
+                    </span>
+                  );
+                })()}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {supplierId && (() => {
+                  const mapped = dataService.getSupplierProducts(supplierId) || [];
+                  if (mapped.length === 0) return null;
+                  return (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setShowAllProducts((prev) => !prev)}
+                      style={{ fontSize: '11.5px', color: '#0284c7', borderColor: '#bae6fd' }}
+                      title={showAllProducts ? "Show only supplier's assigned products" : "Show all products in catalog"}
+                    >
+                      {showAllProducts ? 'Filter to Assigned Only' : '+ Show All Catalog Products'}
+                    </button>
+                  );
+                })()}
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
@@ -432,16 +505,24 @@ export const NewPurchaseModal = ({
                             onChange={(e) => handleProductChange(idx, e.target.value)}
                           >
                             {(() => {
-                              const sProds = getSupplierFilteredProducts(supplierId);
-                              const mappedIds = getMappedProductIds(supplierId);
-                              const mappedProds = sProds.filter((p) => mappedIds.has(p.id));
-                              const otherProds = sProds.filter((p) => !mappedIds.has(p.id));
+                              const mapped = supplierId ? (dataService.getSupplierProducts(supplierId) || []) : [];
+                              const hasMapped = mapped.length > 0;
 
-                              if (mappedIds.size > 0 && mappedProds.length > 0) {
+                              if (hasMapped && !showAllProducts) {
+                                return mapped.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
+                                  </option>
+                                ));
+                              }
+
+                              if (hasMapped && showAllProducts) {
+                                const mappedIds = new Set(mapped.map((m) => m.id));
+                                const otherProds = products.filter((p) => !mappedIds.has(p.id));
                                 return (
                                   <>
-                                    <optgroup label="✨ Mapped Products (Supplied by this Vendor)">
-                                      {mappedProds.map((p) => (
+                                    <optgroup label="✨ Assigned Products (Supplied by this Vendor)">
+                                      {mapped.map((p) => (
                                         <option key={p.id} value={p.id}>
                                           ★ {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
                                         </option>
@@ -460,7 +541,7 @@ export const NewPurchaseModal = ({
                                 );
                               }
 
-                              return sProds.map((p) => (
+                              return products.map((p) => (
                                 <option key={p.id} value={p.id}>
                                   {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
                                 </option>
@@ -598,16 +679,24 @@ export const NewPurchaseModal = ({
                         style={{ width: '100%', fontSize: '12px' }}
                       >
                         {(() => {
-                          const sProds = getSupplierFilteredProducts(supplierId);
-                          const mappedIds = getMappedProductIds(supplierId);
-                          const mappedProds = sProds.filter((p) => mappedIds.has(p.id));
-                          const otherProds = sProds.filter((p) => !mappedIds.has(p.id));
+                          const mapped = supplierId ? (dataService.getSupplierProducts(supplierId) || []) : [];
+                          const hasMapped = mapped.length > 0;
 
-                          if (mappedIds.size > 0 && mappedProds.length > 0) {
+                          if (hasMapped && !showAllProducts) {
+                            return mapped.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
+                              </option>
+                            ));
+                          }
+
+                          if (hasMapped && showAllProducts) {
+                            const mappedIds = new Set(mapped.map((m) => m.id));
+                            const otherProds = products.filter((p) => !mappedIds.has(p.id));
                             return (
                               <>
-                                <optgroup label="✨ Mapped Products (Supplied by this Vendor)">
-                                  {mappedProds.map((p) => (
+                                <optgroup label="✨ Assigned Products (Supplied by this Vendor)">
+                                  {mapped.map((p) => (
                                     <option key={p.id} value={p.id}>
                                       ★ {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
                                     </option>
@@ -626,7 +715,7 @@ export const NewPurchaseModal = ({
                             );
                           }
 
-                          return sProds.map((p) => (
+                          return products.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name} (Stock: {p.current_stock} {p.unit || 'Units'})
                             </option>
@@ -904,7 +993,7 @@ export const NewPurchaseModal = ({
             await dataService.saveSupplierProducts(newS.id, prodIds, currentUser);
           }
           if (newS?.id) {
-            setSupplierId(newS.id);
+            handleSupplierChange(newS.id);
             setIsQuickSupplierOpen(false);
           }
         }}

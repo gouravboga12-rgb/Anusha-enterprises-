@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
-import { Plus, Trash2, Warehouse, History, ShieldAlert } from 'lucide-react';
+import { Plus, Trash2, Warehouse, History, ShieldAlert, Package } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const UNIT_OPTIONS = ['Units', 'Boxes', 'Packets', 'Meters', 'Pieces', 'Kg', 'Custom'];
@@ -22,6 +22,7 @@ export const EditPurchaseModal = ({
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [items, setItems] = useState([]);
+  const [showAllProducts, setShowAllProducts] = useState(false);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -29,6 +30,7 @@ export const EditPurchaseModal = ({
   useEffect(() => {
     if (purchase && isOpen) {
       setSupplierId(purchase.supplier_id || '');
+      setShowAllProducts(false);
       setGodownId(purchase.godown_id || godowns[0]?.id || '');
       setDate(purchase.date || '');
       setTime(purchase.time || '');
@@ -68,8 +70,10 @@ export const EditPurchaseModal = ({
   };
 
   const addItemRow = () => {
-    if (products.length === 0) return;
-    const defProd = products[0];
+    const mapped = supplierId ? (dataService.getSupplierProducts(supplierId) || []) : [];
+    const available = (!showAllProducts && mapped.length > 0) ? mapped : products;
+    if (available.length === 0) return;
+    const defProd = available[0];
     setItems([
       ...items,
       {
@@ -232,15 +236,58 @@ export const EditPurchaseModal = ({
 
         {/* Product Items Table */}
         <div style={{ marginBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <label className="form-label" style={{ margin: 0 }}>Products Inward</label>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={addItemRow}
-            >
-              <Plus size={14} /> Add Product Line
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>Products Inward</label>
+              {supplierId && (() => {
+                const mapped = dataService.getSupplierProducts(supplierId) || [];
+                if (mapped.length === 0) return null;
+                return (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      background: showAllProducts ? '#f1f5f9' : '#e0f2fe',
+                      color: showAllProducts ? '#475569' : '#0369a1',
+                      border: showAllProducts ? '1px solid #cbd5e1' : '1px solid #bae6fd',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Package size={11} color={showAllProducts ? '#64748b' : '#0284c7'} />
+                    {showAllProducts
+                      ? `Showing all products (${products.length})`
+                      : `Filtered to ${mapped.length} assigned product${mapped.length > 1 ? 's' : ''}`}
+                  </span>
+                );
+              })()}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {supplierId && (() => {
+                const mapped = dataService.getSupplierProducts(supplierId) || [];
+                if (mapped.length === 0) return null;
+                return (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setShowAllProducts((prev) => !prev)}
+                    style={{ fontSize: '11.5px', color: '#0284c7', borderColor: '#bae6fd' }}
+                  >
+                    {showAllProducts ? 'Filter to Assigned Only' : '+ Show All Products'}
+                  </button>
+                );
+              })()}
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={addItemRow}
+              >
+                <Plus size={14} /> Add Product Line
+              </button>
+            </div>
           </div>
 
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
@@ -270,11 +317,61 @@ export const EditPurchaseModal = ({
                           value={item.product_id}
                           onChange={(e) => handleProductChange(idx, e.target.value)}
                         >
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} ({p.sku})
-                            </option>
-                          ))}
+                          {(() => {
+                            const mapped = supplierId ? (dataService.getSupplierProducts(supplierId) || []) : [];
+                            const hasMapped = mapped.length > 0;
+
+                            if (hasMapped && !showAllProducts) {
+                              const mappedIds = new Set(mapped.map((m) => m.id));
+                              const currentProd = products.find((p) => p.id === item.product_id);
+                              const extra = currentProd && !mappedIds.has(currentProd.id) ? [currentProd] : [];
+                              return (
+                                <>
+                                  {mapped.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} ({p.sku})
+                                    </option>
+                                  ))}
+                                  {extra.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} ({p.sku}) [Existing Item]
+                                    </option>
+                                  ))}
+                                </>
+                              );
+                            }
+
+                            if (hasMapped && showAllProducts) {
+                              const mappedIds = new Set(mapped.map((m) => m.id));
+                              const otherProds = products.filter((p) => !mappedIds.has(p.id));
+                              return (
+                                <>
+                                  <optgroup label="✨ Assigned Products">
+                                    {mapped.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        ★ {p.name} ({p.sku})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                  {otherProds.length > 0 && (
+                                    <optgroup label="Other Catalog Products">
+                                      {otherProds.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.name} ({p.sku})
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  )}
+                                </>
+                              );
+                            }
+
+                            return products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} ({p.sku})
+                              </option>
+                            ));
+                          })()}
                         </select>
                       </td>
                       <td>
