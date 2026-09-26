@@ -516,25 +516,29 @@ export const App = () => {
       </div>
 
       {/* Global Modals */}
-      <NewSaleModal
-        isOpen={isNewSaleOpen}
-        onClose={() => setIsNewSaleOpen(false)}
-        dataService={dataService}
-        currentUser={currentUser}
-        initialCustomerId={saleInitialCustId}
-        onOpenPayment={(cId, type) => openPayment(cId, type)}
-        onViewInvoice={(sale) => openInvoice(sale, 'sale')}
-      />
+      {isNewSaleOpen && (
+        <NewSaleModal
+          isOpen={isNewSaleOpen}
+          onClose={() => setIsNewSaleOpen(false)}
+          dataService={dataService}
+          currentUser={currentUser}
+          initialCustomerId={saleInitialCustId}
+          onOpenPayment={(cId, type) => openPayment(cId, type)}
+          onViewInvoice={(sale) => openInvoice(sale, 'sale')}
+        />
+      )}
 
-      <NewPurchaseModal
-        isOpen={isNewPurchaseOpen}
-        onClose={() => setIsNewPurchaseOpen(false)}
-        dataService={dataService}
-        currentUser={currentUser}
-        initialSupplierId={purInitialSuppId}
-        onOpenPayment={(sId, type) => openPayment(sId, type)}
-        onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
-      />
+      {isNewPurchaseOpen && (
+        <NewPurchaseModal
+          isOpen={isNewPurchaseOpen}
+          onClose={() => setIsNewPurchaseOpen(false)}
+          dataService={dataService}
+          currentUser={currentUser}
+          initialSupplierId={purInitialSuppId}
+          onOpenPayment={(sId, type) => openPayment(sId, type)}
+          onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
+        />
+      )}
 
       <RecordPaymentModal
         isOpen={isPaymentOpen}

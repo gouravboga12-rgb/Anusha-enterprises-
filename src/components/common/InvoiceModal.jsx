@@ -14,6 +14,8 @@ export const InvoiceModal = ({
   onEdit
 }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isEditingVehicle, setIsEditingVehicle] = useState(false);
+  const [newVehicleInput, setNewVehicleInput] = useState('');
 
   const baseDoc = docProp || documentProp;
   if (!baseDoc) return null;
@@ -51,6 +53,20 @@ export const InvoiceModal = ({
   const pendingAmount = doc.pending_amount || 0;
   const paymentStatus = doc.payment_status || (pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending');
 
+  const handleSaveVehicle = () => {
+    try {
+      const v = newVehicleInput.trim();
+      if (isSale) {
+        dataService?.updateSale(doc.id, { vehicle_no: v }, 'Vehicle number updated from invoice view');
+      } else {
+        dataService?.updatePurchase(doc.id, { vehicle_no: v }, 'Vehicle number updated from invoice view');
+      }
+      setIsEditingVehicle(false);
+    } catch (e) {
+      console.error('Failed to update vehicle number:', e);
+    }
+  };
+
   const handleDownloadPdf = async () => {
     if (isExporting) return;
     setIsExporting(true);
@@ -68,6 +84,69 @@ export const InvoiceModal = ({
   };
 
   const handlePrint = () => {
+    const content = document.getElementById('invoice-printable-content');
+    if (!content) {
+      window.print();
+      return;
+    }
+
+    try {
+      const printWindow = window.open('', '_blank', 'width=900,height=800');
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${isSale ? 'Sales Invoice' : 'Purchase Bill'} - ${docNo}</title>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <style>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body {
+                  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                  background: #ffffff;
+                  color: #0f172a;
+                  padding: 24px;
+                  font-size: 12px;
+                  line-height: 1.5;
+                }
+                .no-print { display: none !important; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { padding: 8px 10px; border-bottom: 1px solid #cbd5e1; text-align: left; }
+                th { background-color: #f1f5f9; font-weight: 700; color: #0f172a; border-bottom: 2px solid #0f172a; }
+                .badge { border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 6px; font-size: 11px; display: inline-block; }
+                .badge-paid { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
+                .badge-partial { background: #fffbeb; color: #d97706; border-color: #fde68a; }
+                .badge-pending { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+                @page { size: A4 portrait; margin: 12mm 15mm; }
+                @media print {
+                  body { padding: 0; }
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              </style>
+            </head>
+            <body>
+              ${content.outerHTML}
+              <script>
+                window.onload = function() {
+                  window.focus();
+                  window.print();
+                  setTimeout(function() { window.close(); }, 800);
+                };
+              <\/script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        return;
+      }
+    } catch (e) {
+      console.warn('Popup print blocked or failed, falling back to window.print()', e);
+    }
+
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) backdrop.classList.add('print-active');
     window.print();
   };
 
@@ -225,12 +304,40 @@ export const InvoiceModal = ({
                     <strong>Time:</strong> {doc.time}
                   </div>
                 )}
-                {vehicleNo ? (
+                {isEditingVehicle ? (
+                  <div className="no-print" style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ fontSize: '11.5px', padding: '3px 8px', width: '130px', textTransform: 'uppercase' }}
+                      placeholder="Vehicle No / Clear"
+                      value={newVehicleInput}
+                      onChange={(e) => setNewVehicleInput(e.target.value)}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: '11px', padding: '3px 8px', fontWeight: 700 }}
+                      onClick={handleSaveVehicle}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '11px', padding: '3px 8px' }}
+                      onClick={() => setIsEditingVehicle(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : vehicleNo ? (
                   <div style={{
-                    fontSize: '12.5px',
+                    fontSize: '12px',
                     color: '#0f172a',
                     marginTop: '6px',
-                    background: '#ffffff',
+                    background: '#eff6ff',
                     padding: '3px 10px',
                     borderRadius: '6px',
                     border: '1.5px solid #0f172a',
@@ -241,8 +348,51 @@ export const InvoiceModal = ({
                     boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
                   }}>
                     <span>🚗</span> <span>Vehicle: <strong style={{ textTransform: 'uppercase', letterSpacing: '0.03em' }}>{vehicleNo}</strong></span>
+                    <button
+                      type="button"
+                      className="no-print"
+                      onClick={() => {
+                        setNewVehicleInput(vehicleNo);
+                        setIsEditingVehicle(true);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#0284c7',
+                        marginLeft: '4px',
+                        padding: '1px 3px',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                      }}
+                      title="Edit or Clear Vehicle Number"
+                    >
+                      <Edit size={12} />
+                    </button>
                   </div>
-                ) : null}
+                ) : (
+                  <div className="no-print" style={{ marginTop: '5px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewVehicleInput('');
+                        setIsEditingVehicle(true);
+                      }}
+                      style={{
+                        background: '#f8fafc',
+                        border: '1px dashed #94a3b8',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        color: '#475569',
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        fontWeight: 600
+                      }}
+                    >
+                      + Add Vehicle No
+                    </button>
+                  </div>
+                )}
                 <div style={{ marginTop: '5px' }}>
                   <span className={`badge ${
                     paymentStatus === 'Paid' ? 'badge-paid' : paymentStatus === 'Partially Paid' ? 'badge-partial' : 'badge-pending'

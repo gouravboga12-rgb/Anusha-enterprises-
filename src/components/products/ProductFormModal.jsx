@@ -2,12 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { ImageUploader } from '../common/ImageUploader';
 
+const STANDARD_UNITS = [
+  { value: 'Boxes', label: 'Boxes' },
+  { value: 'Units', label: 'Units / Pieces' },
+  { value: 'Packets', label: 'Packets' },
+  { value: 'Meters', label: 'Meters' },
+  { value: 'Pieces', label: 'Pieces' },
+  { value: 'Kg', label: 'Kilograms (Kg)' },
+  { value: 'Sets', label: 'Sets' },
+  { value: 'Bags', label: 'Bags' },
+  { value: 'Rolls', label: 'Rolls' },
+  { value: 'Litres', label: 'Litres' }
+];
+
 export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 1100 }) => {
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
     current_stock: 0,
-    unit: 'boxes',
+    unit: 'Boxes',
     purchase_price: '',
     selling_price: '',
     min_stock_alert: 20,
@@ -15,16 +28,28 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
     image_url: '',
     description: ''
   });
+  const [isCustomUnit, setIsCustomUnit] = useState(false);
+  const [customUnitText, setCustomUnitText] = useState('');
 
   useEffect(() => {
     if (product) {
       setFormData(product);
+      const isStd = STANDARD_UNITS.some(
+        (u) => u.value.toLowerCase() === (product.unit || '').toLowerCase()
+      );
+      if (product.unit && !isStd) {
+        setIsCustomUnit(true);
+        setCustomUnitText(product.unit);
+      } else {
+        setIsCustomUnit(false);
+        setCustomUnitText('');
+      }
     } else {
       setFormData({
         sku: '',
         name: '',
         current_stock: 0,
-        unit: 'boxes',
+        unit: 'Boxes',
         purchase_price: '',
         selling_price: '',
         min_stock_alert: 20,
@@ -32,6 +57,8 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
         image_url: '',
         description: ''
       });
+      setIsCustomUnit(false);
+      setCustomUnitText('');
     }
   }, [product, isOpen]);
 
@@ -41,9 +68,14 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
       alert('Please enter product name');
       return;
     }
+    const finalUnit = isCustomUnit
+      ? (customUnitText.trim() || 'Units')
+      : (formData.unit || 'Units');
+
     if (onSave) {
       await onSave({
         ...formData,
+        unit: finalUnit,
         current_stock: formData.current_stock !== '' && formData.current_stock !== undefined ? Number(formData.current_stock) : 0,
         min_stock_alert: formData.min_stock_alert !== '' && formData.min_stock_alert !== undefined ? Number(formData.min_stock_alert) : 0,
         purchase_price: formData.purchase_price !== '' && formData.purchase_price !== undefined ? Number(formData.purchase_price) : 0,
@@ -88,14 +120,40 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
             <label className="form-label">Packaging Unit</label>
             <select
               className="form-select"
-              value={formData.unit}
-              onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+              value={isCustomUnit ? 'custom' : (formData.unit || 'Boxes')}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'custom') {
+                  setIsCustomUnit(true);
+                  if (!customUnitText) setCustomUnitText('');
+                } else {
+                  setIsCustomUnit(false);
+                  setFormData({ ...formData, unit: val });
+                }
+              }}
             >
-              <option value="boxes">Boxes</option>
-              <option value="units">Units / Pieces</option>
-              <option value="sets">Sets</option>
-              <option value="packets">Packets</option>
+              {STANDARD_UNITS.map((u) => (
+                <option key={u.value} value={u.value}>{u.label}</option>
+              ))}
+              <option value="custom">+ Custom / Type Unit...</option>
             </select>
+
+            {isCustomUnit && (
+              <div style={{ marginTop: '6px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  style={{ borderColor: '#6366f1', background: '#fdf4ff' }}
+                  placeholder="Type custom unit (e.g. Meters, Rolls, Bags, Bundles)"
+                  value={customUnitText}
+                  onChange={(e) => setCustomUnitText(e.target.value)}
+                  autoFocus
+                />
+                <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>
+                  Enter custom measurement or packaging unit
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -141,7 +141,13 @@ export const PurchasesList = ({
                         fontWeight: 800,
                         color: pur.pending_amount > 0 ? '#d97706' : '#10b981'
                       }}>
-                        {formatCurrency(pur.pending_amount)}
+                        {pur.advance_amount > 0 ? (
+                          <span style={{ color: '#059669', fontSize: '12px' }} title={`₹${pur.advance_amount} excess advance paid`}>
+                            +{formatCurrency(pur.advance_amount)} Adv
+                          </span>
+                        ) : (
+                          formatCurrency(pur.pending_amount)
+                        )}
                       </td>
                       <td>
                         <span className={`badge ${
@@ -275,8 +281,10 @@ export const PurchasesList = ({
                     <span className="val" style={{ color: '#10b981' }}>{formatCurrency(pur.paid_amount)}</span>
                   </div>
                   <div className="amount-col">
-                    <span className="label">Balance Due</span>
-                    <span className="val" style={{ color: isDue ? '#d97706' : '#10b981' }}>{formatCurrency(pur.pending_amount)}</span>
+                    <span className="label">{pur.advance_amount > 0 ? 'Advance Paid' : 'Balance Due'}</span>
+                    <span className="val" style={{ color: isDue ? '#d97706' : '#10b981' }}>
+                      {pur.advance_amount > 0 ? `+${formatCurrency(pur.advance_amount)} Adv` : formatCurrency(pur.pending_amount)}
+                    </span>
                   </div>
                 </div>
 

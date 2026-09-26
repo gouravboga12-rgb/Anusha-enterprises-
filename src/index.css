@@ -1836,8 +1836,42 @@ h1, h2, h3, h4, h5, h6 {
   .btn,
   button,
   .footer,
-  .login-page-container,
-  .modal-backdrop:not(.print-active) {
+  .login-page-container {
+    display: none !important;
+  }
+
+  /* Hide regular modals during print, but fully show and unclip invoice modals */
+  .modal-backdrop:not(:has(#invoice-printable-content)):not(.print-active) {
+    display: none !important;
+  }
+
+  .modal-backdrop:has(#invoice-printable-content),
+  .modal-backdrop.print-active {
+    display: block !important;
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    z-index: auto !important;
+  }
+
+  .modal-backdrop:has(#invoice-printable-content) .modal-container,
+  .modal-backdrop.print-active .modal-container {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  .modal-backdrop:has(#invoice-printable-content) .modal-header,
+  .modal-backdrop:has(#invoice-printable-content) .modal-footer,
+  .modal-backdrop.print-active .modal-header,
+  .modal-backdrop.print-active .modal-footer {
     display: none !important;
   }
 

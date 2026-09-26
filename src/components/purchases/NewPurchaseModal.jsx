@@ -5,6 +5,8 @@ import { formatCurrency, getTodayDateString, getCurrentTimeString } from '../../
 import { SupplierFormModal } from '../suppliers/SupplierFormModal';
 import { ProductFormModal } from '../products/ProductFormModal';
 
+const STANDARD_PUR_UNITS = ['Units', 'Boxes', 'Packets', 'Meters', 'Pieces', 'Kg', 'Sets', 'Bags', 'Rolls', 'Litres'];
+
 export const NewPurchaseModal = ({
   isOpen,
   onClose,
@@ -209,6 +211,11 @@ export const NewPurchaseModal = ({
       }, currentUser);
 
       if (onPurchaseCreated) onPurchaseCreated(pur);
+      setVehicleNo('');
+      setNotes('');
+      setInitialPayment('');
+      setReferenceNo('');
+      setError('');
       onClose();
 
       if (generateInvoice && onViewInvoice) {
@@ -219,15 +226,24 @@ export const NewPurchaseModal = ({
     }
   };
 
+  const handleClose = () => {
+    setVehicleNo('');
+    setNotes('');
+    setInitialPayment('');
+    setReferenceNo('');
+    setError('');
+    onClose();
+  };
+
   return (
     <>
       <Modal
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={handleClose}
         title="Record Supplier Inward Purchase (Stock In)"
         maxWidth="840px"
       >
-        <form onSubmit={(e) => handleSubmit(e, false)}>
+        <form onSubmit={(e) => handleSubmit(e, false)} autoComplete="off">
           {error && (
             <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
               {error}
@@ -467,7 +483,8 @@ export const NewPurchaseModal = ({
                 <tbody>
                   {items.map((item, idx) => {
                     const lineTotal = (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0);
-                    const isCustomUnit = !['Units', 'Boxes', 'Packets', 'Meters', 'Pieces', 'Kg'].includes(item.unit);
+                    const matchedStd = STANDARD_PUR_UNITS.find((u) => u.toLowerCase() === (item.unit || '').trim().toLowerCase());
+                    const isCustomUnit = !matchedStd;
 
                     return (
                       <tr key={idx}>
@@ -553,22 +570,19 @@ export const NewPurchaseModal = ({
                             <select
                               className="form-select"
                               style={{ flex: 1, minWidth: '85px', fontSize: '12px', padding: '6px 4px' }}
-                              value={isCustomUnit ? 'Custom' : item.unit}
+                              value={isCustomUnit ? 'Custom' : (matchedStd || 'Units')}
                               onChange={(e) => {
                                 const val = e.target.value;
                                 if (val === 'Custom') {
-                                  handleItemChange(idx, 'unit', '');
+                                  handleItemChange(idx, 'unit', !matchedStd ? item.unit : '');
                                 } else {
                                   handleItemChange(idx, 'unit', val);
                                 }
                               }}
                             >
-                              <option value="Units">Units</option>
-                              <option value="Boxes">Boxes</option>
-                              <option value="Packets">Packets</option>
-                              <option value="Meters">Meters</option>
-                              <option value="Pieces">Pieces</option>
-                              <option value="Kg">Kg</option>
+                              {STANDARD_PUR_UNITS.map((u) => (
+                                <option key={u} value={u}>{u}</option>
+                              ))}
                               <option value="Custom">Custom...</option>
                             </select>
                           </div>
@@ -576,7 +590,7 @@ export const NewPurchaseModal = ({
                             <input
                               type="text"
                               className="form-input"
-                              style={{ fontSize: '11px', marginTop: '4px', padding: '3px 6px' }}
+                              style={{ fontSize: '11px', marginTop: '4px', padding: '3px 6px', borderColor: '#0284c7' }}
                               placeholder="Type unit (e.g. Rolls, Bags)"
                               value={item.unit || ''}
                               onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
@@ -619,7 +633,8 @@ export const NewPurchaseModal = ({
             <div className="mobile-cards-view" style={{ flexDirection: 'column', gap: '10px' }}>
               {items.map((item, idx) => {
                 const lineTotal = (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0);
-                const isCustomUnit = !['Units', 'Boxes', 'Packets', 'Meters', 'Pieces', 'Kg'].includes(item.unit);
+                const matchedStd = STANDARD_PUR_UNITS.find((u) => u.toLowerCase() === (item.unit || '').trim().toLowerCase());
+                const isCustomUnit = !matchedStd;
 
                 return (
                   <div key={idx} style={{
@@ -735,22 +750,19 @@ export const NewPurchaseModal = ({
                           <select
                             className="form-select"
                             style={{ flex: 1, fontSize: '11.5px', padding: '4px' }}
-                            value={isCustomUnit ? 'Custom' : item.unit}
+                            value={isCustomUnit ? 'Custom' : (matchedStd || 'Units')}
                             onChange={(e) => {
                               const val = e.target.value;
                               if (val === 'Custom') {
-                                handleItemChange(idx, 'unit', '');
+                                handleItemChange(idx, 'unit', !matchedStd ? item.unit : '');
                               } else {
                                 handleItemChange(idx, 'unit', val);
                               }
                             }}
                           >
-                            <option value="Units">Units</option>
-                            <option value="Boxes">Boxes</option>
-                            <option value="Packets">Packets</option>
-                            <option value="Meters">Meters</option>
-                            <option value="Pieces">Pieces</option>
-                            <option value="Kg">Kg</option>
+                            {STANDARD_PUR_UNITS.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
                             <option value="Custom">Custom...</option>
                           </select>
                         </div>
@@ -758,7 +770,7 @@ export const NewPurchaseModal = ({
                           <input
                             type="text"
                             className="form-input"
-                            style={{ fontSize: '11px', marginTop: '4px', padding: '3px 6px' }}
+                            style={{ fontSize: '11px', marginTop: '4px', padding: '3px 6px', borderColor: '#0284c7' }}
                             placeholder="Type unit (e.g. Rolls)"
                             value={item.unit || ''}
                             onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
@@ -921,6 +933,8 @@ export const NewPurchaseModal = ({
               <input
                 type="text"
                 className="form-input"
+                name="new_purchase_vehicle_no"
+                autoComplete="off"
                 placeholder="e.g. TS 08 AB 1234 / Auto / Lorry"
                 value={vehicleNo}
                 onChange={(e) => setVehicleNo(e.target.value)}
@@ -931,6 +945,8 @@ export const NewPurchaseModal = ({
               <input
                 type="text"
                 className="form-input"
+                name="new_purchase_notes"
+                autoComplete="off"
                 placeholder="e.g. Received via VRL Logistics, LR #5541"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -939,7 +955,7 @@ export const NewPurchaseModal = ({
           </div>
 
           <div className="modal-footer" style={{ margin: '16px -24px -24px', padding: '16px 24px', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <button type="button" className="btn btn-secondary" onClick={handleClose}>
               Cancel
             </button>
             <button

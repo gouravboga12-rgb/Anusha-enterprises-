@@ -146,7 +146,13 @@ export const SalesList = ({
                         fontWeight: 800,
                         color: sale.pending_amount > 0 ? '#e11d48' : '#10b981'
                       }}>
-                        {formatCurrency(sale.pending_amount)}
+                        {sale.advance_amount > 0 ? (
+                          <span style={{ color: '#059669', fontSize: '12px' }} title={`₹${sale.advance_amount} surplus advance credit`}>
+                            +{formatCurrency(sale.advance_amount)} Adv
+                          </span>
+                        ) : (
+                          formatCurrency(sale.pending_amount)
+                        )}
                       </td>
                       <td>
                         <span className={`badge ${
@@ -256,14 +262,14 @@ export const SalesList = ({
 
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <span style={{ fontSize: '10px', color: isDue ? '#be123c' : '#047857', fontWeight: 700, textTransform: 'uppercase' }}>
-                      {isDue ? 'Balance Due' : 'Paid in Full'}
+                      {isDue ? 'Balance Due' : (sale.advance_amount > 0 ? 'Advance Credit' : 'Paid in Full')}
                     </span>
                     <div style={{
                       fontSize: '17px',
                       fontWeight: 800,
                       color: isDue ? '#e11d48' : '#10b981'
                     }}>
-                      {formatCurrency(sale.pending_amount)}
+                      {sale.advance_amount > 0 ? `+${formatCurrency(sale.advance_amount)} Adv` : formatCurrency(sale.pending_amount)}
                     </div>
                     <div style={{ fontSize: '11px', color: '#64748b' }}>
                       Total: {formatCurrency(sale.total_amount)}
