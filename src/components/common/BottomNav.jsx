@@ -1,14 +1,18 @@
 import React from 'react';
-import { LayoutDashboard, Users, ShoppingCart, Truck, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, Truck, Boxes, CalendarCheck } from 'lucide-react';
+import { getTodayDateString } from '../../utils/formatters';
 
-export const BottomNav = ({ activeTab, onSelectTab, onToggleSidebar }) => {
+export const BottomNav = ({ activeTab, onSelectTab, onToggleSidebar, dataService }) => {
+  const dayBook = dataService?.getDayBook ? dataService.getDayBook(getTodayDateString()) : { events: [] };
+  const todayEventCount = dayBook?.events?.length || 0;
+
   return (
     <nav className="mobile-bottom-nav">
       <button
         className={`bottom-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
         onClick={() => onSelectTab('dashboard')}
       >
-        <LayoutDashboard size={19} />
+        <LayoutDashboard size={20} />
         <span>Home</span>
       </button>
 
@@ -16,34 +20,39 @@ export const BottomNav = ({ activeTab, onSelectTab, onToggleSidebar }) => {
         className={`bottom-nav-item ${activeTab === 'customers' ? 'active' : ''}`}
         onClick={() => onSelectTab('customers')}
       >
-        <Users size={19} />
+        <Users size={20} />
         <span>Customers</span>
-      </button>
-
-      <button
-        className={`bottom-nav-item ${activeTab === 'sales' ? 'active' : ''}`}
-        onClick={() => onSelectTab('sales')}
-      >
-        <ShoppingCart size={19} />
-        <span>Sales & Bills</span>
       </button>
 
       <button
         className={`bottom-nav-item ${activeTab === 'suppliers' ? 'active' : ''}`}
         onClick={() => onSelectTab('suppliers')}
       >
-        <Truck size={19} />
+        <Truck size={20} />
         <span>Suppliers</span>
       </button>
 
       <button
-        className="bottom-nav-item"
-        onClick={onToggleSidebar}
-        title="Open all modules menu"
+        className={`bottom-nav-item ${activeTab === 'products' ? 'active' : ''}`}
+        onClick={() => onSelectTab('products')}
       >
-        <Menu size={19} />
-        <span>More Menu</span>
+        <Boxes size={20} />
+        <span>Products</span>
+      </button>
+
+      <button
+        className={`bottom-nav-item ${activeTab === 'daybook' ? 'active' : ''}`}
+        onClick={() => onSelectTab('daybook')}
+      >
+        <div style={{ position: 'relative' }}>
+          <CalendarCheck size={20} />
+          {todayEventCount > 0 && (
+            <span className="bottom-nav-badge">{todayEventCount}</span>
+          )}
+        </div>
+        <span>Day Book</span>
       </button>
     </nav>
   );
 };
+
