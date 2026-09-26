@@ -449,6 +449,7 @@ export const App = () => {
                 setActiveTab('suppliers');
               }}
               onViewPurchaseDetails={(pur) => openPurchaseDetails(pur)}
+              onEditPurchase={(pur) => openEditPurchase(pur)}
               onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
             />
           )}

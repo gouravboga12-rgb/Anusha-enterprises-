@@ -138,11 +138,6 @@ export const EditSaleModal = ({
       }
     }
 
-    if (!reason.trim()) {
-      setError('Please provide a mandatory reason for this sale invoice correction (required for audit trail)');
-      return;
-    }
-
     try {
       const updated = dataService.updateSale(sale.id, {
         customer_id: customerId,
@@ -151,7 +146,7 @@ export const EditSaleModal = ({
         time,
         vehicle_no: vehicleNo,
         notes
-      }, reason.trim(), currentUser);
+      }, reason.trim() || 'Sale details updated', currentUser);
 
       if (onSaleUpdated) onSaleUpdated(updated);
       onClose();
@@ -394,17 +389,15 @@ export const EditSaleModal = ({
 
         {/* Reason for Correction */}
         <div className="form-group" style={{ marginBottom: '16px' }}>
-          <label className="form-label" style={{ fontWeight: 700, color: '#b45309', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <ShieldAlert size={14} /> Reason for Correction * (Mandatory for Audit Trail)
+          <label className="form-label" style={{ fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ShieldAlert size={14} /> Reason for Correction (Optional)
           </label>
           <input
             type="text"
             className="form-input"
-            required
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="e.g. Corrected quantity billed / customer return..."
-            style={{ borderColor: '#fde68a', backgroundColor: '#fffbeb' }}
           />
         </div>
 

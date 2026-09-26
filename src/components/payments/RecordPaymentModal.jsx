@@ -628,11 +628,11 @@ export const RecordPaymentModal = ({
           </span>
         </div>
 
-        <div className="modal-footer" style={{ margin: '16px -24px -24px', padding: '16px 24px' }}>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>
+        <div className="modal-footer" style={{ margin: '16px -24px -24px', padding: '16px 24px', display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose} style={{ flex: '1 1 auto', minWidth: '100px' }}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', fontWeight: 700 }}>
+          <button type="submit" className="btn btn-primary" style={{ flex: '2 1 auto', padding: '10px 16px', fontWeight: 700, minWidth: '180px' }}>
             <Receipt size={16} /> Save & Record Payment Voucher
           </button>
         </div>

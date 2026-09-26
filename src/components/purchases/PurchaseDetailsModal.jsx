@@ -104,6 +104,11 @@ export const PurchaseDetailsModal = ({
                 Mobile: {supplier.mobile} {supplier.area ? `• Hub: ${supplier.area}` : ''}
               </div>
             )}
+            {purchase?.vehicle_no && (
+              <div style={{ fontSize: '12px', color: '#0284c7', fontWeight: 600, marginTop: '2px' }}>
+                🚗 Vehicle / Inward Transport: {purchase.vehicle_no}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

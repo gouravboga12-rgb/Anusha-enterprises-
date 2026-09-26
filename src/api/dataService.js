@@ -2002,6 +2002,7 @@ class DataService {
       advance_amount: advanceAmount,
       payment_status: paymentStatus,
       notes: purData.notes || '',
+      vehicle_no: purData.vehicle_no || purData.vehicleNo || '',
       recorded_by: currentUser?.name || 'Admin',
       godown_id: godownId,
       created_at: new Date().toISOString()
@@ -2055,7 +2056,7 @@ class DataService {
       id: newPur.id, purchase_no: newPur.purchase_no, supplier_id: newPur.supplier_id,
       date: newPur.date, time: newPur.time, total_amount: newPur.total_amount,
       paid_amount: newPur.paid_amount, pending_amount: newPur.pending_amount,
-      payment_status: newPur.payment_status, notes: newPur.notes, recorded_by: newPur.recorded_by,
+      payment_status: newPur.payment_status, notes: newPur.notes, vehicle_no: newPur.vehicle_no, recorded_by: newPur.recorded_by,
       godown_id: newPur.godown_id
     }]).then(() => {
       supabase.from('supplier_purchase_items').insert(
@@ -2078,7 +2079,9 @@ class DataService {
     return newPur;
   }
 
-  updatePurchase(purId, updatedData, currentUser, reason) {
+  updatePurchase(purId, updatedData, p3, p4) {
+    const currentUser = (p3 && typeof p3 === 'object' && p3.name) ? p3 : (p4 && typeof p4 === 'object' && p4.name) ? p4 : null;
+    const reason = typeof p3 === 'string' ? p3 : typeof p4 === 'string' ? p4 : '';
     const existingPur = this.getPurchaseById(purId);
     if (!existingPur) throw new Error('Purchase record not found');
 
@@ -2103,8 +2106,11 @@ class DataService {
     if (updatedData.date && updatedData.date !== existingPur.date) {
       changes.push({ field: 'date', oldValue: existingPur.date, newValue: updatedData.date });
     }
+    if (updatedData.vehicle_no !== undefined && updatedData.vehicle_no !== existingPur.vehicle_no) {
+      changes.push({ field: 'vehicle_no', oldValue: existingPur.vehicle_no || 'None', newValue: updatedData.vehicle_no || 'None' });
+    }
     if (changes.length > 0) {
-      this.recordAuditEntry('supplier_purchases', purId, existingPur.purchase_no, changes, reason, currentUser?.name || 'Admin');
+      this.recordAuditEntry('supplier_purchases', purId, existingPur.purchase_no, changes, reason || 'Purchase details updated', currentUser?.name || 'Admin');
     }
 
     const cleanItems = newItems.map((i, idx) => {
@@ -2169,6 +2175,7 @@ class DataService {
 
     const updatedPur = {
       ...existingPur, ...updatedData, items: cleanItems, godown_id: newGodownId,
+      vehicle_no: updatedData.vehicle_no !== undefined ? updatedData.vehicle_no : (existingPur.vehicle_no || ''),
       total_amount: totalAmount, paid_amount: paidAmount,
       pending_amount: pendingAmount, payment_status: paymentStatus,
       updated_at: new Date().toISOString()
@@ -2176,14 +2183,14 @@ class DataService {
 
     this.purchases = this.purchases.map((p) => (p.id === purId ? updatedPur : p));
     this.logActivity(currentUser, 'UPDATE', 'Purchases', purId, existingPur.purchase_no,
-      `Corrected purchase ${existingPur.purchase_no}. Reason: ${reason || 'N/A'}`
+      `Corrected purchase ${existingPur.purchase_no}. Reason: ${reason || 'Updated'}${updatedPur.vehicle_no ? ` (Vehicle: ${updatedPur.vehicle_no})` : ''}`
     );
     this.notify();
 
     supabase.from('supplier_purchases').update({
       total_amount: totalAmount, paid_amount: paidAmount, pending_amount: pendingAmount,
       payment_status: paymentStatus, date: updatedPur.date, time: updatedPur.time,
-      notes: updatedPur.notes, godown_id: newGodownId
+      notes: updatedPur.notes, vehicle_no: updatedPur.vehicle_no, godown_id: newGodownId
     }).eq('id', purId).then(async () => {
       await supabase.from('supplier_purchase_items').delete().eq('purchase_id', purId);
       await supabase.from('supplier_purchase_items').insert(

@@ -480,8 +480,30 @@ export const InvoiceModal = ({
         </div>
       </div>
 
-        {/* Modal Bottom Close */}
-        <div className="modal-footer" style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+        {/* Modal Bottom Close & Edit */}
+        <div className="modal-footer no-print" style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          {onEdit && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                onClose();
+                onEdit(doc, type);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#fef3c7',
+                color: '#b45309',
+                border: '1px solid #fde68a',
+                fontWeight: 600,
+              }}
+            >
+              <Edit size={15} />
+              <span>Edit {isSale ? 'Sale Bill' : 'Purchase Bill'}</span>
+            </button>
+          )}
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             Close
           </button>

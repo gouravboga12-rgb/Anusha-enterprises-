@@ -1325,8 +1325,26 @@ h1, h2, h3, h4, h5, h6 {
     padding: 18px;
   }
 
+  .modal-body .modal-footer {
+    padding: 14px 18px !important;
+    margin-left: -18px !important;
+    margin-right: -18px !important;
+    margin-bottom: -18px !important;
+    width: auto !important;
+    box-sizing: border-box !important;
+  }
+
   .modal-footer {
     padding: 12px 18px;
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+  }
+
+  .modal-footer > .btn,
+  .modal-footer > button {
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: center !important;
   }
 
   /* Stack form inputs vertically on phones */

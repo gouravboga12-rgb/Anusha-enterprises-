@@ -21,6 +21,7 @@ export const EditPurchaseModal = ({
   const [godownId, setGodownId] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [vehicleNo, setVehicleNo] = useState('');
   const [items, setItems] = useState([]);
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [reason, setReason] = useState('');
@@ -34,6 +35,7 @@ export const EditPurchaseModal = ({
       setGodownId(purchase.godown_id || godowns[0]?.id || '');
       setDate(purchase.date || '');
       setTime(purchase.time || '');
+      setVehicleNo(purchase.vehicle_no || '');
       setItems(
         purchase.items.map((i) => ({
           product_id: i.product_id,
@@ -137,9 +139,16 @@ export const EditPurchaseModal = ({
       }
     }
 
-    if (!reason.trim()) {
-      setError('Please provide a mandatory reason for this purchase correction (required for audit trail)');
-      return;
+    for (const item of items) {
+      if (!item.product_id) {
+        setError('Please select a product for all line items');
+        return;
+      }
+      const reqQty = Number(item.quantity) || 0;
+      if (reqQty <= 0) {
+        setError('Quantity must be greater than 0');
+        return;
+      }
     }
 
     try {
@@ -149,8 +158,9 @@ export const EditPurchaseModal = ({
         items,
         date,
         time,
+        vehicle_no: vehicleNo,
         notes
-      }, reason.trim(), currentUser);
+      }, reason.trim() || 'Purchase details updated', currentUser);
 
       if (onPurchaseUpdated) onPurchaseUpdated(updated);
       onClose();
@@ -317,6 +327,7 @@ export const EditPurchaseModal = ({
                           value={item.product_id}
                           onChange={(e) => handleProductChange(idx, e.target.value)}
                         >
+                          <option value="">-- Select Product --</option>
                           {(() => {
                             const mapped = supplierId ? (dataService.getSupplierProducts(supplierId) || []) : [];
                             const hasMapped = mapped.length > 0;
@@ -489,29 +500,40 @@ export const EditPurchaseModal = ({
           </div>
         </div>
 
+        <div className="form-row" style={{ marginBottom: '16px' }}>
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label" style={{ fontWeight: 600 }}>Vehicle Number / Transport (Optional)</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. TS 08 AB 1234 / Auto / Lorry"
+              value={vehicleNo}
+              onChange={(e) => setVehicleNo(e.target.value)}
+            />
+          </div>
+          <div className="form-group" style={{ flex: 2 }}>
+            <label className="form-label" style={{ fontWeight: 600 }}>Notes / Remarks (Optional)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Revised invoice from vendor..."
+            />
+          </div>
+        </div>
+
         <div className="form-group" style={{ marginBottom: '16px' }}>
-          <label className="form-label" style={{ fontWeight: 700, color: '#b45309', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <ShieldAlert size={14} /> Reason for Correction * (Mandatory for Audit Trail)
+          <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b' }}>
+            <ShieldAlert size={13} color="#94a3b8" /> Reason for Correction (Optional)
           </label>
           <input
             type="text"
             className="form-input"
-            required
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. Corrected supplier invoice quantity / price mismatch..."
-            style={{ borderColor: '#fde68a', backgroundColor: '#fffbeb' }}
-          />
-        </div>
-
-        <div className="form-group" style={{ marginBottom: '20px' }}>
-          <label className="form-label">Notes / Remarks</label>
-          <input
-            type="text"
-            className="form-input"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Revised invoice from vendor..."
+            placeholder="e.g. Corrected vehicle number / quantity (optional)"
+            style={{ fontSize: '13px' }}
           />
         </div>
 

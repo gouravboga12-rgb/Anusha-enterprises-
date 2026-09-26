@@ -49,13 +49,14 @@ export const NewPurchaseModal = ({
   const [godownId, setGodownId] = useState(godowns[0]?.id || '');
   const [date, setDate] = useState(getTodayDateString());
   const [time, setTime] = useState(getCurrentTimeString());
+  const [vehicleNo, setVehicleNo] = useState('');
   const [items, setItems] = useState([
     {
-      product_id: products[0]?.id || '',
+      product_id: '',
       godown_id: godowns[0]?.id || '',
       quantity: 10,
-      unit: products[0]?.unit || 'Units',
-      purchase_price: products[0]?.purchase_price || 0
+      unit: 'Units',
+      purchase_price: 0
     }
   ]);
   const [initialPayment, setInitialPayment] = useState('');
@@ -66,14 +67,6 @@ export const NewPurchaseModal = ({
   const [isQuickSupplierOpen, setIsQuickSupplierOpen] = useState(false);
   const [isQuickProductOpen, setIsQuickProductOpen] = useState(false);
 
-  // Suppliers mapped to currently selected products
-  const selectedProductIds = items.map((i) => i.product_id).filter(Boolean);
-  const suggestedSupplierIds = new Set();
-  selectedProductIds.forEach((pid) => {
-    const supps = dataService.getProductSuppliers(pid);
-    supps.forEach((s) => suggestedSupplierIds.add(s.id));
-  });
-
   const handleSupplierChange = (newSupplierId) => {
     setSupplierId(newSupplierId);
     setShowAllProducts(false);
@@ -83,17 +76,13 @@ export const NewPurchaseModal = ({
     if (mapped.length > 0) {
       const mappedIds = new Set(mapped.map((m) => m.id));
       setItems((prevItems) => {
-        const needsUpdate = prevItems.some((item) => !mappedIds.has(item.product_id));
-        if (!needsUpdate) return prevItems;
-
-        const firstMapped = mapped[0];
         return prevItems.map((item) => {
-          if (mappedIds.has(item.product_id)) return item;
+          if (!item.product_id || mappedIds.has(item.product_id)) return item;
           return {
             ...item,
-            product_id: firstMapped.id,
-            unit: firstMapped.unit || 'Units',
-            purchase_price: firstMapped.purchase_price || 0
+            product_id: '',
+            unit: 'Units',
+            purchase_price: 0
           };
         });
       });
@@ -108,18 +97,16 @@ export const NewPurchaseModal = ({
       setGodownId(godowns[0]?.id || '');
       setDate(getTodayDateString());
       setTime(getCurrentTimeString());
-      const availableProds = getSupplierFilteredProducts(sid, false);
-      setItems(
-        availableProds.length > 0
-          ? [{
-              product_id: availableProds[0].id,
-              godown_id: godowns[0]?.id || '',
-              quantity: 10,
-              unit: availableProds[0].unit || 'Units',
-              purchase_price: availableProds[0].purchase_price || 0
-            }]
-          : []
-      );
+      setVehicleNo('');
+      setItems([
+        {
+          product_id: '',
+          godown_id: godowns[0]?.id || '',
+          quantity: 10,
+          unit: 'Units',
+          purchase_price: 0
+        }
+      ]);
       setInitialPayment('');
       setPaymentMode('Bank Transfer');
       setReferenceNo('');
@@ -134,8 +121,8 @@ export const NewPurchaseModal = ({
     updated[index] = {
       ...updated[index],
       product_id: prodId,
-      unit: updated[index].unit || prod?.unit || 'Units',
-      purchase_price: prod ? prod.purchase_price : 0
+      unit: prod?.unit || updated[index].unit || 'Units',
+      purchase_price: prod ? (prod.purchase_price || 0) : 0
     };
     setItems(updated);
   };
@@ -147,17 +134,14 @@ export const NewPurchaseModal = ({
   };
 
   const addItemRow = () => {
-    const availableProds = getSupplierFilteredProducts(supplierId, showAllProducts);
-    if (availableProds.length === 0) return;
-    const defProd = availableProds[0];
     setItems([
       ...items,
       {
-        product_id: defProd.id,
+        product_id: '',
         godown_id: godownId || godowns[0]?.id || '',
         quantity: 10,
-        unit: defProd.unit || 'Units',
-        purchase_price: defProd.purchase_price || 0
+        unit: 'Units',
+        purchase_price: 0
       }
     ]);
   };
@@ -199,6 +183,10 @@ export const NewPurchaseModal = ({
     }
 
     for (const item of items) {
+      if (!item.product_id) {
+        setError('Please select a product for all line items');
+        return;
+      }
       const reqQty = Number(item.quantity) || 0;
       if (reqQty <= 0) {
         setError('Quantity must be greater than 0');
@@ -213,6 +201,7 @@ export const NewPurchaseModal = ({
         items,
         date,
         time,
+        vehicle_no: vehicleNo,
         initial_payment: initialPayment,
         payment_mode: paymentMode,
         reference_no: referenceNo,
@@ -251,11 +240,6 @@ export const NewPurchaseModal = ({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>Select Supplier *</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {suggestedSupplierIds.size > 0 && (
-                    <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Sparkles size={12} /> {suggestedSupplierIds.size} mapped
-                    </span>
-                  )}
                   <button
                     type="button"
                     className="btn btn-sm btn-secondary"
@@ -293,22 +277,11 @@ export const NewPurchaseModal = ({
                 <option value="__CREATE_NEW__" style={{ fontWeight: 700, color: '#0284c7', background: '#f0f9ff' }}>
                   ➕ + Add New Supplier...
                 </option>
-                {suggestedSupplierIds.size > 0 && (
-                  <optgroup label="✨ Mapped Suppliers (Supplies Selected Product)">
-                    {suppliers.filter((s) => suggestedSupplierIds.has(s.id)).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        ★ {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                <optgroup label={suggestedSupplierIds.size > 0 ? "All Other Suppliers" : "All Suppliers"}>
-                  {suppliers.filter((s) => !suggestedSupplierIds.has(s.id)).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.company_name} ({s.supplier_id}) - {s.area || 'Hub'}
-                    </option>
-                  ))}
-                </optgroup>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.company_name} {s.supplier_id ? `(${s.supplier_id})` : ''} {s.area ? `- ${s.area}` : ''}
+                  </option>
+                ))}
               </select>
               {previousPayable > 0 && (
                 <div style={{ marginTop: '5px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
@@ -504,6 +477,7 @@ export const NewPurchaseModal = ({
                             value={item.product_id}
                             onChange={(e) => handleProductChange(idx, e.target.value)}
                           >
+                            <option value="">-- Select Product --</option>
                             {(() => {
                               const mapped = supplierId ? (dataService.getSupplierProducts(supplierId) || []) : [];
                               const hasMapped = mapped.length > 0;
@@ -678,6 +652,7 @@ export const NewPurchaseModal = ({
                         onChange={(e) => handleProductChange(idx, e.target.value)}
                         style={{ width: '100%', fontSize: '12px' }}
                       >
+                        <option value="">-- Select Product --</option>
                         {(() => {
                           const mapped = supplierId ? (dataService.getSupplierProducts(supplierId) || []) : [];
                           const hasMapped = mapped.length > 0;
@@ -940,15 +915,27 @@ export const NewPurchaseModal = ({
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '16px' }}>
-            <label className="form-label">Notes / Transport Lorry Receipt #</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="e.g. Received via VRL Logistics, LR #5541"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+          <div className="form-row" style={{ marginBottom: '16px' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>Vehicle Number / Transport (Optional)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. TS 08 AB 1234 / Auto / Lorry"
+                value={vehicleNo}
+                onChange={(e) => setVehicleNo(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ flex: 2 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>Notes / Transport Lorry Receipt #</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. Received via VRL Logistics, LR #5541"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="modal-footer" style={{ margin: '16px -24px -24px', padding: '16px 24px', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>

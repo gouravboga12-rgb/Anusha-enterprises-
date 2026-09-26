@@ -105,6 +105,11 @@ export const BillDetailsModal = ({
                 Mobile: {customer.mobile} {customer.area ? `• Area: ${customer.area}` : ''}
               </div>
             )}
+            {sale?.vehicle_no && (
+              <div style={{ fontSize: '12px', color: '#0284c7', fontWeight: 600, marginTop: '2px' }}>
+                🚗 Vehicle: {sale.vehicle_no}
+              </div>
+            )}
           </div>
 
           {/* Dedicated Action Buttons */}
