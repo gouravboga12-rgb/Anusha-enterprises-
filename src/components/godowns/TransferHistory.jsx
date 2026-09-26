@@ -124,6 +124,11 @@ Total Transfers: ${transfers.length}
                         <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', padding: '2px 8px', borderRadius: '4px' }}>
                           {t.transfer_no}
                         </span>
+                        {t.vehicle_no && (
+                          <div style={{ fontSize: '11px', color: '#0f172a', fontWeight: 700, background: '#f8fafc', padding: '2px 6px', borderRadius: '4px', border: '1px solid #0f172a', display: 'inline-block', marginTop: '3px' }}>
+                            🚗 {t.vehicle_no}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '12px 14px', fontSize: '12px', color: '#64748b' }}>
                         <div>{formatDate(t.date)}</div>

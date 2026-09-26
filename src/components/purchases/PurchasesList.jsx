@@ -73,8 +73,8 @@ export const PurchasesList = ({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card">
+      {/* Table (Desktop) */}
+      <div className="card desktop-table-view">
         <div className="table-responsive">
           <table className="data-table">
             <thead>
@@ -104,7 +104,12 @@ export const PurchasesList = ({
                   return (
                     <tr key={pur.id}>
                       <td style={{ fontWeight: 700, color: '#0284c7', fontSize: '13px' }}>
-                        {pur.purchase_no}
+                        <div>{pur.purchase_no}</div>
+                        {pur.vehicle_no && (
+                          <div style={{ fontSize: '10px', color: '#0f172a', fontWeight: 700, background: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', marginTop: '2px', display: 'inline-block' }}>
+                            🚗 {pur.vehicle_no}
+                          </div>
+                        )}
                       </td>
                       <td style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>
                         <div style={{ fontWeight: 600 }}>{formatDate(pur.date)}</div>
@@ -201,6 +206,126 @@ export const PurchasesList = ({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile & Tablet Card View */}
+      <div className="mobile-cards-view">
+        {filteredPurchases.length === 0 ? (
+          <div className="card" style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
+            No supplier purchases found matching your query.
+          </div>
+        ) : (
+          filteredPurchases.map((pur) => {
+            const supp = dataService.getSupplierById(pur.supplier_id);
+            const isDue = pur.pending_amount > 0;
+
+            return (
+              <div key={pur.id} className="mobile-record-card">
+                <div className="card-top-row">
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, color: '#0284c7', fontSize: '14px' }}>
+                        {pur.purchase_no}
+                      </span>
+                      <span className={`badge ${
+                        pur.payment_status === 'Paid' ? 'badge-paid' :
+                        pur.payment_status === 'Partially Paid' ? 'badge-partial' : 'badge-pending'
+                      }`} style={{ fontSize: '10px' }}>
+                        {pur.payment_status}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginTop: '3px' }}>
+                      {supp ? supp.company_name : 'Unknown Supplier'}
+                    </div>
+                    {pur.vehicle_no && (
+                      <div style={{ fontSize: '11px', color: '#0f172a', fontWeight: 700, background: '#f8fafc', padding: '1px 6px', borderRadius: '4px', border: '1px solid #0f172a', display: 'inline-block', marginTop: '3px' }}>
+                        🚗 {pur.vehicle_no}
+                      </div>
+                    )}
+                    {pur.notes && (
+                      <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', marginTop: '2px' }}>
+                        Note: {pur.notes}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>{formatDate(pur.date)}</div>
+                    <div style={{ fontSize: '10px', color: '#94a3b8' }}>{pur.time}</div>
+                  </div>
+                </div>
+
+                {/* Items summary */}
+                <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', margin: '8px 0', fontSize: '12px' }}>
+                  <div style={{ fontWeight: 600, color: '#475569', marginBottom: '3px', fontSize: '11px', textTransform: 'uppercase' }}>Items Received:</div>
+                  {pur.items.map((i, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: '#334155', marginTop: '2px' }}>
+                      <span>{i.product_name}</span>
+                      <span style={{ fontWeight: 600 }}>{i.quantity} {i.unit || 'Units'} × {formatCurrency(i.purchase_price)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="card-amounts-grid">
+                  <div className="amount-col">
+                    <span className="label">Total Billed</span>
+                    <span className="val" style={{ color: '#0f172a' }}>{formatCurrency(pur.total_amount)}</span>
+                  </div>
+                  <div className="amount-col">
+                    <span className="label">Paid</span>
+                    <span className="val" style={{ color: '#10b981' }}>{formatCurrency(pur.paid_amount)}</span>
+                  </div>
+                  <div className="amount-col">
+                    <span className="label">Balance Due</span>
+                    <span className="val" style={{ color: isDue ? '#d97706' : '#10b981' }}>{formatCurrency(pur.pending_amount)}</span>
+                  </div>
+                </div>
+
+                <div className="card-actions-bar">
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1, padding: '6px 8px', fontSize: '12px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff' }}
+                    onClick={() => onViewInvoice && onViewInvoice(pur)}
+                  >
+                    <FileText size={13} /> Invoice
+                  </button>
+                  {onEditPurchase && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ flex: 1, padding: '6px 8px', fontSize: '12px', color: '#d97706', borderColor: '#fde68a', background: '#fffbeb' }}
+                      onClick={() => onEditPurchase(pur)}
+                    >
+                      <Edit2 size={13} /> Edit
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1, padding: '6px 8px', fontSize: '12px' }}
+                    onClick={() => onViewPurchaseDetails && onViewPurchaseDetails(pur)}
+                  >
+                    <Receipt size={13} color="#0284c7" /> Bill
+                  </button>
+                  {isDue && (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      style={{ flex: 1, padding: '6px 8px', fontSize: '12px', background: '#0284c7' }}
+                      onClick={() => onOpenPayment(pur.supplier_id, 'supplier', pur.id)}
+                    >
+                      Pay
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '6px 10px', fontSize: '12px' }}
+                    onClick={() => onSelectSupplier(pur.supplier_id)}
+                    title="View Supplier Profile"
+                  >
+                    <Eye size={13} />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ export const StockTransferModal = ({ isOpen, onClose, dataService, currentUser, 
     quantity: '',
     date: getTodayDateString(),
     time: getCurrentTimeString(),
+    vehicle_no: '',
     reason: '',
     notes: ''
   });
@@ -52,6 +53,7 @@ export const StockTransferModal = ({ isOpen, onClose, dataService, currentUser, 
         quantity: Number(form.quantity),
         date: form.date,
         time: form.time,
+        vehicle_no: form.vehicle_no,
         reason: form.reason,
         notes: form.notes
       }, currentUser);
@@ -64,6 +66,7 @@ export const StockTransferModal = ({ isOpen, onClose, dataService, currentUser, 
         quantity: '',
         date: getTodayDateString(),
         time: getCurrentTimeString(),
+        vehicle_no: '',
         reason: '',
         notes: ''
       });
@@ -180,6 +183,18 @@ export const StockTransferModal = ({ isOpen, onClose, dataService, currentUser, 
               <label className="form-label">Time</label>
               <input type="text" className="form-input" value={form.time} onChange={(e) => handleChange('time', e.target.value)} placeholder="HH:MM AM/PM" />
             </div>
+          </div>
+
+          {/* Vehicle / Transport (Optional) */}
+          <div>
+            <label className="form-label" style={{ fontWeight: 600 }}>Vehicle Number / Transport (Optional)</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. TS 08 AB 1234 / Auto / Delivery Van"
+              value={form.vehicle_no || ''}
+              onChange={(e) => handleChange('vehicle_no', e.target.value)}
+            />
           </div>
 
           {/* Reason */}

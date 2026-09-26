@@ -234,7 +234,7 @@ export const GodownDetail = ({ godownId, dataService, currentUser, onBack, onOpe
                   color: isOut ? '#d97706' : '#0284c7', bg: isOut ? '#fffbeb' : '#eff6ff',
                   title: isOut ? `Transfer Out → ${toG?.name}` : `Transfer In ← ${fromG?.name}`,
                   ref: t.transfer_no,
-                  detail: `${prod?.name}: ${isOut ? '-' : '+'}${t.quantity} ${prod?.unit || 'units'}${t.reason ? ` — ${t.reason}` : ''}`
+                  detail: `${prod?.name}: ${isOut ? '-' : '+'}${t.quantity} ${prod?.unit || 'units'}${t.vehicle_no ? ` • 🚗 ${t.vehicle_no}` : ''}${t.reason ? ` — ${t.reason}` : ''}`
                 });
               });
             }

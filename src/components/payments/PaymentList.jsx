@@ -152,8 +152,8 @@ export const PaymentList = ({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card">
+      {/* Table (Desktop) */}
+      <div className="card desktop-table-view">
         <div className="table-responsive">
           <table className="data-table">
             <thead>
@@ -231,6 +231,95 @@ export const PaymentList = ({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile & Tablet Card View */}
+      <div className="mobile-cards-view">
+        {filteredPayments.length === 0 ? (
+          <div className="card" style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
+            No payment records found.
+          </div>
+        ) : (
+          filteredPayments.map((p) => {
+            const isCust = p.type === 'customer_payment';
+            let partyName = 'Party';
+            if (isCust) {
+              const c = dataService.getCustomerById(p.customer_id);
+              if (c) partyName = c.name;
+            } else {
+              const s = dataService.getSupplierById(p.supplier_id);
+              if (s) partyName = s.company_name;
+            }
+
+            return (
+              <div key={p.id} className="mobile-record-card">
+                <div className="card-top-row">
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, color: '#0284c7', fontSize: '13px' }}>
+                        {p.receipt_no}
+                      </span>
+                      <span className={`badge ${isCust ? 'badge-paid' : 'badge-pending'}`} style={{ fontSize: '10px' }}>
+                        {isCust ? 'Inward (Customer)' : 'Outward (Supplier)'}
+                      </span>
+                      <span className="badge badge-paid" style={{ fontSize: '10px', background: '#f1f5f9', color: '#334155' }}>
+                        {p.payment_mode}
+                      </span>
+                    </div>
+                    <div
+                      style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginTop: '4px', cursor: 'pointer' }}
+                      onClick={() => isCust ? onSelectCustomer(p.customer_id) : onSelectSupplier(p.supplier_id)}
+                    >
+                      {partyName}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      fontWeight: 900,
+                      fontSize: '16px',
+                      color: isCust ? '#10b981' : '#e11d48'
+                    }}>
+                      {isCust ? '+' : '-'}{formatCurrency(p.amount)}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                      {formatDate(p.date)} {p.time}
+                    </div>
+                  </div>
+                </div>
+
+                {(p.reference_no || p.notes || p.recorded_by) && (
+                  <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', margin: '8px 0', fontSize: '12px' }}>
+                    {p.reference_no && (
+                      <div style={{ color: '#475569', marginBottom: '2px' }}>
+                        <span style={{ fontWeight: 600 }}>Ref / UTR:</span> {p.reference_no}
+                      </div>
+                    )}
+                    {p.notes && (
+                      <div style={{ color: '#64748b', fontStyle: 'italic', marginBottom: '2px' }}>
+                        <span style={{ fontWeight: 600, fontStyle: 'normal' }}>Note:</span> {p.notes}
+                      </div>
+                    )}
+                    {p.recorded_by && (
+                      <div style={{ color: '#94a3b8', fontSize: '11px' }}>
+                        Recorded by: {p.recorded_by}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="card-actions-bar">
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1, padding: '6px 8px', fontSize: '12px' }}
+                    onClick={() => isCust ? onSelectCustomer(p.customer_id) : onSelectSupplier(p.supplier_id)}
+                  >
+                    View {isCust ? 'Customer' : 'Supplier'} Profile
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

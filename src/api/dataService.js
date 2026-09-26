@@ -384,7 +384,15 @@ class DataService {
       });
 
       this.godownStock = (godownStockData || []).map((gs) => ({ ...gs, quantity: Number(gs.quantity) || 0 }));
-      this.stockTransfers = (transfersData || []).map((t) => ({ ...t, quantity: Number(t.quantity) || 0 }));
+      this.stockTransfers = (transfersData || []).map((t) => {
+        const parsed = parseNotesAndVehicle(t.notes, t.vehicle_no);
+        return {
+          ...t,
+          notes: parsed.notes,
+          vehicle_no: parsed.vehicle_no,
+          quantity: Number(t.quantity) || 0
+        };
+      });
       this.supplierProducts = suppProdsData || [];
       this.crmUsers = usersData || [];
       this.activityLog = activityData || [];
@@ -1122,6 +1130,10 @@ class DataService {
     const transferId = 'tr-' + Date.now();
     const transferNo = `TR-${Math.floor(10000 + Math.random() * 90000)}`;
 
+    const vehicleNo = (transferData.vehicle_no || transferData.vehicleNo || '').trim();
+    const notesText = (transferData.notes || '').trim();
+    const storageNotes = formatNotesForStorage(notesText, vehicleNo);
+
     const newTransfer = {
       id: transferId,
       transfer_no: transferNo,
@@ -1131,8 +1143,9 @@ class DataService {
       quantity: qty,
       date: date || getTodayDateString(),
       time: time || getCurrentTimeString(),
+      vehicle_no: vehicleNo,
       reason: reason || '',
-      notes: notes || '',
+      notes: notesText,
       recorded_by: currentUser?.name || 'Admin',
       created_at: new Date().toISOString()
     };
@@ -1180,8 +1193,9 @@ class DataService {
 
     this.stockTransfers = [newTransfer, ...this.stockTransfers];
 
+    const vehicleLog = vehicleNo ? ` [Vehicle: ${vehicleNo}]` : '';
     this.logActivity(currentUser, 'TRANSFER', 'Stock', transferId, transferNo,
-      `Transferred ${qty} ${prod.unit || 'units'} of ${prod.name} from ${fromGodown.name} to ${toGodown.name}. Reason: ${reason || 'N/A'}`
+      `Transferred ${qty} ${prod.unit || 'units'} of ${prod.name} from ${fromGodown.name} to ${toGodown.name}${vehicleLog}. Reason: ${reason || 'N/A'}`
     );
 
     this.notify();
@@ -1197,7 +1211,20 @@ class DataService {
         { id: toRowId, godown_id: to_godown_id, product_id, quantity: toNewQty, updated_at: nowIso }
       ], { onConflict: 'godown_id,product_id' })
         .then(() => {
-          return supabase.from('stock_transfers').insert([newTransfer]);
+          const transferPayload = {
+            id: newTransfer.id,
+            transfer_no: newTransfer.transfer_no,
+            from_godown_id: newTransfer.from_godown_id,
+            to_godown_id: newTransfer.to_godown_id,
+            product_id: newTransfer.product_id,
+            quantity: newTransfer.quantity,
+            date: newTransfer.date,
+            time: newTransfer.time,
+            reason: newTransfer.reason,
+            notes: storageNotes,
+            recorded_by: newTransfer.recorded_by
+          };
+          return supabase.from('stock_transfers').insert([transferPayload]);
         })
         .catch((e) => console.error('transferStock async persistence exception:', e));
     }
