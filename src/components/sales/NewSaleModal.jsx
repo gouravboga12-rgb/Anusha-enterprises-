@@ -134,6 +134,19 @@ export const NewSaleModal = ({
   const finalDueAfter = Math.max(0, netBalanceAfter);
   const finalAdvanceAfter = Math.max(0, -netBalanceAfter);
 
+  // Compute stock errors for all line items
+  const stockErrors = items.map((item) => {
+    const available = dataService.getProductStockInGodown(item.product_id, item.godown_id);
+    const qty = Number(item.quantity) || 0;
+    if (qty > available) {
+      const prod = products.find((p) => p.id === item.product_id);
+      const godown = godowns.find((g) => g.id === item.godown_id);
+      return { name: prod?.name || 'Product', available, qty, godownName: godown?.name || 'Godown' };
+    }
+    return null;
+  }).filter(Boolean);
+  const hasStockError = stockErrors.length > 0;
+
   const handleSubmit = (e, generateInvoice = false) => {
     if (e) e.preventDefault();
     setError('');
@@ -724,6 +737,30 @@ export const NewSaleModal = ({
               gap: '6px',
               fontSize: '13px'
             }}>
+
+              {/* Stock Exceeded Banner — fills the gap and blocks saving */}
+              {hasStockError && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '2px solid #ef4444',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  marginBottom: '4px'
+                }}>
+                  <div style={{ fontWeight: 800, color: '#b91c1c', fontSize: '13px', marginBottom: '4px' }}>
+                    ⚠️ Stock Quantity Exceeded — Cannot Save
+                  </div>
+                  {stockErrors.map((e, i) => (
+                    <div key={i} style={{ fontSize: '12px', color: '#7f1d1d', marginTop: '2px' }}>
+                      • <strong>{e.name}</strong>: You entered <strong>{e.qty}</strong> but only <strong>{e.available}</strong> available in {e.godownName}.
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '11px', color: '#b91c1c', marginTop: '6px', fontWeight: 600 }}>
+                    Please reduce the quantity or switch to a godown with more stock.
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                 <span>This Bill Pending Due:</span>
                 <span style={{ fontWeight: 700, color: thisBillPending > 0 ? '#e11d48' : '#10b981' }}>
@@ -799,21 +836,34 @@ export const NewSaleModal = ({
               type="button"
               className="btn btn-secondary"
               onClick={(e) => handleSubmit(e, true)}
+              disabled={hasStockError}
               style={{
-                background: '#f0f9ff',
-                color: '#0284c7',
-                borderColor: '#bae6fd',
+                background: hasStockError ? '#f1f5f9' : '#f0f9ff',
+                color: hasStockError ? '#94a3b8' : '#0284c7',
+                borderColor: hasStockError ? '#e2e8f0' : '#bae6fd',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '6px',
+                cursor: hasStockError ? 'not-allowed' : 'pointer',
+                opacity: hasStockError ? 0.6 : 1
               }}
-              title="Save sale and immediately open printable invoice"
+              title={hasStockError ? 'Fix stock quantities before saving' : 'Save sale and immediately open printable invoice'}
             >
-              <FileText size={16} /> Save & Generate Invoice
+              <FileText size={16} /> Save &amp; Generate Invoice
             </button>
-            <button type="submit" className="btn btn-primary" style={{ fontWeight: 700 }}>
-              Save Sale & Update Stock
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={hasStockError}
+              style={{
+                fontWeight: 700,
+                cursor: hasStockError ? 'not-allowed' : 'pointer',
+                opacity: hasStockError ? 0.6 : 1
+              }}
+              title={hasStockError ? 'Fix stock quantities before saving' : 'Save sale and update godown stock'}
+            >
+              Save Sale &amp; Update Stock
             </button>
           </div>
         </form>
