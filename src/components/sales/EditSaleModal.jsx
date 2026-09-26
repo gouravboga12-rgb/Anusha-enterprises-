@@ -11,7 +11,8 @@ export const EditSaleModal = ({
   sale,
   dataService,
   currentUser,
-  onSaleUpdated
+  onSaleUpdated,
+  onSave
 }) => {
   const customers = dataService.getCustomers();
   const products = dataService.getProducts().filter((p) => p.is_active);
@@ -149,6 +150,7 @@ export const EditSaleModal = ({
       }, reason.trim() || 'Sale details updated', currentUser);
 
       if (onSaleUpdated) onSaleUpdated(updated);
+      if (onSave) onSave(updated);
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to update sale invoice');

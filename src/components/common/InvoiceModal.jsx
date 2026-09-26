@@ -15,10 +15,31 @@ export const InvoiceModal = ({
 }) => {
   const [isExporting, setIsExporting] = useState(false);
 
-  const doc = docProp || documentProp;
-  if (!doc) return null;
+  const baseDoc = docProp || documentProp;
+  if (!baseDoc) return null;
 
   const isSale = type === 'sale';
+
+  // Always resolve latest doc from dataService if available to reflect edits/updates immediately
+  const doc = (isSale
+    ? (dataService?.getSaleById ? dataService.getSaleById(baseDoc.id) : null)
+    : (dataService?.getPurchaseById ? dataService.getPurchaseById(baseDoc.id) : null)) || baseDoc;
+
+  // Resiliently resolve vehicle number and notes from all potential fields and formatters
+  let vehicleNo = (doc.vehicle_no || doc.vehicleNo || doc.transport_no || doc.transportNo || '').trim();
+  let noteText = (doc.notes || doc.note || doc.remarks || doc.delivery_notes || doc.deliveryNotes || '').trim();
+
+  // If vehicle was saved embedded inside notes (e.g. from storage format [Vehicle: ...])
+  if (!vehicleNo && noteText) {
+    const match = noteText.match(/\[Vehicle:\s*([^\]]+)\]/i) || noteText.match(/(?:^|\n)Vehicle:\s*([^\n|]+)/i);
+    if (match) {
+      vehicleNo = match[1].trim();
+      noteText = noteText.replace(/\[Vehicle:\s*[^\]]+\]/gi, '').replace(/(?:^|\n)Vehicle:\s*[^\n|]+/gi, '').trim();
+    }
+  } else if (noteText) {
+    noteText = noteText.replace(/\[Vehicle:\s*[^\]]+\]/gi, '').replace(/(?:^|\n)Vehicle:\s*[^\n|]+/gi, '').trim();
+  }
+
   const customer = isSale ? dataService?.getCustomerById(doc.customer_id) : null;
   const supplier = !isSale ? dataService?.getSupplierById(doc.supplier_id) : null;
   const primaryGodown = !isSale ? dataService?.getGodownById(doc.godown_id) : null;
@@ -204,11 +225,24 @@ export const InvoiceModal = ({
                     <strong>Time:</strong> {doc.time}
                   </div>
                 )}
-                {doc.vehicle_no && (
-                  <div style={{ fontSize: '11.5px', color: '#0369a1', marginTop: '4px', background: '#f0f9ff', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bae6fd', display: 'inline-block', fontWeight: 600 }}>
-                    🚗 <strong>Vehicle No:</strong> {doc.vehicle_no}
+                {vehicleNo ? (
+                  <div style={{
+                    fontSize: '12.5px',
+                    color: '#0f172a',
+                    marginTop: '6px',
+                    background: '#ffffff',
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    border: '1.5px solid #0f172a',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: 800,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+                  }}>
+                    <span>🚗</span> <span>Vehicle: <strong style={{ textTransform: 'uppercase', letterSpacing: '0.03em' }}>{vehicleNo}</strong></span>
                   </div>
-                )}
+                ) : null}
                 <div style={{ marginTop: '5px' }}>
                   <span className={`badge ${
                     paymentStatus === 'Paid' ? 'badge-paid' : paymentStatus === 'Partially Paid' ? 'badge-partial' : 'badge-pending'
@@ -387,32 +421,89 @@ export const InvoiceModal = ({
             gap: '16px',
             marginBottom: '24px'
           }}>
-            {/* Notes / Transport Reference */}
+            {/* Notes & Transport / Delivery Details */}
             <div style={{
               background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              border: '1.5px solid #cbd5e1',
               borderRadius: '8px',
-              padding: '12px 16px',
+              padding: '14px 18px',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              gap: '12px'
             }}>
               <div>
-                <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                  {isSale ? 'Delivery Reference & Transport' : 'Transport LR# / Delivery Reference'}
-                </span>
-                {doc.vehicle_no && (
-                  <p style={{ margin: '4px 0 2px', fontSize: '12px', color: '#0369a1', fontWeight: 700 }}>
-                    🚗 Vehicle / Transport No: {doc.vehicle_no}
-                  </p>
-                )}
-                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#334155', fontStyle: doc.notes ? 'normal' : 'italic' }}>
-                  {doc.notes || 'No special delivery instructions recorded.'}
-                </p>
+                <div style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  marginBottom: '10px',
+                  borderBottom: '1.5px solid #e2e8f0',
+                  paddingBottom: '5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span>📋</span> {isSale ? 'Invoice Notes & Dispatch Details' : 'Purchase Inward & Delivery Reference'}
+                </div>
+
+                {vehicleNo ? (
+                  <div style={{
+                    marginBottom: '10px',
+                    padding: '8px 12px',
+                    background: '#ffffff',
+                    border: '1.5px solid #0f172a',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}>
+                    <span style={{ fontSize: '16px' }}>🚗</span>
+                    <div style={{ fontSize: '13px', color: '#0f172a' }}>
+                      <span style={{ color: '#475569', fontWeight: 600 }}>Vehicle / Transport No: </span>
+                      <strong style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {vehicleNo}
+                      </strong>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div style={{
+                  padding: '10px 14px',
+                  background: noteText ? '#f0f9ff' : '#f8fafc',
+                  border: noteText ? '1.5px solid #38bdf8' : '1px dashed #cbd5e1',
+                  borderRadius: '6px'
+                }}>
+                  <div style={{
+                    fontSize: '11.5px',
+                    fontWeight: 800,
+                    color: noteText ? '#0369a1' : '#64748b',
+                    textTransform: 'uppercase',
+                    marginBottom: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}>
+                    <span>📝</span> Note / Remarks:
+                  </div>
+                  <div style={{
+                    fontSize: '13.5px',
+                    color: noteText ? '#0f172a' : '#64748b',
+                    fontWeight: noteText ? 600 : 400,
+                    fontStyle: noteText ? 'normal' : 'italic',
+                    lineHeight: '1.5',
+                    wordBreak: 'break-word'
+                  }}>
+                    {noteText || 'No special delivery instructions recorded.'}
+                  </div>
+                </div>
               </div>
 
-              <div style={{ marginTop: '12px', fontSize: '11px', color: '#64748b' }}>
-                Recorded by: <strong>{doc.recorded_by || 'Admin'}</strong>
+              <div style={{ marginTop: '8px', fontSize: '11px', color: '#475569', borderTop: '1px solid #f1f5f9', paddingTop: '6px' }}>
+                Billed / Recorded by: <strong style={{ color: '#0f172a' }}>{doc.recorded_by || 'Admin'}</strong>
               </div>
             </div>
 

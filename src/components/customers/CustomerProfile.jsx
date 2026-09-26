@@ -757,8 +757,13 @@ export const CustomerProfile = ({
                         <td style={{ fontWeight: 700, color: '#0284c7' }}>
                           <div>{sale.invoice_no}</div>
                           {sale.vehicle_no && (
-                            <div style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600, background: '#eff6ff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #bfdbfe', display: 'inline-block', marginTop: '3px' }}>
+                            <div style={{ fontSize: '11px', color: '#0f172a', fontWeight: 700, background: '#f8fafc', padding: '2px 6px', borderRadius: '4px', border: '1px solid #0f172a', display: 'inline-block', marginTop: '3px' }}>
                               🚗 {sale.vehicle_no}
+                            </div>
+                          )}
+                          {sale.notes && (
+                            <div style={{ fontSize: '11px', color: '#334155', fontStyle: 'italic', marginTop: '3px', maxWidth: '220px' }}>
+                              📝 {sale.notes}
                             </div>
                           )}
                         </td>
@@ -865,8 +870,13 @@ export const CustomerProfile = ({
                         {formatDate(sale.date)} • {sale.time}
                       </div>
                       {sale.vehicle_no && (
-                        <div style={{ fontSize: '11px', color: '#0369a1', fontWeight: 600, marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: '#0f172a', fontWeight: 700, marginTop: '2px' }}>
                           🚗 Vehicle: {sale.vehicle_no}
+                        </div>
+                      )}
+                      {sale.notes && (
+                        <div style={{ fontSize: '11px', color: '#475569', fontStyle: 'italic', marginTop: '2px' }}>
+                          📝 Note: {sale.notes}
                         </div>
                       )}
                     </div>

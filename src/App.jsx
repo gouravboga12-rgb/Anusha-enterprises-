@@ -629,9 +629,12 @@ export const App = () => {
         sale={editingSale}
         dataService={dataService}
         currentUser={currentUser}
-        onSave={() => {
+        onSave={(updated) => {
           setIsEditSaleOpen(false);
           setEditingSale(null);
+          if (updated && invoiceModalDoc?.id === updated.id) {
+            setInvoiceModalDoc(updated);
+          }
         }}
       />
 

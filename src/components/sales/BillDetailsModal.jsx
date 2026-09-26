@@ -106,8 +106,13 @@ export const BillDetailsModal = ({
               </div>
             )}
             {sale?.vehicle_no && (
-              <div style={{ fontSize: '12px', color: '#0284c7', fontWeight: 600, marginTop: '2px' }}>
+              <div style={{ fontSize: '12px', color: '#0f172a', fontWeight: 700, marginTop: '3px' }}>
                 🚗 Vehicle: {sale.vehicle_no}
+              </div>
+            )}
+            {sale?.notes && (
+              <div style={{ fontSize: '12px', color: '#334155', fontStyle: 'italic', marginTop: '2px' }}>
+                📝 Note: {sale.notes}
               </div>
             )}
           </div>

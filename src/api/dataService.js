@@ -57,6 +57,33 @@ export const decodeStoredPassword = (storedHash) => {
   return '';
 };
 
+// Safely parse vehicle number and notes from storage
+export const parseNotesAndVehicle = (rawNotes, rawVehicle) => {
+  let vehicle_no = (rawVehicle || '').trim();
+  let notes = (rawNotes || '').trim();
+
+  if (!vehicle_no && notes) {
+    const match = notes.match(/\[Vehicle:\s*([^\]]+)\]/i) || notes.match(/(?:^|\n)Vehicle:\s*([^\n|]+)/i);
+    if (match) {
+      vehicle_no = match[1].trim();
+      notes = notes.replace(/\[Vehicle:\s*[^\]]+\]/gi, '').replace(/(?:^|\n)Vehicle:\s*[^\n|]+/gi, '').trim();
+    }
+  }
+  return { notes, vehicle_no };
+};
+
+// Format notes for resilient database storage without losing vehicle number
+export const formatNotesForStorage = (notes, vehicle_no) => {
+  const cleanVehicle = (vehicle_no || '').trim();
+  const cleanNotes = (notes || '').replace(/\[Vehicle:\s*[^\]]+\]/gi, '').replace(/(?:^|\n)Vehicle:\s*[^\n|]+/gi, '').trim();
+  if (cleanVehicle && cleanNotes) {
+    return `[Vehicle: ${cleanVehicle}] ${cleanNotes}`;
+  } else if (cleanVehicle) {
+    return `[Vehicle: ${cleanVehicle}]`;
+  }
+  return cleanNotes;
+};
+
 class DataService {
   constructor() {
     if (isSupabaseConfigured) {
@@ -296,31 +323,41 @@ class DataService {
       this.customers = (custs || []).filter((c) => c && c.status !== 'archived');
       this.suppliers = (supps || []).filter((s) => s && s.status !== 'archived');
 
-      this.sales = (salesData || []).map((s) => ({
-        ...s,
-        total_amount: Number(s.total_amount) || 0,
-        paid_amount: Number(s.paid_amount) || 0,
-        pending_amount: Number(s.pending_amount) || 0,
-        items: (s.items || []).map((i) => ({
-          ...i,
-          quantity: Number(i.quantity) || 0,
-          selling_price: Number(i.selling_price) || 0,
-          total: Number(i.total) || 0
-        }))
-      }));
+      this.sales = (salesData || []).map((s) => {
+        const parsed = parseNotesAndVehicle(s.notes, s.vehicle_no);
+        return {
+          ...s,
+          notes: parsed.notes,
+          vehicle_no: parsed.vehicle_no,
+          total_amount: Number(s.total_amount) || 0,
+          paid_amount: Number(s.paid_amount) || 0,
+          pending_amount: Number(s.pending_amount) || 0,
+          items: (s.items || []).map((i) => ({
+            ...i,
+            quantity: Number(i.quantity) || 0,
+            selling_price: Number(i.selling_price) || 0,
+            total: Number(i.total) || 0
+          }))
+        };
+      });
 
-      this.purchases = (purData || []).map((p) => ({
-        ...p,
-        total_amount: Number(p.total_amount) || 0,
-        paid_amount: Number(p.paid_amount) || 0,
-        pending_amount: Number(p.pending_amount) || 0,
-        items: (p.items || []).map((i) => ({
-          ...i,
-          quantity: Number(i.quantity) || 0,
-          purchase_price: Number(i.purchase_price) || 0,
-          total: Number(i.total) || 0
-        }))
-      }));
+      this.purchases = (purData || []).map((p) => {
+        const parsed = parseNotesAndVehicle(p.notes, p.vehicle_no);
+        return {
+          ...p,
+          notes: parsed.notes,
+          vehicle_no: parsed.vehicle_no,
+          total_amount: Number(p.total_amount) || 0,
+          paid_amount: Number(p.paid_amount) || 0,
+          pending_amount: Number(p.pending_amount) || 0,
+          items: (p.items || []).map((i) => ({
+            ...i,
+            quantity: Number(i.quantity) || 0,
+            purchase_price: Number(i.purchase_price) || 0,
+            total: Number(i.total) || 0
+          }))
+        };
+      });
 
       const unifiedCustomerPayments = (custPayments || []).map((p) => ({ ...p, type: 'customer_payment', amount: Number(p.amount) || 0 }));
       const unifiedSupplierPayments = (suppPayments || []).map((p) => ({ ...p, type: 'supplier_payment', amount: Number(p.amount) || 0 }));
@@ -1698,6 +1735,10 @@ class DataService {
       };
     });
 
+    const vehicleNo = (saleData.vehicle_no || saleData.vehicleNo || '').trim();
+    const notesText = (saleData.notes || '').trim();
+    const storageNotes = formatNotesForStorage(notesText, vehicleNo);
+
     const newSale = {
       id: saleId,
       invoice_no: invoiceNo,
@@ -1710,8 +1751,8 @@ class DataService {
       pending_amount: pendingAmount,
       advance_amount: advanceAmount,
       payment_status: paymentStatus,
-      vehicle_no: saleData.vehicle_no || saleData.vehicleNo || '',
-      notes: saleData.notes || '',
+      vehicle_no: vehicleNo,
+      notes: notesText,
       recorded_by: currentUser?.name || 'Admin',
       created_at: new Date().toISOString()
     };
@@ -1744,7 +1785,7 @@ class DataService {
         reference_no: saleData.reference_no || '',
         date: saleData.date || getTodayDateString(),
         time: saleData.time || getCurrentTimeString(),
-        notes: saleData.notes ? `${saleData.notes}${advTag}` : `Payment for ${invoiceNo}${advTag}`,
+        notes: notesText ? `${notesText}${advTag}` : `Payment for ${invoiceNo}${advTag}`,
         recorded_by: currentUser?.name || 'Admin',
         created_at: new Date().toISOString()
       };
@@ -1757,18 +1798,19 @@ class DataService {
       return `${i.product_name}: ${i.quantity} × ₹${i.selling_price} = ₹${i.total}${g ? ' (from ' + g.name + ')' : ''}`;
     }).join(' | ');
     const advLog = advanceAmount > 0 ? ` [Advance Received: ₹${Number(advanceAmount).toLocaleString('en-IN')}]` : '';
+    const vehicleLog = vehicleNo ? ` [Vehicle: ${vehicleNo}]` : '';
     this.logActivity(currentUser, 'CREATE', 'Sales', saleId, invoiceNo,
-      `Sale to ${cust?.name || 'Customer'} — ${itemsSummary} — Total: ₹${totalAmount} | Paid: ₹${initialPay}${advLog}`
+      `Sale to ${cust?.name || 'Customer'} — ${itemsSummary} — Total: ₹${totalAmount} | Paid: ₹${initialPay}${advLog}${vehicleLog}`
     );
 
     this.notify();
 
-    // Background Supabase write
+    // Background Supabase write (stores vehicle_no resiliently inside notes column)
     supabase.from('customer_sales').insert([{
       id: newSale.id, invoice_no: newSale.invoice_no, customer_id: newSale.customer_id,
       date: newSale.date, time: newSale.time, total_amount: newSale.total_amount,
       paid_amount: newSale.paid_amount, pending_amount: newSale.pending_amount,
-      payment_status: newSale.payment_status, notes: newSale.notes, recorded_by: newSale.recorded_by
+      payment_status: newSale.payment_status, notes: storageNotes, recorded_by: newSale.recorded_by
     }]).then(() => {
       supabase.from('customer_sale_items').insert(
         cleanItems.map((i) => ({
@@ -1895,24 +1937,30 @@ class DataService {
     const pendingAmount = Math.max(0, totalAmount - paidAmount);
     const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
+    const vehicleNo = updatedData.vehicle_no !== undefined ? (updatedData.vehicle_no || '').trim() : (existingSale.vehicle_no || '').trim();
+    const notesText = updatedData.notes !== undefined ? (updatedData.notes || '').trim() : (existingSale.notes || '').trim();
+    const storageNotes = formatNotesForStorage(notesText, vehicleNo);
+
     const updatedSale = {
       ...existingSale, ...updatedData, items: cleanItems,
-      vehicle_no: updatedData.vehicle_no !== undefined ? updatedData.vehicle_no : (existingSale.vehicle_no || ''),
+      vehicle_no: vehicleNo,
+      notes: notesText,
       total_amount: totalAmount, paid_amount: paidAmount,
       pending_amount: pendingAmount, payment_status: paymentStatus,
       updated_at: new Date().toISOString()
     };
 
     this.sales = this.sales.map((s) => (s.id === saleId ? updatedSale : s));
+    const vehicleLog = vehicleNo ? ` [Vehicle: ${vehicleNo}]` : '';
     this.logActivity(currentUser, 'UPDATE', 'Sales', saleId, existingSale.invoice_no,
-      `Corrected sale ${existingSale.invoice_no}. Reason: ${reason || 'N/A'}`
+      `Corrected sale ${existingSale.invoice_no}. Reason: ${reason || 'N/A'}${vehicleLog}`
     );
     this.notify();
 
     supabase.from('customer_sales').update({
       total_amount: totalAmount, paid_amount: paidAmount, pending_amount: pendingAmount,
       payment_status: paymentStatus, date: updatedSale.date, time: updatedSale.time,
-      vehicle_no: updatedSale.vehicle_no, notes: updatedSale.notes
+      notes: storageNotes
     }).eq('id', saleId).then(async () => {
       await supabase.from('customer_sale_items').delete().eq('sale_id', saleId);
       await supabase.from('customer_sale_items').insert(
@@ -1989,6 +2037,10 @@ class DataService {
       };
     });
 
+    const vehicleNo = (purData.vehicle_no || purData.vehicleNo || '').trim();
+    const notesText = (purData.notes || '').trim();
+    const storageNotes = formatNotesForStorage(notesText, vehicleNo);
+
     const newPur = {
       id: purId,
       purchase_no: purchaseNo,
@@ -2001,8 +2053,8 @@ class DataService {
       pending_amount: pendingAmount,
       advance_amount: advanceAmount,
       payment_status: paymentStatus,
-      notes: purData.notes || '',
-      vehicle_no: purData.vehicle_no || purData.vehicleNo || '',
+      notes: notesText,
+      vehicle_no: vehicleNo,
       recorded_by: currentUser?.name || 'Admin',
       godown_id: godownId,
       created_at: new Date().toISOString()
@@ -2032,7 +2084,7 @@ class DataService {
         reference_no: purData.reference_no || '',
         date: purData.date || getTodayDateString(),
         time: purData.time || getCurrentTimeString(),
-        notes: purData.notes ? `${purData.notes}${advTag}` : `Payment for ${purchaseNo}${advTag}`,
+        notes: notesText ? `${notesText}${advTag}` : `Payment for ${purchaseNo}${advTag}`,
         recorded_by: currentUser?.name || 'Admin',
         created_at: new Date().toISOString()
       };
@@ -2046,17 +2098,19 @@ class DataService {
       return `${i.product_name}: ${i.quantity} × ₹${i.purchase_price} = ₹${i.total}${g ? ' → ' + g.name : ''}`;
     }).join(' | ');
     const advLog = advanceAmount > 0 ? ` [Advance Paid: ₹${Number(advanceAmount).toLocaleString('en-IN')}]` : '';
+    const vehicleLog = vehicleNo ? ` [Vehicle: ${vehicleNo}]` : '';
     this.logActivity(currentUser, 'CREATE', 'Purchases', purId, purchaseNo,
-      `Purchase from ${supp?.company_name || 'Supplier'} → ${godown?.name || 'Main Godown'} — ${itemsSummary} — Total: ₹${totalAmount} | Paid: ₹${initialPay}${advLog}`
+      `Purchase from ${supp?.company_name || 'Supplier'} → ${godown?.name || 'Main Godown'} — ${itemsSummary} — Total: ₹${totalAmount} | Paid: ₹${initialPay}${advLog}${vehicleLog}`
     );
 
     this.notify();
 
+    // Background Supabase write (stores vehicle_no resiliently inside notes column)
     supabase.from('supplier_purchases').insert([{
       id: newPur.id, purchase_no: newPur.purchase_no, supplier_id: newPur.supplier_id,
       date: newPur.date, time: newPur.time, total_amount: newPur.total_amount,
       paid_amount: newPur.paid_amount, pending_amount: newPur.pending_amount,
-      payment_status: newPur.payment_status, notes: newPur.notes, vehicle_no: newPur.vehicle_no, recorded_by: newPur.recorded_by,
+      payment_status: newPur.payment_status, notes: storageNotes, recorded_by: newPur.recorded_by,
       godown_id: newPur.godown_id
     }]).then(() => {
       supabase.from('supplier_purchase_items').insert(
@@ -2173,9 +2227,14 @@ class DataService {
     const pendingAmount = Math.max(0, totalAmount - paidAmount);
     const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
+    const vehicleNo = updatedData.vehicle_no !== undefined ? (updatedData.vehicle_no || '').trim() : (existingPur.vehicle_no || '').trim();
+    const notesText = updatedData.notes !== undefined ? (updatedData.notes || '').trim() : (existingPur.notes || '').trim();
+    const storageNotes = formatNotesForStorage(notesText, vehicleNo);
+
     const updatedPur = {
       ...existingPur, ...updatedData, items: cleanItems, godown_id: newGodownId,
-      vehicle_no: updatedData.vehicle_no !== undefined ? updatedData.vehicle_no : (existingPur.vehicle_no || ''),
+      vehicle_no: vehicleNo,
+      notes: notesText,
       total_amount: totalAmount, paid_amount: paidAmount,
       pending_amount: pendingAmount, payment_status: paymentStatus,
       updated_at: new Date().toISOString()
@@ -2190,7 +2249,7 @@ class DataService {
     supabase.from('supplier_purchases').update({
       total_amount: totalAmount, paid_amount: paidAmount, pending_amount: pendingAmount,
       payment_status: paymentStatus, date: updatedPur.date, time: updatedPur.time,
-      notes: updatedPur.notes, vehicle_no: updatedPur.vehicle_no, godown_id: newGodownId
+      notes: storageNotes, godown_id: newGodownId
     }).eq('id', purId).then(async () => {
       await supabase.from('supplier_purchase_items').delete().eq('purchase_id', purId);
       await supabase.from('supplier_purchase_items').insert(
