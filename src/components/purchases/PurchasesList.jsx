@@ -1,6 +1,25 @@
 import React, { useState } from 'react';
-import { PlusCircle, Search, ShoppingBag, Receipt, Eye, FileText, Edit2 } from 'lucide-react';
+import { PlusCircle, Search, ShoppingBag, Receipt, Eye, FileText, Edit2, Calendar, X } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+
+const toYYYYMMDD = (dateStr) => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (!isNaN(d)) return d.toISOString().slice(0, 10);
+  return null;
+};
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const weekStartStr = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 6);
+  return d.toISOString().slice(0, 10);
+};
+const monthStartStr = () => {
+  const d = new Date();
+  d.setDate(1);
+  return d.toISOString().slice(0, 10);
+};
 
 export const PurchasesList = ({
   purchases,
@@ -14,6 +33,8 @@ export const PurchasesList = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const filteredPurchases = purchases.filter((pur) => {
     const supp = dataService.getSupplierById(pur.supplier_id);
@@ -24,8 +45,25 @@ export const PurchasesList = ({
 
     if (!matchesSearch) return false;
     if (statusFilter !== 'all' && pur.payment_status !== statusFilter) return false;
+
+    // Date range filter
+    if (dateFrom || dateTo) {
+      const purDateStr = toYYYYMMDD(pur.date);
+      if (purDateStr) {
+        if (dateFrom && purDateStr < dateFrom) return false;
+        if (dateTo && purDateStr > dateTo) return false;
+      }
+    }
+
     return true;
   });
+
+  const setQuickDate = (preset) => {
+    if (preset === 'today') { setDateFrom(todayStr()); setDateTo(todayStr()); }
+    else if (preset === 'week') { setDateFrom(weekStartStr()); setDateTo(todayStr()); }
+    else if (preset === 'month') { setDateFrom(monthStartStr()); setDateTo(todayStr()); }
+    else { setDateFrom(''); setDateTo(''); }
+  };
 
   return (
     <div>
@@ -43,8 +81,9 @@ export const PurchasesList = ({
 
       {/* Filter Bar */}
       <div className="card" style={{ padding: '14px 18px', marginBottom: '18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '260px' }}>
+        {/* Row 1: Search + Status */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '200px' }}>
             <Search size={18} color="#64748b" />
             <input
               type="text"
@@ -70,6 +109,73 @@ export const PurchasesList = ({
               <option value="Pending">Pending</option>
             </select>
           </div>
+        </div>
+
+        {/* Row 2: Date range filter */}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '10px', borderTop: '1px dashed #e2e8f0' }}>
+          <Calendar size={15} color="#64748b" />
+          <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Date:</span>
+          <input
+            type="date"
+            className="form-input"
+            style={{ padding: '4px 8px', fontSize: '12px', width: 'auto' }}
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            title="From date"
+          />
+          <span style={{ fontSize: '12px', color: '#94a3b8' }}>to</span>
+          <input
+            type="date"
+            className="form-input"
+            style={{ padding: '4px 8px', fontSize: '12px', width: 'auto' }}
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            title="To date"
+          />
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['all', 'All Time']].map(([preset, label]) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setQuickDate(preset)}
+                style={{
+                  fontSize: '11px',
+                  padding: '3px 9px',
+                  borderRadius: '20px',
+                  border: '1px solid #cbd5e1',
+                  background: (
+                    (preset === 'today' && dateFrom === todayStr() && dateTo === todayStr()) ||
+                    (preset === 'week' && dateFrom === weekStartStr() && dateTo === todayStr()) ||
+                    (preset === 'month' && dateFrom === monthStartStr() && dateTo === todayStr()) ||
+                    (preset === 'all' && !dateFrom && !dateTo)
+                  ) ? '#0284c7' : '#f8fafc',
+                  color: (
+                    (preset === 'today' && dateFrom === todayStr() && dateTo === todayStr()) ||
+                    (preset === 'week' && dateFrom === weekStartStr() && dateTo === todayStr()) ||
+                    (preset === 'month' && dateFrom === monthStartStr() && dateTo === todayStr()) ||
+                    (preset === 'all' && !dateFrom && !dateTo)
+                  ) ? '#fff' : '#475569',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {(dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={() => { setDateFrom(''); setDateTo(''); }}
+              style={{ fontSize: '11px', padding: '3px 6px', borderRadius: '4px', border: 'none', background: '#fee2e2', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
+            >
+              <X size={11} /> Clear
+            </button>
+          )}
+          <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: 'auto' }}>
+            {filteredPurchases.length} purchase{filteredPurchases.length !== 1 ? 's' : ''}
+          </span>
         </div>
       </div>
 

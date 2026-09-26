@@ -1,11 +1,7 @@
 import React from 'react';
 import { LayoutDashboard, Users, Truck, Boxes, CalendarCheck } from 'lucide-react';
-import { getTodayDateString } from '../../utils/formatters';
 
 export const BottomNav = ({ activeTab, onSelectTab, onToggleSidebar, dataService }) => {
-  const dayBook = dataService?.getDayBook ? dataService.getDayBook(getTodayDateString()) : { events: [] };
-  const todayEventCount = dayBook?.events?.length || 0;
-
   return (
     <nav className="mobile-bottom-nav">
       <button
@@ -44,15 +40,11 @@ export const BottomNav = ({ activeTab, onSelectTab, onToggleSidebar, dataService
         className={`bottom-nav-item ${activeTab === 'daybook' ? 'active' : ''}`}
         onClick={() => onSelectTab('daybook')}
       >
-        <div style={{ position: 'relative' }}>
-          <CalendarCheck size={20} />
-          {todayEventCount > 0 && (
-            <span className="bottom-nav-badge">{todayEventCount}</span>
-          )}
-        </div>
+        <CalendarCheck size={20} />
         <span>Day Book</span>
       </button>
     </nav>
   );
 };
+
 
