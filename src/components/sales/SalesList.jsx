@@ -256,13 +256,18 @@ export const SalesList = ({
                         fontWeight: 800,
                         color: sale.pending_amount > 0 ? '#e11d48' : '#10b981'
                       }}>
-                        {sale.advance_amount > 0 ? (
-                          <span style={{ color: '#059669', fontSize: '12px' }} title={`₹${sale.advance_amount} surplus advance credit`}>
-                            +{formatCurrency(sale.advance_amount)} Adv
-                          </span>
-                        ) : (
-                          formatCurrency(sale.pending_amount)
-                        )}
+                        {(() => {
+                          const custL = dataService.getCustomerLedger(sale.customer_id);
+                          const custAdv = custL?.advanceBalance || 0;
+                          if (custAdv > 0 && sale.pending_amount === 0) {
+                            return (
+                              <span style={{ color: '#059669', fontSize: '12px' }} title={`₹${custAdv} surplus advance credit`}>
+                                +{formatCurrency(custAdv)} Adv
+                              </span>
+                            );
+                          }
+                          return formatCurrency(sale.pending_amount);
+                        })()}
                       </td>
                       <td>
                         <span className={`badge ${
@@ -371,16 +376,30 @@ export const SalesList = ({
                   </div>
 
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <span style={{ fontSize: '10px', color: isDue ? '#be123c' : '#047857', fontWeight: 700, textTransform: 'uppercase' }}>
-                      {isDue ? 'Balance Due' : (sale.advance_amount > 0 ? 'Advance Credit' : 'Paid in Full')}
-                    </span>
-                    <div style={{
-                      fontSize: '17px',
-                      fontWeight: 800,
-                      color: isDue ? '#e11d48' : '#10b981'
-                    }}>
-                      {sale.advance_amount > 0 ? `+${formatCurrency(sale.advance_amount)} Adv` : formatCurrency(sale.pending_amount)}
-                    </div>
+                    {(() => {
+                      const custL = dataService.getCustomerLedger(sale.customer_id);
+                      const custAdv = custL?.advanceBalance || 0;
+                      const hasAdv = custAdv > 0 && sale.pending_amount === 0;
+                      return (
+                        <>
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            color: isDue ? '#be123c' : (hasAdv ? '#15803d' : '#047857')
+                          }}>
+                            {isDue ? 'Balance Due' : (hasAdv ? 'Advance Credit' : 'Paid in Full')}
+                          </span>
+                          <div style={{
+                            fontSize: '17px',
+                            fontWeight: 800,
+                            color: isDue ? '#e11d48' : '#10b981'
+                          }}>
+                            {hasAdv ? `+${formatCurrency(custAdv)} Adv` : formatCurrency(sale.pending_amount)}
+                          </div>
+                        </>
+                      );
+                    })()}
                     <div style={{ fontSize: '11px', color: '#64748b' }}>
                       Total: {formatCurrency(sale.total_amount)}
                     </div>

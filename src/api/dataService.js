@@ -2128,9 +2128,19 @@ class DataService {
       ? Number(saleData.sgst_amount)
       : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (saleData.apply_gst ? sgstAmount : 0));
 
-    const pendingAmount = Math.max(0, totalAmount - initialPay);
-    const advanceAmount = Math.max(0, initialPay - totalAmount);
-    const paymentStatus = initialPay >= totalAmount ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
+    // Deduct old unpaid customer amount and absorb existing advance:
+    const priorLedger = this.getCustomerLedger ? this.getCustomerLedger(saleData.customer_id) : null;
+    const priorPending = priorLedger ? (priorLedger.pendingBalance || 0) : 0; // Old unpaid amount
+    const priorAdvance = priorLedger ? (priorLedger.advanceBalance || 0) : 0; // Old advance amount
+
+    // Total net customer obligation before this payment
+    const netDueBeforePayment = (priorPending - priorAdvance) + totalAmount;
+    const trueAdvance = Math.max(0, initialPay - netDueBeforePayment);
+    // Effective credit applied to this bill (after deducting any old unpaid due)
+    const effectivePaidForThisBill = Math.min(totalAmount, Math.max(0, priorAdvance + initialPay - priorPending));
+    const pendingAmount = Math.max(0, totalAmount - effectivePaidForThisBill);
+    const advanceAmount = trueAdvance;
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : (effectivePaidForThisBill > 0 ? 'Partially Paid' : 'Pending');
 
     const vehicleNo = (saleData.vehicle_no || saleData.vehicleNo || '').trim();
     const ewayNo = (saleData.eway_no || saleData.ewayNo || saleData.eway_bill_no || '').trim();
@@ -2178,7 +2188,7 @@ class DataService {
 
     let newPayment = null;
     if (initialPay > 0) {
-      const advTag = advanceAmount > 0 ? ` (includes ₹${Number(advanceAmount).toLocaleString('en-IN')} Advance Payment)` : '';
+      const advTag = trueAdvance > 0 ? ` (includes ₹${Number(trueAdvance).toLocaleString('en-IN')} Advance Payment)` : '';
       newPayment = {
         id: 'pay-' + Date.now(),
         receipt_no: `REC-${Math.floor(100 + Math.random() * 900)}`,
@@ -2477,9 +2487,20 @@ class DataService {
     const totalAmount = purData.items.reduce((acc, item) =>
       acc + (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0), 0);
 
-    const pendingAmount = Math.max(0, totalAmount - initialPay);
-    const advanceAmount = Math.max(0, initialPay - totalAmount);
-    const paymentStatus = initialPay >= totalAmount ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
+    const supp = this.getSupplierById(purData.supplier_id);
+    const canonicalSupplierId = supp ? supp.id : purData.supplier_id;
+
+    // Deduct old unpaid supplier amount and absorb existing advance:
+    const priorLedger = this.getSupplierLedger ? this.getSupplierLedger(canonicalSupplierId) : null;
+    const priorPending = priorLedger ? (priorLedger.pendingBalance || 0) : 0; // Old unpaid to supplier
+    const priorAdvance = priorLedger ? (priorLedger.advanceBalance || 0) : 0; // Old advance with supplier
+
+    const netDueBeforePayment = (priorPending - priorAdvance) + totalAmount;
+    const trueAdvance = Math.max(0, initialPay - netDueBeforePayment);
+    const effectivePaidForThisBill = Math.min(totalAmount, Math.max(0, priorAdvance + initialPay - priorPending));
+    const pendingAmount = Math.max(0, totalAmount - effectivePaidForThisBill);
+    const advanceAmount = trueAdvance;
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : (effectivePaidForThisBill > 0 ? 'Partially Paid' : 'Pending');
 
     const cleanItems = purData.items.map((i, idx) => {
       const prod = this.getProductById(i.product_id);
@@ -2500,9 +2521,6 @@ class DataService {
     const vehicleNo = (purData.vehicle_no || purData.vehicleNo || '').trim();
     const notesText = (purData.notes || '').trim();
     const storageNotes = formatNotesForStorage(notesText, vehicleNo);
-
-    const supp = this.getSupplierById(purData.supplier_id);
-    const canonicalSupplierId = supp ? supp.id : purData.supplier_id;
 
     const newPur = {
       id: purId,
@@ -2535,7 +2553,7 @@ class DataService {
 
     let newPayment = null;
     if (initialPay > 0) {
-      const advTag = advanceAmount > 0 ? ` (includes ₹${Number(advanceAmount).toLocaleString('en-IN')} Advance Payment)` : '';
+      const advTag = trueAdvance > 0 ? ` (includes ₹${Number(trueAdvance).toLocaleString('en-IN')} Advance Payment)` : '';
       newPayment = {
         id: 'pay-' + Date.now(),
         receipt_no: `VOUCH-${Math.floor(100 + Math.random() * 900)}`,
@@ -2794,13 +2812,22 @@ class DataService {
     const receiptNo = `REC-${Math.floor(100 + Math.random() * 900)}`;
     const amt = Number(payData.amount) || 0;
 
+    const priorLedger = this.getCustomerLedger ? this.getCustomerLedger(payData.customer_id) : null;
+    const priorPending = priorLedger ? (priorLedger.pendingBalance || 0) : 0;
+    const trueAdvance = Math.max(0, amt - priorPending);
+    const advTag = trueAdvance > 0 ? ` (includes ₹${Number(trueAdvance).toLocaleString('en-IN')} Advance Payment)` : '';
+    let payNotes = (payData.notes || '').replace(/\s*\(includes\s+₹?[0-9,.]+\s+Advance\s+Payment\)/gi, '').trim();
+    if (advTag && !payNotes.includes('Advance Payment')) {
+      payNotes = payNotes ? `${payNotes}${advTag}` : advTag.trim();
+    }
+
     const newPayment = {
       id: payId, receipt_no: receiptNo, type: 'customer_payment',
       customer_id: payData.customer_id, sale_id: payData.sale_id || null,
       amount: amt, payment_mode: payData.payment_mode || 'Cash',
       reference_no: payData.reference_no || '',
       date: payData.date || getTodayDateString(), time: payData.time || getCurrentTimeString(),
-      notes: payData.notes || '', recorded_by: currentUser?.name || 'Admin',
+      notes: payNotes, recorded_by: currentUser?.name || 'Admin',
       created_at: new Date().toISOString()
     };
 
@@ -2828,13 +2855,22 @@ class DataService {
     const receiptNo = `VOUCH-${Math.floor(100 + Math.random() * 900)}`;
     const amt = Number(payData.amount) || 0;
 
+    const priorLedger = this.getSupplierLedger ? this.getSupplierLedger(payData.supplier_id) : null;
+    const priorPending = priorLedger ? (priorLedger.pendingBalance || 0) : 0;
+    const trueAdvance = Math.max(0, amt - priorPending);
+    const advTag = trueAdvance > 0 ? ` (includes ₹${Number(trueAdvance).toLocaleString('en-IN')} Advance Payment)` : '';
+    let payNotes = (payData.notes || '').replace(/\s*\(includes\s+₹?[0-9,.]+\s+Advance\s+Payment\)/gi, '').trim();
+    if (advTag && !payNotes.includes('Advance Payment')) {
+      payNotes = payNotes ? `${payNotes}${advTag}` : advTag.trim();
+    }
+
     const newPayment = {
       id: payId, receipt_no: receiptNo, type: 'supplier_payment',
       supplier_id: payData.supplier_id, purchase_id: payData.purchase_id || null,
       amount: amt, payment_mode: payData.payment_mode || 'Bank Transfer',
       reference_no: payData.reference_no || '',
       date: payData.date || getTodayDateString(), time: payData.time || getCurrentTimeString(),
-      notes: payData.notes || '', recorded_by: currentUser?.name || 'Admin',
+      notes: payNotes, recorded_by: currentUser?.name || 'Admin',
       created_at: new Date().toISOString()
     };
 
@@ -2863,7 +2899,9 @@ class DataService {
     const linked = this.getSalePayments(saleId);
     const totalPaid = linked.reduce((acc, p) => acc + (p.amount || 0), 0);
     const pendingAmount = Math.max(0, sale.total_amount - totalPaid);
-    const advanceAmount = Math.max(0, totalPaid - sale.total_amount);
+    const custLedger = this.getCustomerLedger ? this.getCustomerLedger(sale.customer_id) : null;
+    const custAdv = custLedger ? (custLedger.advanceBalance || 0) : 0;
+    const advanceAmount = Math.min(Math.max(0, totalPaid - sale.total_amount), custAdv);
     const paymentStatus = pendingAmount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
     sale.paid_amount = totalPaid;
     sale.pending_amount = pendingAmount;
@@ -2880,7 +2918,9 @@ class DataService {
     const linked = this.getPurchasePayments(purchaseId);
     const totalPaid = linked.reduce((acc, p) => acc + (p.amount || 0), 0);
     const pendingAmount = Math.max(0, pur.total_amount - totalPaid);
-    const advanceAmount = Math.max(0, totalPaid - pur.total_amount);
+    const suppLedger = this.getSupplierLedger ? this.getSupplierLedger(pur.supplier_id) : null;
+    const suppAdv = suppLedger ? (suppLedger.advanceBalance || 0) : 0;
+    const advanceAmount = Math.min(Math.max(0, totalPaid - pur.total_amount), suppAdv);
     const paymentStatus = pendingAmount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
     pur.paid_amount = totalPaid;
     pur.pending_amount = pendingAmount;
@@ -3303,7 +3343,8 @@ class DataService {
     custPayments.forEach((p) => {
       const linkedSale = p.sale_id ? this.getSaleById(p.sale_id) : null;
       const refDetail = linkedSale ? `for ${linkedSale.invoice_no}` : (p.reference_no ? `Ref: ${p.reference_no}` : '');
-      const notesDetail = p.notes ? ` (${p.notes})` : '';
+      const cleanNotes = (p.notes || '').replace(/\s*\(includes\s+₹?[0-9,.]+\s+Advance\s+Payment\)/gi, '').trim();
+      const notesDetail = cleanNotes ? ` (${cleanNotes})` : '';
       entries.push({
         id: p.id, date: p.date, time: p.time, type: 'PAYMENT',
         reference: p.receipt_no, particulars: `Payment Received (${p.payment_mode}) ${refDetail}${notesDetail}`,
@@ -3323,9 +3364,33 @@ class DataService {
 
     let running = 0;
     const computedEntries = entries.map((entry) => {
+      const prevRunning = running;
       running = running + (entry.debit || 0) - (entry.credit || 0);
+
+      let particulars = entry.particulars;
+      let advanceThisTxn = 0;
+
+      if (entry.type === 'PAYMENT' && entry.credit > 0) {
+        if (prevRunning > 0) {
+          // Customer had old unpaid amount = prevRunning.
+          // Payment first deducts the old unpaid amount!
+          if (entry.credit > prevRunning) {
+            advanceThisTxn = entry.credit - prevRunning;
+          }
+        } else {
+          // Customer had zero due or already in advance -> entire payment contributes to advance
+          advanceThisTxn = entry.credit;
+        }
+
+        if (advanceThisTxn > 0) {
+          particulars = `${particulars} (includes ₹${Number(advanceThisTxn).toLocaleString('en-IN')} Advance Payment)`;
+        }
+      }
+
       return {
         ...entry,
+        particulars,
+        advanceThisTxn,
         runningRaw: running,
         balance: Math.max(0, running),
         advance: Math.max(0, -running),
@@ -3383,7 +3448,8 @@ class DataService {
     suppPayments.forEach((p) => {
       const linkedPur = p.purchase_id ? this.getPurchaseById(p.purchase_id) : null;
       const refDetail = linkedPur ? `for ${linkedPur.purchase_no}` : (p.reference_no ? `Ref: ${p.reference_no}` : '');
-      const notesDetail = p.notes ? ` (${p.notes})` : '';
+      const cleanNotes = (p.notes || '').replace(/\s*\(includes\s+₹?[0-9,.]+\s+Advance\s+Payment\)/gi, '').trim();
+      const notesDetail = cleanNotes ? ` (${cleanNotes})` : '';
       entries.push({
         id: p.id, date: p.date, time: p.time, type: 'PAYMENT',
         reference: p.receipt_no, particulars: `Payment Made (${p.payment_mode}) ${refDetail}${notesDetail}`,
@@ -3403,13 +3469,36 @@ class DataService {
 
     let running = 0;
     const computedEntries = entries.map((entry) => {
+      const prevRunning = running;
       running = running + (entry.credit || 0) - (entry.debit || 0);
+
+      let particulars = entry.particulars;
+      let advanceThisTxn = 0;
+
+      if (entry.type === 'PAYMENT' && entry.debit > 0) {
+        if (prevRunning > 0) {
+          // We had old unpaid amount to supplier = prevRunning.
+          // Payout first deducts the old unpaid amount!
+          if (entry.debit > prevRunning) {
+            advanceThisTxn = entry.debit - prevRunning;
+          }
+        } else {
+          advanceThisTxn = entry.debit;
+        }
+
+        if (advanceThisTxn > 0) {
+          particulars = `${particulars} (includes ₹${Number(advanceThisTxn).toLocaleString('en-IN')} Advance Payment)`;
+        }
+      }
+
       return {
         ...entry,
+        particulars,
+        advanceThisTxn,
         runningRaw: running,
         balance: Math.max(0, running),
         advance: Math.max(0, -running),
-        balanceStatus: running > 0 ? 'DUE' : (running < 0 ? 'ADVANCE' : 'SETTLED')
+        balanceStatus: running > 0 ? 'PAYABLE' : (running < 0 ? 'ADVANCE' : 'SETTLED')
       };
     });
 

@@ -138,6 +138,8 @@ export const RecordPaymentModal = ({
   
   const projectedPaid = targetPreviousPaid + numAmount;
   const projectedRemaining = Math.max(0, targetPendingBefore - numAmount);
+  const surplusAdvance = Math.max(0, numAmount - partyPendingTotal);
+  const clearedOldDue = Math.min(numAmount, partyPendingTotal);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -535,14 +537,20 @@ export const RecordPaymentModal = ({
               </div>
               <div style={{ background: projectedRemaining === 0 ? '#ecfdf5' : '#fef2f2', padding: '6px 8px', borderRadius: '6px', border: `1px solid ${projectedRemaining === 0 ? '#a7f3d0' : '#fecaca'}` }}>
                 <div style={{ color: projectedRemaining === 0 ? '#047857' : '#be123c', fontSize: '11px' }}>New Balance</div>
-                <strong style={{ color: projectedRemaining === 0 ? '#059669' : '#e11d48', fontSize: '13px' }}>{formatCurrency(projectedRemaining)}</strong>
+                <strong style={{ color: projectedRemaining === 0 ? '#059669' : '#e11d48', fontSize: '13px' }}>
+                  {surplusAdvance > 0 ? `+${formatCurrency(surplusAdvance)} Adv` : formatCurrency(projectedRemaining)}
+                </strong>
               </div>
             </div>
-            {projectedRemaining === 0 && (
+            {surplusAdvance > 0 ? (
+              <div style={{ marginTop: '8px', color: '#047857', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CheckCircle2 size={14} /> Fully settles all unpaid dues ({formatCurrency(clearedOldDue)}) and creates +{formatCurrency(surplusAdvance)} advance credit!
+              </div>
+            ) : projectedRemaining === 0 ? (
               <div style={{ marginTop: '8px', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <CheckCircle2 size={14} /> This payment will fully settle and mark this bill as Paid!
               </div>
-            )}
+            ) : null}
           </div>
         )}
 

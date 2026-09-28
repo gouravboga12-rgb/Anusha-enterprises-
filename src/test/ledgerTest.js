@@ -262,6 +262,36 @@ const suppPayEntry = suppLedger.entries.find((e) => e.type === 'PAYMENT');
 assert(purEntry && purEntry.credit === 15000, 'Supplier ledger purchase entry has Credit = ₹15,000');
 assert(suppPayEntry && suppPayEntry.debit === 5000, 'Supplier ledger payment entry has Debit = ₹5,000');
 
+// Scenario 11: Advance calculation with old unpaid deduction
+console.log('\n--- TEST SCENARIO 11: Advance Calculation Deducting Old Unpaid Balance ---');
+// testCustomer currently owes ₹13,000. Pay ₹10,000:
+const pay11a = dataService.recordCustomerPayment({
+  customer_id: testCustomer.id,
+  amount: 10000,
+  payment_mode: 'Cash',
+  notes: 'Partial settlement'
+});
+const ledgerAfter11a = dataService.getCustomerLedger(testCustomer.id);
+assert(ledgerAfter11a.pendingBalance === 3000, 'Pending balance reduced to ₹3,000');
+assert(ledgerAfter11a.advanceBalance === 0, 'No advance balance because old unpaid amount remained');
+assert(!pay11a.notes.includes('Advance Payment'), 'Payment notes do NOT falsely claim Advance Payment');
+
+// Now pay ₹5,000 (clears ₹3,000 old due + creates ₹2,000 advance):
+const pay11b = dataService.recordCustomerPayment({
+  customer_id: testCustomer.id,
+  amount: 5000,
+  payment_mode: 'UPI',
+  notes: 'Advance deposit'
+});
+const ledgerAfter11b = dataService.getCustomerLedger(testCustomer.id);
+assert(ledgerAfter11b.pendingBalance === 0, 'Pending balance fully settled (₹0)');
+assert(ledgerAfter11b.advanceBalance === 2000, 'Surplus advance balance correctly marked as ₹2,000');
+const latestLedgerEntry = ledgerAfter11b.entries[ledgerAfter11b.entries.length - 1];
+assert(latestLedgerEntry.advanceThisTxn === 2000, 'Ledger entry advanceThisTxn is ₹2,000');
+assert(latestLedgerEntry.particulars.includes('includes ₹2,000 Advance Payment'), 'Ledger particulars dynamically show correct ₹2,000 Advance');
+assert(latestLedgerEntry.advance === 2000, 'Running balance advance is ₹2,000');
+
 console.log(`\n========================================`);
 console.log(`ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY!`);
 console.log(`========================================`);
+

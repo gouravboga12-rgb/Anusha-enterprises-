@@ -140,13 +140,17 @@ export const NewSaleModal = ({
   const existingAdvance = customerLedger ? (customerLedger.advanceBalance || 0) : 0;
 
   const numPayment = Number(initialPayment) || 0;
-  const thisBillPending = Math.max(0, totalBillAmount - numPayment);
-  const thisBillAdvance = Math.max(0, numPayment - totalBillAmount);
+  // Deduct old unpaid customer amount and absorb existing advance
+  const totalCustomerObligation = Math.max(0, (previousBalance - existingAdvance) + totalBillAmount);
+  const thisBillEffectiveCovered = Math.min(totalBillAmount, Math.max(0, existingAdvance + numPayment - previousBalance));
+  const thisBillPending = Math.max(0, totalBillAmount - thisBillEffectiveCovered);
 
   // Net calculation accounting for existing advance and current payment
   const netBalanceAfter = (previousBalance - existingAdvance) + (totalBillAmount - numPayment);
   const finalDueAfter = Math.max(0, netBalanceAfter);
   const finalAdvanceAfter = Math.max(0, -netBalanceAfter);
+  const appliedToOldDue = Math.min(numPayment, previousBalance);
+  const appliedFromOldAdvance = Math.min(existingAdvance, totalBillAmount);
 
   // Compute stock errors for all line items
   const stockErrors = items.map((item) => {
@@ -875,6 +879,27 @@ export const NewSaleModal = ({
                 </div>
               )}
 
+              {previousBalance > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b91c1c', fontSize: '12px' }}>
+                  <span>Old Unpaid Customer Balance:</span>
+                  <span style={{ fontWeight: 700 }}>{formatCurrency(previousBalance)}</span>
+                </div>
+              )}
+
+              {previousBalance > 0 && numPayment > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0284c7', fontSize: '12px' }}>
+                  <span>Deducted from Old Unpaid Balance:</span>
+                  <span style={{ fontWeight: 700 }}>-{formatCurrency(appliedToOldDue)}</span>
+                </div>
+              )}
+
+              {existingAdvance > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontSize: '12px' }}>
+                  <span>Deducted from Existing Customer Advance:</span>
+                  <span style={{ fontWeight: 700 }}>-{formatCurrency(appliedFromOldAdvance)}</span>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                 <span>This Bill Pending Due:</span>
                 <span style={{ fontWeight: 700, color: thisBillPending > 0 ? '#e11d48' : '#10b981' }}>
@@ -882,10 +907,10 @@ export const NewSaleModal = ({
                 </span>
               </div>
 
-              {thisBillAdvance > 0 && (
+              {finalAdvanceAfter > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#047857' }}>
-                  <span>Excess Advance Received with this Bill:</span>
-                  <span style={{ fontWeight: 700 }}>+{formatCurrency(thisBillAdvance)}</span>
+                  <span>Surplus Advance Credit (After Clearing All Dues):</span>
+                  <span style={{ fontWeight: 700 }}>+{formatCurrency(finalAdvanceAfter)} Adv</span>
                 </div>
               )}
 
