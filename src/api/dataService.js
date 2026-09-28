@@ -268,8 +268,14 @@ class DataService {
 
   _normalizeSale(s) {
     if (!s) return s;
+    const existing = this.getSaleById ? (this.getSaleById(s.id) || this.getSaleById(s.invoice_no)) : null;
+    const incomingItems = (s.items && s.items.length > 0)
+      ? s.items
+      : ((s.customer_sale_items && s.customer_sale_items.length > 0)
+          ? s.customer_sale_items
+          : (existing?.items && existing.items.length > 0 ? existing.items : []));
     const parsed = parseNotesAndVehicle(s.notes, s.vehicle_no, s.eway_no, s.customer_address);
-    const cleanItems = (s.items || []).map((i) => {
+    const cleanItems = incomingItems.map((i) => {
       const prod = this.getProductById ? this.getProductById(i.product_id) : null;
       return {
         ...i,
@@ -2206,19 +2212,25 @@ class DataService {
     this.saveCache();
     this.notify();
 
-    // Background Supabase write (stores vehicle_no resiliently inside notes column)
+    // Background Supabase write with complete fields and UUID-safe item rows
     supabase.from('customer_sales').insert([{
       id: newSale.id, invoice_no: newSale.invoice_no, customer_id: newSale.customer_id,
+      customer_address: custAddr, eway_no: ewayNo, subtotal: subtotal,
+      cgst_amount: finalCgst, sgst_amount: finalSgst, gst_rate: 18,
       date: newSale.date, time: newSale.time, total_amount: newSale.total_amount,
       paid_amount: newSale.paid_amount, pending_amount: newSale.pending_amount,
       payment_status: newSale.payment_status, notes: storageNotes, recorded_by: newSale.recorded_by
     }]).then(() => {
       supabase.from('customer_sale_items').insert(
-        cleanItems.map((i) => ({
-          id: i.id, sale_id: i.sale_id, product_id: i.product_id, product_name: i.product_name,
-          quantity: i.quantity, unit: i.unit, hsn_code: i.hsn_code, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
-        }))
-      ).then().catch((e) => console.warn(e));
+        cleanItems.map((i) => {
+          const row = {
+            sale_id: saleId, product_id: i.product_id, product_name: i.product_name,
+            quantity: i.quantity, unit: i.unit, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
+          };
+          if (i.hsn_code) row.hsn_code = i.hsn_code;
+          return row;
+        })
+      ).then().catch((e) => console.warn('customer_sale_items insert error:', e));
 
       if (newPayment) {
         supabase.from('customer_payments').insert([{
@@ -2408,10 +2420,14 @@ class DataService {
     }).eq('id', saleId).then(async () => {
       await supabase.from('customer_sale_items').delete().eq('sale_id', saleId);
       await supabase.from('customer_sale_items').insert(
-        cleanItems.map((i) => ({
-          id: i.id, sale_id: saleId, product_id: i.product_id, product_name: i.product_name,
-          quantity: i.quantity, unit: i.unit, hsn_code: i.hsn_code, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
-        }))
+        cleanItems.map((i) => {
+          const row = {
+            sale_id: saleId, product_id: i.product_id, product_name: i.product_name,
+            quantity: i.quantity, unit: i.unit, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
+          };
+          if (i.hsn_code) row.hsn_code = i.hsn_code;
+          return row;
+        })
       );
     }).catch((e) => console.warn('updateSale error:', e));
 

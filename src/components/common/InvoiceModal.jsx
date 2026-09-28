@@ -48,32 +48,34 @@ export const InvoiceModal = ({
       .replace(/\[EWay:\s*[^\]]+\]/gi, '')
       .replace(/(?:^|\n)EWay:\s*[^\n|]+/gi, '')
       .replace(/\[CustAddr:\s*[^\]]+\]/gi, '')
+      .replace(/\(includes\s*₹?[\d,.]+\s*Advance\s*Payment\)/gi, '')
+      .replace(/\[Advance:\s*[^\]]+\]/gi, '')
+      .replace(/Advance\s*Payment:?\s*₹?[\d,.]+/gi, '')
       .trim();
   }
 
-  const customer = dataService?.getCustomerById(doc.customer_id);
-  const docNo = doc.invoice_no || 'INV';
-  const items = doc.items || [];
+  const saleFromStore = dataService?.getSaleById ? (dataService.getSaleById(doc.id) || dataService.getSaleById(doc.invoice_no)) : null;
+  const activeDoc = (doc.items && doc.items.length > 0) ? doc : (saleFromStore || doc);
+  const customer = dataService?.getCustomerById(activeDoc.customer_id || doc.customer_id);
+  const docNo = activeDoc.invoice_no || doc.invoice_no || 'INV';
+  const items = (activeDoc.items && activeDoc.items.length > 0) ? activeDoc.items : (doc.items || []);
 
   // Calculate 18% GST (9% CGST + 9% SGST)
-  const taxableSubtotal = doc.subtotal !== undefined && doc.subtotal !== null && Number(doc.subtotal) > 0
-    ? Number(doc.subtotal)
-    : items.reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.selling_price) || 0), 0);
+  const taxableSubtotal = (items.length > 0)
+    ? items.reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.selling_price) || 0), 0)
+    : (doc.subtotal !== undefined && doc.subtotal !== null && Number(doc.subtotal) > 0 ? Number(doc.subtotal) : 0);
 
-  const cgstAmount = doc.cgst_amount !== undefined && doc.cgst_amount !== null
-    ? Number(doc.cgst_amount)
-    : Math.round(taxableSubtotal * 0.09 * 100) / 100;
-
-  const sgstAmount = doc.sgst_amount !== undefined && doc.sgst_amount !== null
-    ? Number(doc.sgst_amount)
-    : Math.round(taxableSubtotal * 0.09 * 100) / 100;
+  const cgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
+  const sgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
 
   // The total bill amount must ALWAYS include the 18% GST (taxable subtotal + CGST 9% + SGST 9%)
   const totalAmount = Math.round((taxableSubtotal + cgstAmount + sgstAmount) * 100) / 100;
 
-  const paidAmount = doc.paid_amount || 0;
-  const pendingAmount = Math.max(0, totalAmount - paidAmount);
-  const paymentStatus = doc.payment_status || (pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending');
+  const rawPaidAmount = Number(doc.paid_amount || activeDoc.paid_amount) || 0;
+  // If payment exceeds bill amount, cap display at totalAmount (do not mention advance on invoice)
+  const paidAmount = Math.min(rawPaidAmount, totalAmount);
+  const pendingAmount = Math.max(0, totalAmount - rawPaidAmount);
+  const paymentStatus = pendingAmount === 0 ? 'Paid' : rawPaidAmount > 0 ? 'Partially Paid' : 'Pending';
 
   // Customer Address: prioritize invoice-specific address then customer master address
   const customerAddress = (doc.customer_address || customer?.address || '').trim();

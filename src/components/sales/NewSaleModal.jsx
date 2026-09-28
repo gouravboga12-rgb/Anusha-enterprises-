@@ -210,12 +210,21 @@ export const NewSaleModal = ({
     }
 
     try {
+      const preparedItems = items.map((item) => {
+        const prod = products.find((p) => p.id === item.product_id);
+        return {
+          ...item,
+          product_name: item.product_name || prod?.name || 'Product',
+          hsn_code: (item.hsn_code && String(item.hsn_code).trim()) || prod?.hsn_code || ''
+        };
+      });
+
       const sale = dataService.recordSale({
         invoice_no: invoiceNo.trim() || undefined,
         customer_id: customerId,
         customer_address: customerAddress.trim(),
         eway_no: ewayNo.trim(),
-        items,
+        items: preparedItems,
         date,
         time,
         subtotal: taxableSubtotal,
