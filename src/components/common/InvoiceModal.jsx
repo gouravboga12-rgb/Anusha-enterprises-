@@ -68,9 +68,8 @@ export const InvoiceModal = ({
     ? Number(doc.sgst_amount)
     : Math.round(taxableSubtotal * 0.09 * 100) / 100;
 
-  const totalAmount = doc.total_amount !== undefined && doc.total_amount !== null && Number(doc.total_amount) > 0
-    ? Number(doc.total_amount)
-    : (taxableSubtotal + cgstAmount + sgstAmount);
+  // The total bill amount must ALWAYS include the 18% GST (taxable subtotal + CGST 9% + SGST 9%)
+  const totalAmount = Math.round((taxableSubtotal + cgstAmount + sgstAmount) * 100) / 100;
 
   const paidAmount = doc.paid_amount || 0;
   const pendingAmount = Math.max(0, totalAmount - paidAmount);
@@ -809,9 +808,7 @@ export const InvoiceModal = ({
                   </div>
                 </div>
 
-                <div style={{ fontSize: '11px', color: '#475569', borderTop: '1px solid #f1f5f9', paddingTop: '6px', fontWeight: 600 }}>
-                  Billed / Recorded by: <strong style={{ color: '#0f172a', fontWeight: 800 }}>{doc.recorded_by || 'Admin'}</strong>
-                </div>
+
               </div>
 
               {/* Financial Summary Card with 18% GST (9% CGST + 9% SGST) */}
