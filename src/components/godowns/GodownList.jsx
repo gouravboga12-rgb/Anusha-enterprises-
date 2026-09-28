@@ -25,6 +25,9 @@ export const GodownList = ({ dataService, currentUser }) => {
   const allGodowns = dataService.getGodowns(true);
   const products = dataService.getProducts();
 
+  const activeGodownExists = activeView === 'all' || godowns.some((g) => g.id === activeView);
+  const currentView = activeGodownExists ? activeView : 'all';
+
   // Overall stats
   const totalStock = products.reduce((acc, p) => acc + (p.current_stock || 0), 0);
   const lowStockCount = products.filter((p) => p.current_stock <= (p.min_stock_alert || 20) && p.current_stock > 0).length;
@@ -139,8 +142,8 @@ export const GodownList = ({ dataService, currentUser }) => {
           onClick={() => setActiveView('all')}
           style={{
             padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
-            background: activeView === 'all' ? '#0284c7' : '#f1f5f9',
-            color: activeView === 'all' ? '#fff' : '#475569'
+            background: currentView === 'all' ? '#0284c7' : '#f1f5f9',
+            color: currentView === 'all' ? '#fff' : '#475569'
           }}
         >
           <BarChart2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
@@ -152,8 +155,8 @@ export const GodownList = ({ dataService, currentUser }) => {
             onClick={() => setActiveView(g.id)}
             style={{
               padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
-              background: activeView === g.id ? '#0284c7' : '#f1f5f9',
-              color: activeView === g.id ? '#fff' : '#475569'
+              background: currentView === g.id ? '#0284c7' : '#f1f5f9',
+              color: currentView === g.id ? '#fff' : '#475569'
             }}
           >
             <Warehouse size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
@@ -163,7 +166,7 @@ export const GodownList = ({ dataService, currentUser }) => {
       </div>
 
       {/* Godown Cards */}
-      {activeView === 'all' ? (
+      {currentView === 'all' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
           {godowns.length === 0 ? (
             <div className="card" style={{ padding: '40px', textAlign: 'center', gridColumn: '1/-1' }}>
@@ -292,7 +295,7 @@ export const GodownList = ({ dataService, currentUser }) => {
       ) : (
         // Clicked a specific godown tab
         <GodownDetail
-          godownId={activeView}
+          godownId={currentView}
           dataService={dataService}
           currentUser={currentUser}
           onBack={() => setActiveView('all')}

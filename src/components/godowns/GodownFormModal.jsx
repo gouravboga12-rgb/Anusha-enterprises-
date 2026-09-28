@@ -22,6 +22,13 @@ export const GodownFormModal = ({ isOpen, onClose, godown, dataService, currentU
 
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Godown name is required.'); return; }
+    if (!godown) {
+      const isMain = form.name.trim().toLowerCase() === 'main godown' || form.code.trim().toUpperCase() === 'GD-01';
+      if (isMain) {
+        setError('A Main Godown (GD-01) already exists. Please choose a unique name and code for branch godowns.');
+        return;
+      }
+    }
     setSaving(true);
     setError('');
     try {

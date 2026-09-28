@@ -290,7 +290,64 @@ assert(latestLedgerEntry.advanceThisTxn === 2000, 'Ledger entry advanceThisTxn i
 assert(latestLedgerEntry.particulars.includes('includes ₹2,000 Advance Payment'), 'Ledger particulars dynamically show correct ₹2,000 Advance');
 assert(latestLedgerEntry.advance === 2000, 'Running balance advance is ₹2,000');
 
+// Scenario 12: Godown Deduplication and Stock Consolidation
+console.log('\n--- TEST SCENARIO 12: Godown Deduplication and Stock Consolidation ---');
+// Simulate the exact state reported by the user: 5 duplicate Main Godowns + 4 branch godowns
+const branch1 = { id: 'gd-branch-1', name: 'Branch Godown 1', code: 'GD-02', location: 'Nizamabad Town', is_active: true };
+const branch2 = { id: 'gd-branch-2', name: 'Branch Godown 2', code: 'GD-02', location: 'hyderabad', is_active: true };
+const branch3 = { id: 'gd-branch-3', name: 'GODOWN_3', code: 'GD_03', location: 'MEERPET CHAITHNYAHILLS', is_active: true };
+const branch4 = { id: 'gd-branch-4', name: 'Vechile 3555', code: 'GD-03', location: 'Nalgonda', is_active: true };
+
+const dupMain1 = { id: 'godown-main-1', name: 'Main Godown', code: 'GD-01', location: 'Nandipet, Nizamabad', is_default: true, is_active: true };
+const dupMain2 = { id: 'godown-main-2', name: 'Main Godown', code: 'GD-01', location: 'Nandipet, Nizamabad', is_default: true, is_active: true };
+const dupMain3 = { id: 'godown-main-3', name: 'Main Godown', code: 'GD-01', location: 'Nandipet, Nizamabad', is_default: true, is_active: true };
+const dupMain4 = { id: 'godown-main-4', name: 'Main Godown', code: 'GD-01', location: 'Nandipet, Nizamabad', is_default: true, is_active: true };
+const dupMain5 = { id: 'godown-main-5', name: 'Main Godown', code: 'GD-01', location: 'Nandipet, Nizamabad', is_default: true, is_active: true };
+
+dataService.godowns = [dupMain1, branch1, branch2, branch3, branch4, dupMain2, dupMain3, dupMain4, dupMain5];
+
+// Place 10 units in dupMain1 and 15 units in dupMain2
+dataService.godownStock = [
+  { id: 'gs-1', godown_id: 'godown-main-1', product_id: testProduct.id, quantity: 10 },
+  { id: 'gs-2', godown_id: 'godown-main-2', product_id: testProduct.id, quantity: 15 },
+  { id: 'gs-3', godown_id: 'gd-branch-1', product_id: testProduct.id, quantity: 8 }
+];
+
+// Run consolidation
+dataService._consolidateAndDeduplicateGodowns();
+
+const activeGodowns = dataService.getGodowns();
+assert(activeGodowns.length === 5, `Expected 5 godowns after deduplication, got ${activeGodowns.length}`);
+
+const mainGodowns = activeGodowns.filter((g) => g.name === 'Main Godown');
+assert(mainGodowns.length === 1, `Exactly 1 Main Godown exists after deduplication (found ${mainGodowns.length})`);
+
+const canonicalMain = dataService.getDefaultGodown();
+assert(canonicalMain && canonicalMain.name === 'Main Godown', 'Default godown correctly resolves to Main Godown');
+
+// Check stock in Main Godown was merged: 10 + 15 = 25 units
+const mainStock = dataService.getProductStockInGodown(testProduct.id, canonicalMain.id);
+assert(mainStock === 25, `Stock from duplicate Main Godowns was merged: 10 + 15 = 25 (got ${mainStock})`);
+
+// Check branch godown stock was untouched: 8 units
+const branchStock = dataService.getProductStockInGodown(testProduct.id, 'gd-branch-1');
+assert(branchStock === 8, `Branch Godown 1 stock remained untouched at 8 units (got ${branchStock})`);
+
+// Verify getGodownById resolves old duplicate ID to canonical Main Godown
+const resolvedFromLegacy = dataService.getGodownById('godown-main-2');
+assert(resolvedFromLegacy && resolvedFromLegacy.name === 'Main Godown', 'Legacy duplicate Main Godown ID resolves to canonical Main Godown');
+
+// Verify duplicate creation is blocked
+let duplicateCreationBlocked = false;
+try {
+  dataService.saveGodown({ name: 'Main Godown', code: 'GD-01' }, { role: 'owner' });
+} catch (e) {
+  duplicateCreationBlocked = true;
+}
+assert(duplicateCreationBlocked === true, 'Creating duplicate Main Godown is strictly blocked');
+
 console.log(`\n========================================`);
 console.log(`ALL ${passedTests}/${totalTests} TESTS PASSED SUCCESSFULLY!`);
 console.log(`========================================`);
+
 

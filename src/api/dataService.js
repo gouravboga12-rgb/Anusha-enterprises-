@@ -249,6 +249,7 @@ class DataService {
         this.walletTransactions = data.walletTransactions || [];
         this.clearedActivityCutoff = Number(data.clearedActivityCutoff) || 0;
         this.clearedActivityRanges = Array.isArray(data.clearedActivityRanges) ? data.clearedActivityRanges : [];
+        this._consolidateAndDeduplicateGodowns();
         return true;
       }
     } catch (e) {
@@ -374,16 +375,203 @@ class DataService {
         quantity: p.current_stock || 0,
         updated_at: new Date().toISOString()
       }));
+    } else {
+      this._consolidateAndDeduplicateGodowns();
     }
+  }
+
+  // Consolidate duplicate Main Godown records, merge stock, and remap transactions
+  async _consolidateAndDeduplicateGodowns() {
+    if (!this.godowns || this.godowns.length === 0) return;
+
+    const isMainCandidate = (g) => {
+      if (!g) return false;
+      const name = (g.name || '').trim().toLowerCase();
+      const code = (g.code || '').trim().toUpperCase();
+      const id = String(g.id || '').toLowerCase();
+      return (
+        name === 'main godown' ||
+        code === 'GD-01' ||
+        Boolean(g.is_default) ||
+        id.startsWith('godown-main')
+      );
+    };
+
+    const mainCandidates = this.godowns.filter(isMainCandidate);
+
+    if (mainCandidates.length <= 1) {
+      if (mainCandidates.length === 1 && !mainCandidates[0].is_default) {
+        mainCandidates[0].is_default = true;
+      }
+      return;
+    }
+
+    // Pick canonical Main Godown by best score (existing stock > transactions > deterministic ID > oldest)
+    const scoreCandidate = (g) => {
+      let score = 0;
+      const stockUnits = (this.godownStock || [])
+        .filter((gs) => gs.godown_id === g.id)
+        .reduce((sum, gs) => sum + (Number(gs.quantity) || 0), 0);
+      if (stockUnits > 0) score += 1000 + stockUnits;
+
+      const hasPurchases = (this.purchases || []).some((p) => p.godown_id === g.id || p.items?.some((i) => i.godown_id === g.id));
+      if (hasPurchases) score += 500;
+
+      const hasTransfers = (this.stockTransfers || []).some((t) => t.from_godown_id === g.id || t.to_godown_id === g.id);
+      if (hasTransfers) score += 300;
+
+      const hasSales = (this.sales || []).some((s) => s.items?.some((i) => i.godown_id === g.id));
+      if (hasSales) score += 200;
+
+      if (g.id === 'godown-main') score += 100;
+      if (g.is_default) score += 50;
+
+      return score;
+    };
+
+    let canonical = mainCandidates[0];
+    let highestScore = scoreCandidate(canonical);
+
+    for (let i = 1; i < mainCandidates.length; i++) {
+      const cand = mainCandidates[i];
+      const score = scoreCandidate(cand);
+      if (score > highestScore) {
+        canonical = cand;
+        highestScore = score;
+      }
+    }
+
+    canonical.name = 'Main Godown';
+    canonical.code = canonical.code || 'GD-01';
+    canonical.location = canonical.location || 'Nandipet, Nizamabad';
+    canonical.is_default = true;
+    canonical.is_active = true;
+
+    const duplicateGodowns = mainCandidates.filter((g) => g.id !== canonical.id);
+    const duplicateIds = duplicateGodowns.map((g) => g.id);
+
+    // 1. Merge stock quantities from duplicate godowns into the canonical godown
+    const canonicalStockMap = new Map();
+    (this.godownStock || []).forEach((gs) => {
+      if (gs.godown_id === canonical.id || duplicateIds.includes(gs.godown_id)) {
+        canonicalStockMap.set(gs.product_id, (canonicalStockMap.get(gs.product_id) || 0) + (Number(gs.quantity) || 0));
+      }
+    });
+
+    // Filter out duplicate godown stock rows from in-memory array
+    this.godownStock = (this.godownStock || []).filter((gs) => !duplicateIds.includes(gs.godown_id));
+
+    // Update canonical stock rows with merged totals
+    canonicalStockMap.forEach((qty, productId) => {
+      const existing = this.godownStock.find((gs) => gs.godown_id === canonical.id && gs.product_id === productId);
+      if (existing) {
+        existing.quantity = qty;
+        existing.updated_at = new Date().toISOString();
+      } else {
+        this.godownStock.push({
+          id: `gs-${canonical.id}-${productId}`,
+          godown_id: canonical.id,
+          product_id: productId,
+          quantity: qty,
+          updated_at: new Date().toISOString()
+        });
+      }
+    });
+
+    // 2. Remap references in purchases, sales, transfers, and adjustments
+    (this.purchases || []).forEach((p) => {
+      if (duplicateIds.includes(p.godown_id)) p.godown_id = canonical.id;
+      (p.items || []).forEach((item) => {
+        if (duplicateIds.includes(item.godown_id)) item.godown_id = canonical.id;
+      });
+    });
+
+    (this.sales || []).forEach((s) => {
+      (s.items || []).forEach((item) => {
+        if (duplicateIds.includes(item.godown_id)) item.godown_id = canonical.id;
+      });
+    });
+
+    (this.stockTransfers || []).forEach((t) => {
+      if (duplicateIds.includes(t.from_godown_id)) {
+        t.from_godown_id = canonical.id;
+        t.from_godown_name = canonical.name;
+      }
+      if (duplicateIds.includes(t.to_godown_id)) {
+        t.to_godown_id = canonical.id;
+        t.to_godown_name = canonical.name;
+      }
+    });
+
+    (this.adjustments || []).forEach((a) => {
+      if (duplicateIds.includes(a.godown_id)) a.godown_id = canonical.id;
+    });
+
+    // 3. Remove duplicate godowns from in-memory array
+    this.godowns = this.godowns.filter((g) => !duplicateIds.includes(g.id));
+
+    // 4. Background cleanup in Supabase
+    if (isSupabaseConfigured && duplicateIds.length > 0) {
+      (async () => {
+        try {
+          await supabase.from('godowns').upsert([{
+            id: canonical.id,
+            name: canonical.name,
+            code: canonical.code,
+            location: canonical.location,
+            contact_person: canonical.contact_person || null,
+            notes: canonical.notes || 'Default godown',
+            is_active: true,
+            is_default: true,
+            updated_at: new Date().toISOString()
+          }]);
+
+          const canonStockRows = this.godownStock.filter((gs) => gs.godown_id === canonical.id);
+          if (canonStockRows.length > 0) {
+            await supabase.from('godown_stock').upsert(canonStockRows, { onConflict: 'godown_id,product_id' });
+          }
+
+          await Promise.allSettled([
+            supabase.from('supplier_purchases').update({ godown_id: canonical.id }).in('godown_id', duplicateIds),
+            supabase.from('supplier_purchase_items').update({ godown_id: canonical.id }).in('godown_id', duplicateIds),
+            supabase.from('customer_sale_items').update({ godown_id: canonical.id }).in('godown_id', duplicateIds),
+            supabase.from('stock_transfers').update({ from_godown_id: canonical.id, from_godown_name: canonical.name }).in('from_godown_id', duplicateIds),
+            supabase.from('stock_transfers').update({ to_godown_id: canonical.id, to_godown_name: canonical.name }).in('to_godown_id', duplicateIds),
+            supabase.from('manual_stock_adjustments').update({ godown_id: canonical.id }).in('godown_id', duplicateIds)
+          ]);
+
+          await supabase.from('godown_stock').delete().in('godown_id', duplicateIds);
+          const { error: delErr } = await supabase.from('godowns').delete().in('id', duplicateIds);
+          if (delErr) {
+            await supabase.from('godowns').update({ is_active: false }).in('id', duplicateIds);
+          }
+        } catch (dbErr) {
+          console.warn('Godown deduplication Supabase sync warning:', dbErr);
+        }
+      })();
+    }
+
+    this.saveCache();
   }
 
   // First-time migration: if godowns table is empty, create "Main Godown" and seed godown_stock
   async _runFirstTimeMigration() {
     if (!isSupabaseConfigured) return;
-    if (this.godowns.length > 0) return; // Already migrated
+
+    const hasGodowns = Array.isArray(this.godowns) && this.godowns.length > 0;
+    if (hasGodowns) {
+      await this._consolidateAndDeduplicateGodowns();
+      return;
+    }
 
     try {
-      const mainGodownId = 'godown-main-' + Date.now();
+      // Double check directly with Supabase to avoid race conditions across tabs/devices
+      const { data: dbGodowns } = await supabase.from('godowns').select('id, name, code, is_default').limit(5);
+      if (dbGodowns && dbGodowns.length > 0) {
+        return;
+      }
+
+      const mainGodownId = 'godown-main';
       const mainGodown = {
         id: mainGodownId,
         name: 'Main Godown',
@@ -397,12 +585,12 @@ class DataService {
         updated_at: new Date().toISOString()
       };
 
-      await supabase.from('godowns').insert([mainGodown]);
+      await supabase.from('godowns').upsert([mainGodown], { onConflict: 'id' });
       this.godowns = [mainGodown];
 
       // Seed godown_stock from current product stock
-      const stockRows = this.products.map((p) => ({
-        id: `gs-${p.id}-${Date.now()}`,
+      const stockRows = (this.products || []).map((p) => ({
+        id: `gs-${mainGodownId}-${p.id}`,
         godown_id: mainGodownId,
         product_id: p.id,
         quantity: p.current_stock || 0,
@@ -410,7 +598,7 @@ class DataService {
       }));
 
       if (stockRows.length > 0) {
-        await supabase.from('godown_stock').insert(stockRows);
+        await supabase.from('godown_stock').upsert(stockRows, { onConflict: 'godown_id,product_id' });
         this.godownStock = stockRows;
       }
 
@@ -653,6 +841,7 @@ class DataService {
         }
       });
 
+      await this._consolidateAndDeduplicateGodowns();
       this.saveCache();
       this.isLiveConnected = true;
       this.connectionError = null;
@@ -1090,20 +1279,56 @@ class DataService {
   // GODOWN MANAGEMENT
   // ==============================================================================
   getGodowns(includeInactive = false) {
-    return includeInactive ? this.godowns : this.godowns.filter((g) => g.is_active);
+    const list = includeInactive ? this.godowns : this.godowns.filter((g) => g.is_active);
+    const seen = new Set();
+    const result = [];
+    let hasMain = false;
+
+    for (const g of list) {
+      if (!g || !g.id) continue;
+      const isMain = g.is_default || g.code?.trim().toUpperCase() === 'GD-01' || (g.name || '').trim().toLowerCase() === 'main godown';
+      if (isMain) {
+        if (hasMain) continue;
+        hasMain = true;
+      }
+      if (seen.has(g.id)) continue;
+      seen.add(g.id);
+      result.push(g);
+    }
+
+    return result;
   }
 
   getGodownById(id) {
-    return this.godowns.find((g) => g.id === id);
+    if (!id) return null;
+    const direct = this.godowns.find((g) => g.id === id);
+    if (direct) return direct;
+    if (typeof id === 'string' && id.startsWith('godown-main')) {
+      return this.getDefaultGodown();
+    }
+    return null;
   }
 
   getDefaultGodown() {
-    return this.godowns.find((g) => g.is_default) || this.godowns[0] || null;
+    return this.godowns.find((g) => g.is_default && g.is_active)
+      || this.godowns.find((g) => (g.name || '').trim().toLowerCase() === 'main godown' && g.is_active)
+      || this.godowns.find((g) => (g.code || '').trim().toUpperCase() === 'GD-01' && g.is_active)
+      || this.godowns.find((g) => g.is_default)
+      || this.godowns[0]
+      || null;
   }
 
   saveGodown(godownData, currentUser) {
     const isNew = !godownData.id;
     const gId = godownData.id || 'godown-' + Date.now();
+
+    if (isNew) {
+      const isTryingMain = (godownData.name || '').trim().toLowerCase() === 'main godown' || (godownData.code || '').trim().toUpperCase() === 'GD-01';
+      const existingMain = this.getDefaultGodown();
+      if (isTryingMain && existingMain) {
+        throw new Error('A Main Godown (GD-01) already exists. Please choose a unique name and code for branch godowns.');
+      }
+    }
 
     let storedContactPerson = (godownData.contact_person || '').trim();
     const phone = (godownData.contact_phone || '').trim();
