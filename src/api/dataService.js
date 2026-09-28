@@ -321,34 +321,38 @@ class DataService {
   }
 
   async init() {
-    try {
-      if (!isSupabaseConfigured) {
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = (async () => {
+      try {
+        if (!isSupabaseConfigured) {
+          this.isLiveConnected = false;
+          this.connectionError = 'Configure Supabase environment variables in Vercel settings';
+          this._ensureDefaultGodownDemo();
+          this.notify();
+          return;
+        }
+
+        // If we don't have any cached data, show initial loading; otherwise render instantly
+        if (!this.products || this.products.length === 0) {
+          this.isLoading = true;
+          this.notify();
+        }
+
+        await this.fetchAll();
+        await this._runFirstTimeMigration();
+        this.setupRealtimeSubscription();
+        this.isLiveConnected = true;
+        this.connectionError = null;
+      } catch (err) {
+        console.warn('Supabase initialization warning:', err.message);
         this.isLiveConnected = false;
-        this.connectionError = 'Configure Supabase environment variables in Vercel settings';
-        this._ensureDefaultGodownDemo();
-        this.notify();
-        return;
-      }
-
-      // If we don't have any cached data, show initial loading; otherwise render instantly
-      if (!this.products || this.products.length === 0) {
-        this.isLoading = true;
+        this.connectionError = err.message || 'Connecting to Supabase...';
+      } finally {
+        this.isLoading = false;
         this.notify();
       }
-
-      await this.fetchAll();
-      await this._runFirstTimeMigration();
-      this.setupRealtimeSubscription();
-      this.isLiveConnected = true;
-      this.connectionError = null;
-    } catch (err) {
-      console.warn('Supabase initialization warning:', err.message);
-      this.isLiveConnected = false;
-      this.connectionError = err.message || 'Connecting to Supabase...';
-    } finally {
-      this.isLoading = false;
-      this.notify();
-    }
+    })();
+    return this._initPromise;
   }
 
   // Ensure a default godown exists for demo/mock mode
@@ -609,8 +613,12 @@ class DataService {
   }
 
   async fetchAll() {
-    if (this.isFetching) return;
+    if (this.isFetching) {
+      if (this._activeFetchPromise) return this._activeFetchPromise;
+      return;
+    }
     this.isFetching = true;
+    this._activeFetchPromise = (async () => {
 
     try {
       // Run all queries simultaneously in PARALLEL via Promise.all (300ms vs 10+ seconds sequential)
@@ -851,8 +859,11 @@ class DataService {
     } finally {
       this.isFetching = false;
       this.isLoading = false;
+      this._activeFetchPromise = null;
       this.notify();
     }
+    })();
+    return this._activeFetchPromise;
   }
 
   setupRealtimeSubscription() {
@@ -2856,19 +2867,23 @@ class DataService {
           }
 
           if (newPayment) {
-            await supabase.from('supplier_payments').insert([{
-              id: newPayment.id,
-              receipt_no: newPayment.receipt_no,
-              supplier_id: canonicalSupplierId,
-              purchase_id: newPayment.purchase_id,
-              amount: newPayment.amount,
-              payment_mode: newPayment.payment_mode,
-              reference_no: newPayment.reference_no,
-              date: newPayment.date,
-              time: newPayment.time,
-              notes: newPayment.notes,
-              recorded_by: newPayment.recorded_by
-            }]).catch((e) => console.warn(e));
+            try {
+              await supabase.from('supplier_payments').insert([{
+                id: newPayment.id,
+                receipt_no: newPayment.receipt_no,
+                supplier_id: canonicalSupplierId,
+                purchase_id: newPayment.purchase_id,
+                amount: newPayment.amount,
+                payment_mode: newPayment.payment_mode,
+                reference_no: newPayment.reference_no,
+                date: newPayment.date,
+                time: newPayment.time,
+                notes: newPayment.notes,
+                recorded_by: newPayment.recorded_by
+              }]);
+            } catch (e) {
+              console.warn('supplier_payments insert error:', e);
+            }
           }
         }
       }).catch((e) => console.warn('recordPurchase error:', e));
@@ -3260,7 +3275,7 @@ class DataService {
   }
 
   _recordWalletTxn(data, currentUser) {
-    const txnId = 'w-' + Date.now();
+    const txnId = 'w-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
     const txnNo = `WLT-${Math.floor(10000 + Math.random() * 90000)}`;
     const newTxn = {
       id: txnId,
