@@ -55,8 +55,13 @@ export const CustomerProfile = ({
   }
 
   const ledgerData = dataService.getCustomerLedger(customerId);
-  const sales = dataService.getSales().filter((s) => s.customer_id === customerId);
-  const payments = dataService.getPayments().filter((p) => p.customer_id === customerId && p.type === 'customer_payment');
+  const validIds = new Set(
+    [customerId, customer?.id, customer?.customer_id]
+      .filter(Boolean)
+      .map((id) => String(id).toLowerCase().trim())
+  );
+  const sales = dataService.getSales().filter((s) => s && validIds.has(String(s.customer_id).toLowerCase().trim()));
+  const payments = dataService.getPayments().filter((p) => p && validIds.has(String(p.customer_id).toLowerCase().trim()) && p.type === 'customer_payment');
 
   const filteredLedgerEntries = useMemo(() => {
     if (!ledgerData?.entries) return [];

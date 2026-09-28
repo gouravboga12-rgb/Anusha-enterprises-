@@ -293,18 +293,7 @@ class DataService {
     const pendingAmount = Math.max(0, totalAmount - paidAmount);
     const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
-    // Auto sync with Supabase in background if database had outdated tax-exclusive amount
-    if (isSupabaseConfigured() && s.id && subtotal > 0 && rawTotal <= subtotal) {
-      supabase.from('customer_sales').update({
-        subtotal: subtotal,
-        cgst_amount: cgstAmount,
-        sgst_amount: sgstAmount,
-        gst_rate: 18,
-        total_amount: totalAmount,
-        pending_amount: pendingAmount,
-        payment_status: paymentStatus
-      }).eq('id', s.id).then().catch((e) => console.warn('Sync sale tax error:', e));
-    }
+
 
     return {
       ...s,
