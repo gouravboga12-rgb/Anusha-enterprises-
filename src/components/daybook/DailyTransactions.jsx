@@ -103,6 +103,9 @@ export const DailyTransactions = ({ dataService, onViewInvoice }) => {
         const g = dataService.getGodownById(i.godown_id);
         return `${i.product_name}: ${i.quantity} ${unit} × ₹${Number(i.selling_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}${g ? ` [${g.name}]` : ''}`;
       });
+      if (s.cgst_amount > 0 || s.sgst_amount > 0) {
+        itemLines.push(`GST (18%): CGST 9% (₹${s.cgst_amount}) + SGST 9% (₹${s.sgst_amount})`);
+      }
       allEvents.push({
         id: s.id,
         raw: s,

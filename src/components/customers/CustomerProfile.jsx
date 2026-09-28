@@ -772,8 +772,11 @@ export const CustomerProfile = ({
                         </td>
                         <td>
                           {sale.items.map((i, idx) => (
-                            <div key={idx} style={{ fontSize: '12px' }}>
-                              {i.product_name} <span style={{ color: '#64748b' }}>({i.quantity} × {formatCurrency(i.selling_price)})</span>
+                            <div key={idx} style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', marginBottom: '3px' }}>
+                              <span>{i.product_name}</span>{' '}
+                              <span style={{ color: '#1e293b', fontWeight: 700 }}>
+                                ({i.quantity} {i.unit || 'Units'} × {formatCurrency(i.selling_price)})
+                              </span>
                             </div>
                           ))}
                         </td>
@@ -892,9 +895,9 @@ export const CustomerProfile = ({
                   <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', fontSize: '12px', border: '1px solid #f1f5f9' }}>
                     <div style={{ fontWeight: 600, color: '#475569', marginBottom: '4px', fontSize: '11px' }}>ITEMS BILLED:</div>
                     {sale.items.map((i, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: '#1e293b', marginBottom: '2px' }}>
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: '#0f172a', fontWeight: 700, marginBottom: '2px' }}>
                         <span>{i.product_name}</span>
-                        <span style={{ color: '#64748b' }}>{i.quantity} × {formatCurrency(i.selling_price)}</span>
+                        <span style={{ color: '#1e293b', fontWeight: 700 }}>{i.quantity} {i.unit || 'Units'} × {formatCurrency(i.selling_price)}</span>
                       </div>
                     ))}
                   </div>

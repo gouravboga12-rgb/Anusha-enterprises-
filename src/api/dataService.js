@@ -235,7 +235,7 @@ class DataService {
         this.products = data.products || [];
         this.customers = data.customers || [];
         this.suppliers = data.suppliers || [];
-        this.sales = data.sales || [];
+        this.sales = (data.sales || []).map((s) => this._normalizeSale(s));
         this.purchases = data.purchases || [];
         this.payments = data.payments || [];
         this.adjustments = data.adjustments || [];
@@ -264,6 +264,64 @@ class DataService {
 
   notify() {
     this.listeners.forEach((fn) => fn());
+  }
+
+  _normalizeSale(s) {
+    if (!s) return s;
+    const parsed = parseNotesAndVehicle(s.notes, s.vehicle_no, s.eway_no, s.customer_address);
+    const cleanItems = (s.items || []).map((i) => {
+      const prod = this.getProductById ? this.getProductById(i.product_id) : null;
+      return {
+        ...i,
+        unit: (i.unit && String(i.unit).trim()) || prod?.unit || 'Units',
+        hsn_code: (i.hsn_code && String(i.hsn_code).trim()) || (i.hsn && String(i.hsn).trim()) || prod?.hsn_code || '',
+        quantity: Number(i.quantity) || 0,
+        selling_price: Number(i.selling_price) || 0,
+        total: Number(i.total) || ((Number(i.quantity) || 0) * (Number(i.selling_price) || 0))
+      };
+    });
+
+    const subtotal = Number(s.subtotal) || cleanItems.reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.selling_price) || 0), 0);
+    const cgstAmount = Number(s.cgst_amount) || Math.round(subtotal * 0.09 * 100) / 100;
+    const sgstAmount = Number(s.sgst_amount) || Math.round(subtotal * 0.09 * 100) / 100;
+    const totalGst = cgstAmount + sgstAmount;
+    const calculatedWithGst = Math.round((subtotal + totalGst) * 100) / 100;
+    const rawTotal = Number(s.total_amount) || 0;
+    // If stored total_amount is equal to or less than subtotal, GST was omitted -> add 18% GST
+    const totalAmount = (rawTotal > subtotal) ? rawTotal : (subtotal > 0 ? calculatedWithGst : rawTotal);
+    const paidAmount = Number(s.paid_amount) || 0;
+    const pendingAmount = Math.max(0, totalAmount - paidAmount);
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
+
+    // Auto sync with Supabase in background if database had outdated tax-exclusive amount
+    if (isSupabaseConfigured() && s.id && subtotal > 0 && rawTotal <= subtotal) {
+      supabase.from('customer_sales').update({
+        subtotal: subtotal,
+        cgst_amount: cgstAmount,
+        sgst_amount: sgstAmount,
+        gst_rate: 18,
+        total_amount: totalAmount,
+        pending_amount: pendingAmount,
+        payment_status: paymentStatus
+      }).eq('id', s.id).then().catch((e) => console.warn('Sync sale tax error:', e));
+    }
+
+    return {
+      ...s,
+      notes: parsed.notes,
+      vehicle_no: parsed.vehicle_no,
+      eway_no: parsed.eway_no,
+      customer_address: parsed.customer_address,
+      items: cleanItems,
+      subtotal: subtotal,
+      cgst_amount: cgstAmount,
+      sgst_amount: sgstAmount,
+      gst_rate: 18,
+      total_amount: totalAmount,
+      paid_amount: paidAmount,
+      pending_amount: pendingAmount,
+      payment_status: paymentStatus
+    };
   }
 
   async init() {
@@ -426,40 +484,8 @@ class DataService {
       this.customers = custs.filter((c) => c && c.status !== 'archived');
       this.suppliers = supps.filter((s) => s && s.status !== 'archived');
 
-      // Normalize sales
-      this.sales = salesData.map((s) => {
-        const parsed = parseNotesAndVehicle(s.notes, s.vehicle_no, s.eway_no, s.customer_address);
-        const subtotal = Number(s.subtotal) || (s.items || []).reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.selling_price) || 0), 0);
-        const cgstAmount = Number(s.cgst_amount) || Math.round(subtotal * 0.09 * 100) / 100;
-        const sgstAmount = Number(s.sgst_amount) || Math.round(subtotal * 0.09 * 100) / 100;
-        const totalAmount = Number(s.total_amount) || (subtotal + cgstAmount + sgstAmount);
-
-        return {
-          ...s,
-          notes: parsed.notes,
-          vehicle_no: parsed.vehicle_no,
-          eway_no: parsed.eway_no,
-          customer_address: parsed.customer_address,
-          subtotal: subtotal,
-          cgst_amount: cgstAmount,
-          sgst_amount: sgstAmount,
-          gst_rate: 18,
-          total_amount: totalAmount,
-          paid_amount: Number(s.paid_amount) || 0,
-          pending_amount: Number(s.pending_amount) || Math.max(0, totalAmount - (Number(s.paid_amount) || 0)),
-          items: (s.items || []).map((i) => {
-            const prod = this.getProductById(i.product_id);
-            return {
-              ...i,
-              unit: (i.unit && String(i.unit).trim()) || prod?.unit || 'Units',
-              hsn_code: (i.hsn_code && String(i.hsn_code).trim()) || (i.hsn && String(i.hsn).trim()) || prod?.hsn_code || '',
-              quantity: Number(i.quantity) || 0,
-              selling_price: Number(i.selling_price) || 0,
-              total: Number(i.total) || ((Number(i.quantity) || 0) * (Number(i.selling_price) || 0))
-            };
-          })
-        };
-      });
+      // Normalize sales with 18% GST (9% CGST + 9% SGST)
+      this.sales = salesData.map((s) => this._normalizeSale(s));
 
       // Normalize purchases
       this.purchases = purData.map((p) => {
@@ -3259,9 +3285,12 @@ class DataService {
         };
       });
       const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} ${i.unit} × ₹${i.selling_price} = ₹${i.total}`).join(', ');
+      const gstNote = (s.cgst_amount > 0 || s.sgst_amount > 0)
+        ? ` + 18% GST (CGST: ₹${s.cgst_amount}, SGST: ₹${s.sgst_amount})`
+        : '';
       entries.push({
         id: s.id, date: s.date, time: s.time, type: 'SALE',
-        reference: s.invoice_no, particulars: `Sales Invoice — ${summary}`,
+        reference: s.invoice_no, particulars: `Sales Invoice — ${summary}${gstNote}`,
         items_detail: itemsDetail, debit: s.total_amount, credit: 0
       });
     });

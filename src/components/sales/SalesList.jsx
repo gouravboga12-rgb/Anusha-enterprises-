@@ -237,8 +237,11 @@ export const SalesList = ({
                       </td>
                       <td>
                         {sale.items.map((i, idx) => (
-                          <div key={idx} style={{ fontSize: '12px' }}>
-                            {i.product_name} <span style={{ color: '#64748b' }}>({i.quantity} {i.unit || 'Units'} × {formatCurrency(i.selling_price)})</span>
+                          <div key={idx} style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', marginBottom: '3px' }}>
+                            <span>{i.product_name}</span>{' '}
+                            <span style={{ color: '#1e293b', fontWeight: 700 }}>
+                              ({i.quantity} {i.unit || 'Units'} × {formatCurrency(i.selling_price)})
+                            </span>
                           </div>
                         ))}
                       </td>
@@ -399,7 +402,7 @@ export const SalesList = ({
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <span style={{ color: '#64748b', fontSize: '10.5px' }}>Items Sold:</span>
-                    <div style={{ fontSize: '12px', color: '#334155', fontWeight: 500 }}>
+                    <div style={{ fontSize: '12.5px', color: '#0f172a', fontWeight: 700 }}>
                       {sale.items.map((i) => `${i.product_name} (${i.quantity} ${i.unit || 'Units'})`).join(', ')}
                     </div>
                   </div>
