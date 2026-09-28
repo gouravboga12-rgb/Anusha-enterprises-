@@ -585,13 +585,7 @@ export const InvoiceModal = ({
                   </div>
                 )}
 
-                <div style={{ marginTop: '5px' }}>
-                  <span className={`badge ${
-                    paymentStatus === 'Paid' ? 'badge-paid' : paymentStatus === 'Partially Paid' ? 'badge-partial' : 'badge-pending'
-                  }`} style={{ fontSize: '11px', fontWeight: 700 }}>
-                    Status: {paymentStatus}
-                  </span>
-                </div>
+
               </div>
             </div>
 
@@ -841,32 +835,14 @@ export const InvoiceModal = ({
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  fontSize: '14.5px',
+                  fontSize: '15px',
                   fontWeight: 900,
-                  borderTop: '1.5px solid #cbd5e1',
-                  paddingTop: '8px',
+                  borderTop: '2px solid #0f172a',
+                  paddingTop: '10px',
                   color: '#0f172a'
                 }}>
                   <span>Total Bill Amount (Incl. 18% GST):</span>
-                  <span style={{ fontSize: '16px', color: '#0284c7' }}>{formatCurrency(totalAmount)}</span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#16a34a', fontWeight: 700 }}>
-                  <span>Paid / Inward Received:</span>
-                  <strong>{formatCurrency(paidAmount)}</strong>
-                </div>
-
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '14px',
-                  fontWeight: 900,
-                  borderTop: '1.5px dashed #cbd5e1',
-                  paddingTop: '8px',
-                  color: pendingAmount > 0 ? '#b91c1c' : '#16a34a'
-                }}>
-                  <span>Customer Balance Due:</span>
-                  <span>{formatCurrency(pendingAmount)}</span>
+                  <span style={{ fontSize: '17px', color: '#0284c7', fontWeight: 900 }}>{formatCurrency(totalAmount)}</span>
                 </div>
               </div>
             </div>
