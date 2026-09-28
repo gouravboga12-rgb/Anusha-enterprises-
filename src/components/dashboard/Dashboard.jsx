@@ -74,14 +74,14 @@ export const Dashboard = ({
             style={{ background: '#ffffff', color: '#0284c7', fontWeight: 700 }}
             onClick={onOpenNewSale}
           >
-            <PlusCircle size={16} /> + New Sale Bill
+            <PlusCircle size={16} /> + New Sale
           </button>
           <button
             className="btn"
             style={{ background: '#0284c7', color: '#ffffff', border: '1px solid rgba(255,255,255,0.4)', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
             onClick={onOpenNewPurchase}
           >
-            <ShoppingBag size={16} /> + New Purchase Bill
+            <ShoppingBag size={16} /> + New Purchase
           </button>
           <button
             className="btn"
