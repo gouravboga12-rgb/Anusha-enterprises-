@@ -57,29 +57,66 @@ export const decodeStoredPassword = (storedHash) => {
   return '';
 };
 
-// Safely parse vehicle number and notes from storage
-export const parseNotesAndVehicle = (rawNotes, rawVehicle) => {
+// Safely parse vehicle number, e-way number, customer address and notes from storage
+export const parseNotesAndVehicle = (rawNotes, rawVehicle, rawEway, rawCustAddr) => {
   let vehicle_no = (rawVehicle || '').trim();
+  let eway_no = (rawEway || '').trim();
+  let customer_address = (rawCustAddr || '').trim();
   let notes = (rawNotes || '').trim();
 
   if (!vehicle_no && notes) {
     const match = notes.match(/\[Vehicle:\s*([^\]]+)\]/i) || notes.match(/(?:^|\n)Vehicle:\s*([^\n|]+)/i);
     if (match) {
       vehicle_no = match[1].trim();
-      notes = notes.replace(/\[Vehicle:\s*[^\]]+\]/gi, '').replace(/(?:^|\n)Vehicle:\s*[^\n|]+/gi, '').trim();
+      notes = notes.replace(/\[Vehicle:\s*([^\]]+)\]/gi, '').replace(/(?:^|\n)Vehicle:\s*([^\n|]+)/gi, '').trim();
     }
+  } else if (notes) {
+    notes = notes.replace(/\[Vehicle:\s*([^\]]+)\]/gi, '').replace(/(?:^|\n)Vehicle:\s*([^\n|]+)/gi, '').trim();
   }
-  return { notes, vehicle_no };
+
+  if (!eway_no && notes) {
+    const match = notes.match(/\[EWay:\s*([^\]]+)\]/i) || notes.match(/(?:^|\n)EWay:\s*([^\n|]+)/i);
+    if (match) {
+      eway_no = match[1].trim();
+      notes = notes.replace(/\[EWay:\s*([^\]]+)\]/gi, '').replace(/(?:^|\n)EWay:\s*([^\n|]+)/gi, '').trim();
+    }
+  } else if (notes) {
+    notes = notes.replace(/\[EWay:\s*([^\]]+)\]/gi, '').replace(/(?:^|\n)EWay:\s*([^\n|]+)/gi, '').trim();
+  }
+
+  if (!customer_address && notes) {
+    const match = notes.match(/\[CustAddr:\s*([^\]]+)\]/i);
+    if (match) {
+      customer_address = match[1].trim();
+      notes = notes.replace(/\[CustAddr:\s*([^\]]+)\]/gi, '').trim();
+    }
+  } else if (notes) {
+    notes = notes.replace(/\[CustAddr:\s*([^\]]+)\]/gi, '').trim();
+  }
+
+  return { notes, vehicle_no, eway_no, customer_address };
 };
 
-// Format notes for resilient database storage without losing vehicle number
-export const formatNotesForStorage = (notes, vehicle_no) => {
+// Format notes for resilient database storage without losing vehicle number, eway number, or customer address
+export const formatNotesForStorage = (notes, vehicle_no, eway_no, customer_address) => {
   const cleanVehicle = (vehicle_no || '').trim();
-  const cleanNotes = (notes || '').replace(/\[Vehicle:\s*[^\]]+\]/gi, '').replace(/(?:^|\n)Vehicle:\s*[^\n|]+/gi, '').trim();
-  if (cleanVehicle && cleanNotes) {
-    return `[Vehicle: ${cleanVehicle}] ${cleanNotes}`;
-  } else if (cleanVehicle) {
-    return `[Vehicle: ${cleanVehicle}]`;
+  const cleanEway = (eway_no || '').trim();
+  const cleanCustAddr = (customer_address || '').trim();
+  let cleanNotes = (notes || '')
+    .replace(/\[Vehicle:\s*[^\\\]]+\]/gi, '')
+    .replace(/(?:^|\n)Vehicle:\s*[^\n|]+/gi, '')
+    .replace(/\[EWay:\s*[^\\\]]+\]/gi, '')
+    .replace(/(?:^|\n)EWay:\s*[^\n|]+/gi, '')
+    .replace(/\[CustAddr:\s*[^\\\]]+\]/gi, '')
+    .trim();
+
+  const tags = [];
+  if (cleanVehicle) tags.push(`[Vehicle: ${cleanVehicle}]`);
+  if (cleanEway) tags.push(`[EWay: ${cleanEway}]`);
+  if (cleanCustAddr) tags.push(`[CustAddr: ${cleanCustAddr}]`);
+
+  if (tags.length > 0) {
+    return cleanNotes ? `${tags.join(' ')} ${cleanNotes}` : tags.join(' ');
   }
   return cleanNotes;
 };
@@ -380,6 +417,7 @@ class DataService {
       // Normalize products
       this.products = prods.map((p) => ({
         ...p,
+        hsn_code: (p.hsn_code || p.hsn || '').trim(),
         current_stock: Number(p.current_stock) || 0,
         purchase_price: Number(p.purchase_price) || 0,
         selling_price: Number(p.selling_price) || 0
@@ -390,22 +428,34 @@ class DataService {
 
       // Normalize sales
       this.sales = salesData.map((s) => {
-        const parsed = parseNotesAndVehicle(s.notes, s.vehicle_no);
+        const parsed = parseNotesAndVehicle(s.notes, s.vehicle_no, s.eway_no, s.customer_address);
+        const subtotal = Number(s.subtotal) || (s.items || []).reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.selling_price) || 0), 0);
+        const cgstAmount = Number(s.cgst_amount) || Math.round(subtotal * 0.09 * 100) / 100;
+        const sgstAmount = Number(s.sgst_amount) || Math.round(subtotal * 0.09 * 100) / 100;
+        const totalAmount = Number(s.total_amount) || (subtotal + cgstAmount + sgstAmount);
+
         return {
           ...s,
           notes: parsed.notes,
           vehicle_no: parsed.vehicle_no,
-          total_amount: Number(s.total_amount) || 0,
+          eway_no: parsed.eway_no,
+          customer_address: parsed.customer_address,
+          subtotal: subtotal,
+          cgst_amount: cgstAmount,
+          sgst_amount: sgstAmount,
+          gst_rate: 18,
+          total_amount: totalAmount,
           paid_amount: Number(s.paid_amount) || 0,
-          pending_amount: Number(s.pending_amount) || 0,
+          pending_amount: Number(s.pending_amount) || Math.max(0, totalAmount - (Number(s.paid_amount) || 0)),
           items: (s.items || []).map((i) => {
             const prod = this.getProductById(i.product_id);
             return {
               ...i,
               unit: (i.unit && String(i.unit).trim()) || prod?.unit || 'Units',
+              hsn_code: (i.hsn_code && String(i.hsn_code).trim()) || (i.hsn && String(i.hsn).trim()) || prod?.hsn_code || '',
               quantity: Number(i.quantity) || 0,
               selling_price: Number(i.selling_price) || 0,
-              total: Number(i.total) || 0
+              total: Number(i.total) || ((Number(i.quantity) || 0) * (Number(i.selling_price) || 0))
             };
           })
         };
@@ -1569,6 +1619,7 @@ class DataService {
     const dbRecord = {
       id: prodId,
       sku: productData.sku ? productData.sku.trim() : `SKU-${Math.floor(100 + Math.random() * 900)}`,
+      hsn_code: (productData.hsn_code || productData.hsn || '').trim(),
       name: (productData.name || '').trim(),
       current_stock: productData.current_stock !== undefined && productData.current_stock !== ''
         ? Number(productData.current_stock) : 0,
@@ -2002,24 +2053,36 @@ class DataService {
     }
 
     const saleId = 'sale-' + Date.now();
-    const invoiceNo = `INV-${Math.floor(100 + Math.random() * 900)}`;
+
+    // 1. Invoice Number (Custom or Auto-Generated) with Uniqueness Guarantee
+    let invoiceNo = (saleData.invoice_no || saleData.invoiceNo || '').trim();
+    if (!invoiceNo) {
+      invoiceNo = `INV-${Math.floor(100 + Math.random() * 900)}`;
+      let attempts = 0;
+      while (this.sales.some((s) => s.invoice_no?.toLowerCase() === invoiceNo.toLowerCase()) && attempts < 50) {
+        invoiceNo = `INV-${Math.floor(100 + Math.random() * 900)}`;
+        attempts++;
+      }
+    } else {
+      const duplicate = this.sales.find((s) => s.invoice_no?.toLowerCase() === invoiceNo.toLowerCase());
+      if (duplicate) {
+        throw new Error(`Invoice number "${invoiceNo}" already exists. Please enter a different, unique invoice number.`);
+      }
+    }
+
     const initialPay = Math.max(0, Number(saleData.initial_payment) || 0);
 
-    const totalAmount = saleData.items.reduce((acc, item) =>
-      acc + (Number(item.quantity) || 0) * (Number(item.selling_price) || 0), 0);
-
-    const pendingAmount = Math.max(0, totalAmount - initialPay);
-    const advanceAmount = Math.max(0, initialPay - totalAmount);
-    const paymentStatus = initialPay >= totalAmount ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
-
+    // 2. Line Items with Unit & HSN Code
     const cleanItems = saleData.items.map((i, idx) => {
       const prod = this.getProductById(i.product_id);
       const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+      const hsnCode = (i.hsn_code && String(i.hsn_code).trim()) || (i.hsn && String(i.hsn).trim()) || prod?.hsn_code || '';
       return {
         id: `item-${Date.now()}-${idx}`,
         sale_id: saleId,
         product_id: i.product_id,
         product_name: i.product_name || prod?.name || 'Product',
+        hsn_code: hsnCode,
         quantity: Number(i.quantity) || 0,
         unit: unit,
         selling_price: Number(i.selling_price) || 0,
@@ -2028,17 +2091,45 @@ class DataService {
       };
     });
 
+    // 3. 18% GST (9% CGST + 9% SGST) Calculation
+    const subtotal = cleanItems.reduce((acc, item) => acc + item.total, 0);
+    const cgstAmount = Math.round(subtotal * 0.09 * 100) / 100;
+    const sgstAmount = Math.round(subtotal * 0.09 * 100) / 100;
+    const totalGst = cgstAmount + sgstAmount;
+    const calculatedTotal = subtotal + totalGst;
+    const totalAmount = saleData.total_amount !== undefined && saleData.total_amount !== null && Number(saleData.total_amount) > 0
+      ? Number(saleData.total_amount)
+      : (saleData.apply_gst || saleData.cgst_amount ? calculatedTotal : subtotal);
+    const finalCgst = saleData.cgst_amount !== undefined && saleData.cgst_amount !== null
+      ? Number(saleData.cgst_amount)
+      : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (saleData.apply_gst ? cgstAmount : 0));
+    const finalSgst = saleData.sgst_amount !== undefined && saleData.sgst_amount !== null
+      ? Number(saleData.sgst_amount)
+      : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (saleData.apply_gst ? sgstAmount : 0));
+
+    const pendingAmount = Math.max(0, totalAmount - initialPay);
+    const advanceAmount = Math.max(0, initialPay - totalAmount);
+    const paymentStatus = initialPay >= totalAmount ? 'Paid' : initialPay > 0 ? 'Partially Paid' : 'Pending';
+
     const vehicleNo = (saleData.vehicle_no || saleData.vehicleNo || '').trim();
+    const ewayNo = (saleData.eway_no || saleData.ewayNo || saleData.eway_bill_no || '').trim();
+    const custAddr = (saleData.customer_address || saleData.address || '').trim();
     const notesText = (saleData.notes || '').trim();
-    const storageNotes = formatNotesForStorage(notesText, vehicleNo);
+    const storageNotes = formatNotesForStorage(notesText, vehicleNo, ewayNo, custAddr);
 
     const newSale = {
       id: saleId,
       invoice_no: invoiceNo,
       customer_id: saleData.customer_id,
+      customer_address: custAddr,
+      eway_no: ewayNo,
       date: saleData.date || getTodayDateString(),
       time: saleData.time || getCurrentTimeString(),
       items: cleanItems,
+      subtotal: subtotal,
+      cgst_amount: finalCgst,
+      sgst_amount: finalSgst,
+      gst_rate: 18,
       total_amount: totalAmount,
       paid_amount: initialPay,
       pending_amount: pendingAmount,
@@ -2110,7 +2201,7 @@ class DataService {
       supabase.from('customer_sale_items').insert(
         cleanItems.map((i) => ({
           id: i.id, sale_id: i.sale_id, product_id: i.product_id, product_name: i.product_name,
-          quantity: i.quantity, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
+          quantity: i.quantity, unit: i.unit, hsn_code: i.hsn_code, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
         }))
       ).then().catch((e) => console.warn(e));
 
@@ -2210,14 +2301,26 @@ class DataService {
       }
     }
 
+    // Validate unique invoice_no if changed
+    let invoiceNo = existingSale.invoice_no;
+    if (updatedData.invoice_no && updatedData.invoice_no.trim() !== existingSale.invoice_no) {
+      invoiceNo = updatedData.invoice_no.trim();
+      const duplicate = this.sales.find((s) => s.id !== saleId && s.invoice_no?.toLowerCase() === invoiceNo.toLowerCase());
+      if (duplicate) {
+        throw new Error(`Invoice number "${invoiceNo}" already exists. Please enter a different, unique invoice number.`);
+      }
+    }
+
     const cleanItems = newItems.map((i, idx) => {
       const prod = this.getProductById(i.product_id);
       const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+      const hsnCode = (i.hsn_code && String(i.hsn_code).trim()) || (i.hsn && String(i.hsn).trim()) || prod?.hsn_code || '';
       return {
         id: i.id || `item-${Date.now()}-${idx}`,
         sale_id: saleId,
         product_id: i.product_id,
         product_name: i.product_name || prod?.name || 'Product',
+        hsn_code: hsnCode,
         quantity: Number(i.quantity) || 0,
         unit: unit,
         selling_price: Number(i.selling_price) || 0,
@@ -2226,33 +2329,64 @@ class DataService {
       };
     });
 
-    const totalAmount = cleanItems.reduce((acc, i) => acc + i.total, 0);
+    const subtotal = cleanItems.reduce((acc, i) => acc + i.total, 0);
+    const cgstAmount = Math.round(subtotal * 0.09 * 100) / 100;
+    const sgstAmount = Math.round(subtotal * 0.09 * 100) / 100;
+    const totalGst = cgstAmount + sgstAmount;
+    const calculatedTotal = subtotal + totalGst;
+    const totalAmount = updatedData.total_amount !== undefined && updatedData.total_amount !== null && Number(updatedData.total_amount) > 0
+      ? Number(updatedData.total_amount)
+      : (updatedData.apply_gst || updatedData.cgst_amount ? calculatedTotal : subtotal);
+    const finalCgst = updatedData.cgst_amount !== undefined && updatedData.cgst_amount !== null
+      ? Number(updatedData.cgst_amount)
+      : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (updatedData.apply_gst ? cgstAmount : 0));
+    const finalSgst = updatedData.sgst_amount !== undefined && updatedData.sgst_amount !== null
+      ? Number(updatedData.sgst_amount)
+      : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (updatedData.apply_gst ? sgstAmount : 0));
+
     const linkedPayments = this.getSalePayments(saleId);
     const paidAmount = linkedPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
     const pendingAmount = Math.max(0, totalAmount - paidAmount);
     const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
     const vehicleNo = updatedData.vehicle_no !== undefined ? (updatedData.vehicle_no || '').trim() : (existingSale.vehicle_no || '').trim();
+    const ewayNo = updatedData.eway_no !== undefined ? (updatedData.eway_no || '').trim() : (existingSale.eway_no || '').trim();
+    const custAddr = updatedData.customer_address !== undefined ? (updatedData.customer_address || '').trim() : (existingSale.customer_address || '').trim();
     const notesText = updatedData.notes !== undefined ? (updatedData.notes || '').trim() : (existingSale.notes || '').trim();
-    const storageNotes = formatNotesForStorage(notesText, vehicleNo);
+    const storageNotes = formatNotesForStorage(notesText, vehicleNo, ewayNo, custAddr);
 
     const updatedSale = {
-      ...existingSale, ...updatedData, items: cleanItems,
+      ...existingSale,
+      ...updatedData,
+      invoice_no: invoiceNo,
+      items: cleanItems,
       vehicle_no: vehicleNo,
+      eway_no: ewayNo,
+      customer_address: custAddr,
       notes: notesText,
-      total_amount: totalAmount, paid_amount: paidAmount,
-      pending_amount: pendingAmount, payment_status: paymentStatus,
+      subtotal: subtotal,
+      cgst_amount: finalCgst,
+      sgst_amount: finalSgst,
+      gst_rate: 18,
+      total_amount: totalAmount,
+      paid_amount: paidAmount,
+      pending_amount: pendingAmount,
+      payment_status: paymentStatus,
       updated_at: new Date().toISOString()
     };
 
     this.sales = this.sales.map((s) => (s.id === saleId ? updatedSale : s));
     const vehicleLog = vehicleNo ? ` [Vehicle: ${vehicleNo}]` : '';
-    this.logActivity(currentUser, 'UPDATE', 'Sales', saleId, existingSale.invoice_no,
-      `Corrected sale ${existingSale.invoice_no}. Reason: ${reason || 'N/A'}${vehicleLog}`
+    this.logActivity(currentUser, 'UPDATE', 'Sales', saleId, invoiceNo,
+      `Corrected sale ${invoiceNo}. Reason: ${reason || 'N/A'}${vehicleLog}`
     );
+
+    // CRITICAL: Immediately persist updated sale with unit & details to local cache
+    this.saveCache();
     this.notify();
 
     supabase.from('customer_sales').update({
+      invoice_no: invoiceNo,
       total_amount: totalAmount, paid_amount: paidAmount, pending_amount: pendingAmount,
       payment_status: paymentStatus, date: updatedSale.date, time: updatedSale.time,
       notes: storageNotes
@@ -2261,7 +2395,7 @@ class DataService {
       await supabase.from('customer_sale_items').insert(
         cleanItems.map((i) => ({
           id: i.id, sale_id: saleId, product_id: i.product_id, product_name: i.product_name,
-          quantity: i.quantity, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
+          quantity: i.quantity, unit: i.unit, hsn_code: i.hsn_code, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
         }))
       );
     }).catch((e) => console.warn('updateSale error:', e));
@@ -2581,6 +2715,7 @@ class DataService {
       `Corrected purchase ${existingPur.purchase_no}. Reason: ${reason || 'Updated'}${updatedPur.vehicle_no ? ` (Vehicle: ${updatedPur.vehicle_no})` : ''}`
     );
     this.notify();
+    this.saveCache();
 
     supabase.from('supplier_purchases').update({
       total_amount: totalAmount, paid_amount: paidAmount, pending_amount: pendingAmount,
@@ -2591,7 +2726,7 @@ class DataService {
       await supabase.from('supplier_purchase_items').insert(
         cleanItems.map((i) => ({
           id: i.id, purchase_id: purId, product_id: i.product_id, product_name: i.product_name,
-          quantity: i.quantity, purchase_price: i.purchase_price, total: i.total, godown_id: i.godown_id
+          quantity: i.quantity, unit: i.unit, purchase_price: i.purchase_price, total: i.total, godown_id: i.godown_id
         }))
       );
     }).catch((e) => console.warn('updatePurchase error:', e));

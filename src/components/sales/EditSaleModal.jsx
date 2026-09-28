@@ -19,6 +19,9 @@ export const EditSaleModal = ({
   const godowns = dataService.getGodowns();
 
   const [customerId, setCustomerId] = useState('');
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [ewayNo, setEwayNo] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [items, setItems] = useState([]);
@@ -30,6 +33,9 @@ export const EditSaleModal = ({
   useEffect(() => {
     if (sale && isOpen) {
       setCustomerId(sale.customer_id || '');
+      setInvoiceNo(sale.invoice_no || '');
+      setEwayNo(sale.eway_no || '');
+      setCustomerAddress(sale.customer_address || '');
       setDate(sale.date || '');
       setTime(sale.time || '');
       setItems(
@@ -38,6 +44,7 @@ export const EditSaleModal = ({
           godown_id: i.godown_id || godowns[0]?.id || '',
           quantity: i.quantity,
           unit: i.unit || 'Units',
+          hsn_code: i.hsn_code || '',
           selling_price: i.selling_price
         }))
       );
@@ -58,6 +65,7 @@ export const EditSaleModal = ({
       product_id: prodId,
       godown_id: updated[index].godown_id || godowns[0]?.id || '',
       unit: prod?.unit || updated[index].unit || 'Units',
+      hsn_code: prod?.hsn_code || '',
       selling_price: prod ? prod.selling_price : 0
     };
     setItems(updated);
@@ -79,6 +87,7 @@ export const EditSaleModal = ({
         godown_id: godowns[0]?.id || '',
         quantity: 1,
         unit: defProd.unit || 'Units',
+        hsn_code: defProd.hsn_code || '',
         selling_price: defProd.selling_price || 0
       }
     ]);
@@ -89,9 +98,12 @@ export const EditSaleModal = ({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const totalBillAmount = items.reduce((acc, item) => {
+  const taxableSubtotal = items.reduce((acc, item) => {
     return acc + (Number(item.quantity) || 0) * (Number(item.selling_price) || 0);
   }, 0);
+  const cgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
+  const sgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
+  const totalBillAmount = taxableSubtotal + cgstAmount + sgstAmount;
 
   // Map old quantities for reference & stock delta calculation
   const oldQtyMap = {};
@@ -102,6 +114,15 @@ export const EditSaleModal = ({
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
+
+    if (invoiceNo.trim() && invoiceNo.trim().toLowerCase() !== sale.invoice_no?.toLowerCase()) {
+      const cleanInv = invoiceNo.trim();
+      const existing = dataService.getSales().find((s) => s.id !== sale.id && s.invoice_no?.toLowerCase() === cleanInv.toLowerCase());
+      if (existing) {
+        setError(`Invoice number "${cleanInv}" already exists. Please enter a different, unique invoice number.`);
+        return;
+      }
+    }
 
     if (!customerId) {
       setError('Please select a customer');
@@ -141,10 +162,17 @@ export const EditSaleModal = ({
 
     try {
       const updated = dataService.updateSale(sale.id, {
+        invoice_no: invoiceNo.trim() || sale.invoice_no,
         customer_id: customerId,
+        customer_address: customerAddress.trim(),
+        eway_no: ewayNo.trim(),
         items,
         date,
         time,
+        subtotal: taxableSubtotal,
+        cgst_amount: cgstAmount,
+        sgst_amount: sgstAmount,
+        total_amount: totalBillAmount,
         vehicle_no: vehicleNo,
         notes
       }, reason.trim() || 'Sale details updated', currentUser);
@@ -180,13 +208,18 @@ export const EditSaleModal = ({
 
         {/* Customer & Date Selector */}
         <div className="form-row">
-          <div className="form-group" style={{ flex: 2 }}>
-            <label className="form-label">Customer</label>
+          <div className="form-group" style={{ flex: 1.5 }}>
+            <label className="form-label" style={{ fontWeight: 700 }}>Customer</label>
             <select
               className="form-select"
               required
               value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
+              onChange={(e) => {
+                const cId = e.target.value;
+                setCustomerId(cId);
+                const c = customers.find((cust) => cust.id === cId);
+                if (c?.address && !customerAddress) setCustomerAddress(c.address);
+              }}
             >
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -197,7 +230,29 @@ export const EditSaleModal = ({
           </div>
 
           <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label">Sale Date</label>
+            <label className="form-label" style={{ fontWeight: 700 }}>Invoice Number</label>
+            <input
+              type="text"
+              className="form-input"
+              value={invoiceNo}
+              onChange={(e) => setInvoiceNo(e.target.value)}
+              placeholder="e.g. INV-769"
+            />
+          </div>
+
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label" style={{ fontWeight: 700 }}>E-Way Bill Number</label>
+            <input
+              type="text"
+              className="form-input"
+              value={ewayNo}
+              onChange={(e) => setEwayNo(e.target.value)}
+              placeholder="e.g. 2412 3456 7890"
+            />
+          </div>
+
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label" style={{ fontWeight: 700 }}>Sale Date</label>
             <input
               type="date"
               className="form-input"
@@ -205,16 +260,19 @@ export const EditSaleModal = ({
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
+        </div>
 
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label">Time</label>
-            <input
-              type="text"
-              className="form-input"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-            />
-          </div>
+        <div className="form-group" style={{ marginBottom: '16px' }}>
+          <label className="form-label" style={{ fontWeight: 700 }}>
+            Customer Billing & Delivery Address (Updated on Invoice)
+          </label>
+          <input
+            type="text"
+            className="form-input"
+            value={customerAddress}
+            onChange={(e) => setCustomerAddress(e.target.value)}
+            placeholder="e.g. HNO:7-104, Macherla (v), Armoor (M), Nizamabad Dist."
+          />
         </div>
 
         {/* Multi-item Product Table */}
@@ -234,11 +292,12 @@ export const EditSaleModal = ({
             <table className="data-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: '30%' }}>Product</th>
-                  <th style={{ width: '22%' }}>Source Godown</th>
-                  <th style={{ width: '22%' }}>Quantity & Unit</th>
-                  <th style={{ width: '13%' }}>Price (₹)</th>
-                  <th style={{ width: '13%', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: '26%' }}>Product</th>
+                  <th style={{ width: '14%' }}>HSN Code</th>
+                  <th style={{ width: '18%' }}>Source Godown</th>
+                  <th style={{ width: '20%' }}>Quantity & Unit</th>
+                  <th style={{ width: '11%' }}>Price (₹)</th>
+                  <th style={{ width: '11%', textAlign: 'right' }}>Total</th>
                   <th></th>
                 </tr>
               </thead>
@@ -264,6 +323,16 @@ export const EditSaleModal = ({
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="form-input"
+                          style={{ fontSize: '12px', padding: '5px 6px' }}
+                          placeholder="HSN Code"
+                          value={item.hsn_code || ''}
+                          onChange={(e) => handleItemChange(idx, 'hsn_code', e.target.value)}
+                        />
                       </td>
                       <td>
                         <select
@@ -380,10 +449,15 @@ export const EditSaleModal = ({
             <span style={{ fontSize: '15px', fontWeight: 700, color: '#10b981' }}>{formatCurrency(sale.paid_amount || 0)}</span>
           </div>
 
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>New Bill Amount:</span>
-            <span style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>{formatCurrency(totalBillAmount)}</span>
-            <div style={{ fontSize: '11.5px', color: totalBillAmount - (sale.paid_amount || 0) > 0 ? '#e11d48' : '#10b981', fontWeight: 600 }}>
+          <div style={{ textAlign: 'right', minWidth: '240px' }}>
+            <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+              Subtotal: <strong>{formatCurrency(taxableSubtotal)}</strong> | CGST (9%): <strong>+{formatCurrency(cgstAmount)}</strong> | SGST (9%): <strong>+{formatCurrency(sgstAmount)}</strong>
+            </div>
+            <div style={{ marginTop: '4px' }}>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>New Total Bill (Incl. 18% GST):</span>
+              <span style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginLeft: '8px' }}>{formatCurrency(totalBillAmount)}</span>
+            </div>
+            <div style={{ fontSize: '12px', color: totalBillAmount - (sale.paid_amount || 0) > 0 ? '#e11d48' : '#10b981', fontWeight: 700, marginTop: '2px' }}>
               New Pending Due: {formatCurrency(Math.max(0, totalBillAmount - (sale.paid_amount || 0)))}
             </div>
           </div>

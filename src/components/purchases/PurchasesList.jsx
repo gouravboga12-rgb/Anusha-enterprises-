@@ -265,14 +265,7 @@ export const PurchasesList = ({
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            style={{ padding: '4px 8px', fontSize: '11px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff' }}
-                            onClick={() => onViewInvoice && onViewInvoice(pur)}
-                            title="View / Print Inward Purchase Invoice"
-                          >
-                            <FileText size={13} /> Invoice
-                          </button>
+                          
                           {onEditPurchase && (
                             <button
                               className="btn btn-secondary btn-sm"
@@ -395,13 +388,7 @@ export const PurchasesList = ({
                 </div>
 
                 <div className="card-actions-bar">
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    style={{ flex: 1, padding: '6px 8px', fontSize: '12px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff' }}
-                    onClick={() => onViewInvoice && onViewInvoice(pur)}
-                  >
-                    <FileText size={13} /> Invoice
-                  </button>
+                  
                   {onEditPurchase && (
                     <button
                       className="btn btn-secondary btn-sm"

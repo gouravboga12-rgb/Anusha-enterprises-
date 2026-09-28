@@ -307,12 +307,12 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
                       {entry.reference}
                     </td>
                     <td style={{ fontSize: '12.5px', maxWidth: '380px' }}>
-                      <div style={{ fontWeight: 500, color: '#0f172a' }}>{entry.particulars}</div>
+                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>{entry.particulars}</div>
                       {entry.items_detail && entry.items_detail.length > 0 && (
                         <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           {entry.items_detail.map((itm, idx) => (
                             <div key={idx} style={{ fontSize: '11px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>• {itm.product_name}: <strong>{itm.quantity}</strong> × ₹{itm.selling_price} = <strong>₹{itm.total}</strong></span>
+                              <span>• <strong style={{ color: '#0f172a' }}>{itm.product_name}</strong>: <strong>{itm.quantity} {itm.unit}</strong> × ₹{itm.selling_price} = <strong>₹{itm.total}</strong></span>
                               {itm.godown && (
                                 <span style={{ color: '#0284c7', fontSize: '10.5px' }}>[{itm.godown}]</span>
                               )}
@@ -321,10 +321,10 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
                         </div>
                       )}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#b91c1c' }}>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#b91c1c', fontSize: '13px' }}>
                       {entry.debit > 0 ? formatCurrency(entry.debit) : '—'}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#15803d' }}>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#15803d', fontSize: '13px' }}>
                       {entry.credit > 0 ? formatCurrency(entry.credit) : '—'}
                     </td>
                     <td style={{

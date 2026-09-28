@@ -360,7 +360,7 @@ export const App = () => {
                 }}
                 onViewPurchaseDetails={(pur) => openPurchaseDetails(pur)}
                 onEditPurchase={(pur) => openEditPurchase(pur)}
-                onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
+                
               />
             ) : (
               <SupplierList
@@ -450,7 +450,7 @@ export const App = () => {
               }}
               onViewPurchaseDetails={(pur) => openPurchaseDetails(pur)}
               onEditPurchase={(pur) => openEditPurchase(pur)}
-              onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
+              
             />
           )}
 
@@ -495,7 +495,7 @@ export const App = () => {
           {(activeTab === 'daybook' || activeTab === 'day-book' || activeTab === 'reports') && (
             <DailyTransactions
               dataService={dataService}
-              onViewInvoice={(doc, type) => openInvoice(doc, type)}
+              onViewInvoice={(sale) => openInvoice(sale, 'sale')}
             />
           )}
 
@@ -536,7 +536,7 @@ export const App = () => {
           currentUser={currentUser}
           initialSupplierId={purInitialSuppId}
           onOpenPayment={(sId, type) => openPayment(sId, type)}
-          onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
+          
         />
       )}
 
@@ -658,7 +658,7 @@ export const App = () => {
           setIsPurchaseDetailsOpen(false);
           openEditPurchase(pur);
         }}
-        onViewInvoice={(pur) => openInvoice(pur, 'purchase')}
+        
       />
 
       <EditPurchaseModal

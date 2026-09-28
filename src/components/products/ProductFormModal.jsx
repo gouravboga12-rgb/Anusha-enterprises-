@@ -18,6 +18,7 @@ const STANDARD_UNITS = [
 export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 1100 }) => {
   const [formData, setFormData] = useState({
     sku: '',
+    hsn_code: '',
     name: '',
     current_stock: 0,
     unit: 'Boxes',
@@ -33,7 +34,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
 
   useEffect(() => {
     if (product) {
-      setFormData(product);
+      setFormData({ ...product, hsn_code: product.hsn_code || product.hsn || '' });
       const isStd = STANDARD_UNITS.some(
         (u) => u.value.toLowerCase() === (product.unit || '').toLowerCase()
       );
@@ -47,6 +48,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
     } else {
       setFormData({
         sku: '',
+        hsn_code: '',
         name: '',
         current_stock: 0,
         unit: 'Boxes',
@@ -76,6 +78,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
       await onSave({
         ...formData,
         unit: finalUnit,
+        hsn_code: (formData.hsn_code || '').trim(),
         current_stock: formData.current_stock !== '' && formData.current_stock !== undefined ? Number(formData.current_stock) : 0,
         min_stock_alert: formData.min_stock_alert !== '' && formData.min_stock_alert !== undefined ? Number(formData.min_stock_alert) : 0,
         purchase_price: formData.purchase_price !== '' && formData.purchase_price !== undefined ? Number(formData.purchase_price) : 0,
@@ -114,6 +117,16 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
               placeholder="e.g. IBB-001"
               value={formData.sku || ''}
               onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">HSN / SAC Code</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. 8544 or 8536"
+              value={formData.hsn_code || ''}
+              onChange={(e) => setFormData({ ...formData, hsn_code: e.target.value })}
             />
           </div>
           <div className="form-group">

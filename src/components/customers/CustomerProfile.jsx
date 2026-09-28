@@ -559,11 +559,11 @@ export const CustomerProfile = ({
                           </span>
                         </td>
                         <td style={{ fontWeight: 600, fontSize: '12px' }}>{entry.reference}</td>
-                        <td style={{ fontSize: '13px', maxWidth: '300px' }}>{entry.particulars}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#b91c1c' }}>
+                        <td style={{ fontSize: '13px', maxWidth: '300px', fontWeight: 700, color: '#0f172a' }}>{entry.particulars}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#b91c1c', fontSize: '13px' }}>
                           {entry.debit > 0 ? formatCurrency(entry.debit) : '—'}
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#15803d' }}>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#15803d', fontSize: '13px' }}>
                           {entry.credit > 0 ? formatCurrency(entry.credit) : '—'}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '13px' }}>

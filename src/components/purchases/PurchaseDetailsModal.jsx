@@ -112,16 +112,7 @@ export const PurchaseDetailsModal = ({
           </div>
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              className="btn btn-secondary btn-sm"
-              style={{ color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
-              onClick={() => {
-                if (onViewInvoice) onViewInvoice(purchase);
-              }}
-              title="View and Print Official Supplier Inward Invoice"
-            >
-              <FileText size={14} /> View Invoice
-            </button>
+            
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => {

@@ -496,3 +496,15 @@ ON CONFLICT (id) DO NOTHING;
 -- END $$;
 
 
+
+-- ==============================================================================
+-- INVOICE ENHANCEMENTS: HSN CODE, E-WAY BILL NO, CUSTOMER ADDRESS & GST
+-- ==============================================================================
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(50);
+ALTER TABLE public.customer_sale_items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(50);
+ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS eway_no VARCHAR(100);
+ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS customer_address TEXT;
+ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS subtotal DECIMAL(12,2);
+ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS cgst_amount DECIMAL(12,2);
+ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS sgst_amount DECIMAL(12,2);
+ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS gst_rate DECIMAL(5,2) DEFAULT 18.00;

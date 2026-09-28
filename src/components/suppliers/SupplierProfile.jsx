@@ -560,11 +560,11 @@ export const SupplierProfile = ({
                           </span>
                         </td>
                         <td style={{ fontWeight: 600, fontSize: '12px' }}>{entry.reference}</td>
-                        <td style={{ fontSize: '13px', maxWidth: '300px' }}>{entry.particulars}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#d97706' }}>
+                        <td style={{ fontSize: '13px', maxWidth: '300px', fontWeight: 700, color: '#0f172a' }}>{entry.particulars}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#d97706', fontSize: '13px' }}>
                           {entry.credit > 0 ? formatCurrency(entry.credit) : '—'}
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#15803d' }}>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#15803d', fontSize: '13px' }}>
                           {entry.debit > 0 ? formatCurrency(entry.debit) : '—'}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '13px' }}>
@@ -781,14 +781,7 @@ export const SupplierProfile = ({
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <button
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: '3px 8px', fontSize: '11px', color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
-                              onClick={() => onViewInvoice && onViewInvoice(pur)}
-                              title="View, Print & Download Purchase Invoice"
-                            >
-                              <FileText size={13} /> Invoice
-                            </button>
+                            
                             <button
                               className="btn btn-secondary btn-sm"
                               style={{ padding: '3px 8px' }}
@@ -890,14 +883,7 @@ export const SupplierProfile = ({
                   </div>
 
                   <div className="card-action-bar">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      style={{ color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff', fontWeight: 600 }}
-                      onClick={() => onViewInvoice && onViewInvoice(pur)}
-                      title="View, Print & Download Purchase Invoice"
-                    >
-                      <FileText size={13} /> Invoice
-                    </button>
+                    
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => onViewPurchaseDetails && onViewPurchaseDetails(pur)}

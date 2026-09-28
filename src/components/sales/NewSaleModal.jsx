@@ -35,12 +35,16 @@ export const NewSaleModal = ({
       godown_id: getDefaultGodownForProduct(products[0]?.id),
       quantity: 1,
       unit: products[0]?.unit || 'Units',
+      hsn_code: products[0]?.hsn_code || '',
       selling_price: products[0]?.selling_price || 0
     }
   ]);
   const [initialPayment, setInitialPayment] = useState('');
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [referenceNo, setReferenceNo] = useState('');
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [ewayNo, setEwayNo] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [vehicleNo, setVehicleNo] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -55,6 +59,10 @@ export const NewSaleModal = ({
   useEffect(() => {
     if (isOpen) {
       setCustomerId(initialCustomerId || '');
+      const initCust = customers.find((c) => c.id === (initialCustomerId || ''));
+      setCustomerAddress(initCust?.address || '');
+      setInvoiceNo('');
+      setEwayNo('');
       setDate(getTodayDateString());
       setTime(getCurrentTimeString());
       setItems(
@@ -64,6 +72,7 @@ export const NewSaleModal = ({
               godown_id: getDefaultGodownForProduct(products[0].id),
               quantity: 1,
               unit: products[0].unit || 'Units',
+              hsn_code: products[0].hsn_code || '',
               selling_price: products[0].selling_price || 0
             }]
           : []
@@ -86,6 +95,7 @@ export const NewSaleModal = ({
       product_id: prodId,
       godown_id: getDefaultGodownForProduct(prodId),
       unit: updated[index].unit && updated[index].unit !== 'Units' ? updated[index].unit : defaultUnit,
+      hsn_code: prod?.hsn_code || '',
       selling_price: prod ? prod.selling_price : 0
     };
     setItems(updated);
@@ -107,6 +117,7 @@ export const NewSaleModal = ({
         godown_id: getDefaultGodownForProduct(defProd.id),
         quantity: 1,
         unit: defProd.unit || 'Units',
+        hsn_code: defProd.hsn_code || '',
         selling_price: defProd.selling_price || 0
       }
     ]);
@@ -117,9 +128,12 @@ export const NewSaleModal = ({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const totalBillAmount = items.reduce((acc, item) => {
+  const taxableSubtotal = items.reduce((acc, item) => {
     return acc + (Number(item.quantity) || 0) * (Number(item.selling_price) || 0);
   }, 0);
+  const cgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
+  const sgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
+  const totalBillAmount = taxableSubtotal + cgstAmount + sgstAmount;
 
   const customerLedger = customerId ? dataService.getCustomerLedger(customerId) : null;
   const previousBalance = customerLedger ? (customerLedger.pendingBalance || 0) : 0;
@@ -161,6 +175,16 @@ export const NewSaleModal = ({
       return;
     }
 
+    // Validate unique invoice number if entered
+    if (invoiceNo.trim()) {
+      const cleanInv = invoiceNo.trim();
+      const existing = dataService.getSales().find((s) => s.invoice_no?.toLowerCase() === cleanInv.toLowerCase());
+      if (existing) {
+        setError(`Invoice number "${cleanInv}" already exists. Please enter a different, unique invoice number.`);
+        return;
+      }
+    }
+
     // STRICT GODOWN-LEVEL STOCK VALIDATION: Block transaction if stock is insufficient in selected godown
     for (const item of items) {
       const prod = products.find((p) => p.id === item.product_id);
@@ -187,10 +211,17 @@ export const NewSaleModal = ({
 
     try {
       const sale = dataService.recordSale({
+        invoice_no: invoiceNo.trim() || undefined,
         customer_id: customerId,
+        customer_address: customerAddress.trim(),
+        eway_no: ewayNo.trim(),
         items,
         date,
         time,
+        subtotal: taxableSubtotal,
+        cgst_amount: cgstAmount,
+        sgst_amount: sgstAmount,
+        total_amount: totalBillAmount,
         initial_payment: initialPayment,
         payment_mode: paymentMode,
         reference_no: referenceNo,
@@ -271,7 +302,12 @@ export const NewSaleModal = ({
                   if (e.target.value === '__CREATE_NEW__') {
                     setIsQuickCustomerOpen(true);
                   } else {
-                    setCustomerId(e.target.value);
+                    const selectedId = e.target.value;
+                    setCustomerId(selectedId);
+                    const selectedCust = customers.find((c) => c.id === selectedId);
+                    if (selectedCust?.address) {
+                      setCustomerAddress(selectedCust.address);
+                    }
                   }
                 }}
               >
@@ -339,24 +375,58 @@ export const NewSaleModal = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Customer Address (Editable for this Invoice) */}
+          <div className="form-group" style={{ marginBottom: '14px' }}>
+            <label className="form-label" style={{ fontWeight: 700 }}>
+              Customer Billing & Delivery Address (Will be printed on invoice)
+            </label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. HNO:7-104, Macherla (v), Armoor (M), Nizamabad Dist."
+              value={customerAddress}
+              onChange={(e) => setCustomerAddress(e.target.value)}
+            />
+          </div>
+
+          {/* Invoice Meta Row: Custom Unique Invoice Number & E-Way Bill Number */}
+          <div className="form-row" style={{ marginBottom: '14px' }}>
+            <div className="form-group" style={{ flex: 1.2 }}>
+              <label className="form-label" style={{ fontWeight: 700 }}>
+                Invoice Number
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Auto-generated (e.g. INV-769 or enter custom)"
+                value={invoiceNo}
+                onChange={(e) => setInvoiceNo(e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: '#64748b' }}>Leave blank to auto-generate unique number</span>
+            </div>
+
+            <div className="form-group" style={{ flex: 1.2 }}>
+              <label className="form-label" style={{ fontWeight: 700 }}>
+                E-Way Bill Number (Optional)
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. 2412 3456 7890"
+                value={ewayNo}
+                onChange={(e) => setEwayNo(e.target.value)}
+              />
+            </div>
 
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Sale Date</label>
+              <label className="form-label" style={{ fontWeight: 700 }}>Sale Date</label>
               <input
                 type="date"
                 className="form-input"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Time</label>
-              <input
-                type="text"
-                className="form-input"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
               />
             </div>
           </div>
@@ -380,12 +450,13 @@ export const NewSaleModal = ({
               <table className="data-table" style={{ fontSize: '13px' }}>
                 <thead>
                   <tr>
-                    <th style={{ width: '30%' }}>PRODUCT</th>
-                    <th style={{ width: '25%' }}>SOURCE GODOWN</th>
-                    <th style={{ width: '22%' }}>QUANTITY & TYPE</th>
-                    <th style={{ width: '13%' }}>PRICE (₹)</th>
+                    <th style={{ width: '26%' }}>PRODUCT</th>
+                    <th style={{ width: '14%' }}>HSN CODE</th>
+                    <th style={{ width: '20%' }}>SOURCE GODOWN</th>
+                    <th style={{ width: '20%' }}>QUANTITY & TYPE</th>
+                    <th style={{ width: '10%' }}>PRICE (₹)</th>
                     <th style={{ width: '10%', textAlign: 'right' }}>TOTAL</th>
-                    <th style={{ width: '40px' }}></th>
+                    <th style={{ width: '35px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -410,6 +481,16 @@ export const NewSaleModal = ({
                               </option>
                             ))}
                           </select>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ fontSize: '12px', padding: '5px 8px' }}
+                            placeholder="HSN Code"
+                            value={item.hsn_code || ''}
+                            onChange={(e) => handleItemChange(idx, 'hsn_code', e.target.value)}
+                          />
                         </td>
                         <td>
                           <select
@@ -558,6 +639,18 @@ export const NewSaleModal = ({
                     </div>
 
                     <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>HSN Code</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ width: '100%', fontSize: '12px' }}
+                        placeholder="HSN Code"
+                        value={item.hsn_code || ''}
+                        onChange={(e) => handleItemChange(idx, 'hsn_code', e.target.value)}
+                      />
+                    </div>
+
+                    <div>
                       <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>Source Godown</label>
                       <select
                         className="form-select"
@@ -662,11 +755,23 @@ export const NewSaleModal = ({
             border: '1px solid #e2e8f0',
             marginBottom: '16px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>Total Bill Amount:</span>
-              <span style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>
-                {formatCurrency(totalBillAmount)}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569' }}>
+                <span>Subtotal (Taxable Amount):</span>
+                <strong style={{ color: '#0f172a' }}>{formatCurrency(taxableSubtotal)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569' }}>
+                <span>Central GST (CGST 9%):</span>
+                <strong style={{ color: '#0f172a' }}>+{formatCurrency(cgstAmount)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569' }}>
+                <span>State GST (SGST 9%):</span>
+                <strong style={{ color: '#0f172a' }}>+{formatCurrency(sgstAmount)}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 800, color: '#0284c7', paddingTop: '4px' }}>
+                <span>Total Bill Amount (Incl. 18% GST):</span>
+                <span style={{ fontSize: '20px' }}>{formatCurrency(totalBillAmount)}</span>
+              </div>
             </div>
 
             <div className="form-group" style={{ marginBottom: '12px' }}>

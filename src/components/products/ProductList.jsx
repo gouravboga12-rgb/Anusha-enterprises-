@@ -102,6 +102,7 @@ export const ProductList = ({
               <tr>
                 <th>Product</th>
                 <th>SKU</th>
+                <th>HSN Code</th>
                 <th style={{ textAlign: 'right' }}>Current Stock</th>
                 <th style={{ textAlign: 'right' }}>Purchase Cost</th>
                 <th style={{ textAlign: 'right' }}>Selling Price</th>
@@ -113,7 +114,7 @@ export const ProductList = ({
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>
                     No products found.
                   </td>
                 </tr>
@@ -155,6 +156,9 @@ export const ProductList = ({
                       </td>
                       <td style={{ fontWeight: 600, color: '#0284c7', fontSize: '12px' }}>
                         {prod.sku}
+                      </td>
+                      <td style={{ fontWeight: 700, color: '#0f172a', fontSize: '12px' }}>
+                        {prod.hsn_code ? <span className="badge badge-active" style={{ fontSize: '11px', padding: '2px 8px' }}>{prod.hsn_code}</span> : <span style={{ color: '#94a3b8' }}>—</span>}
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{

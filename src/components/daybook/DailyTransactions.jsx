@@ -566,7 +566,7 @@ export const DailyTransactions = ({ dataService, onViewInvoice }) => {
 
                         {/* Row 3: Product Details */}
                         {evt.details && (
-                          <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.45, whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', lineHeight: 1.45, whiteSpace: 'pre-line', wordBreak: 'break-word' }}>
                             {evt.details}
                           </div>
                         )}
@@ -586,7 +586,7 @@ export const DailyTransactions = ({ dataService, onViewInvoice }) => {
                               {evt.status}
                             </span>
                           )}
-                          {(evt.rawType === 'sale' || evt.rawType === 'purchase') && evt.raw && onViewInvoice && (
+                          {evt.rawType === 'sale' && evt.raw && onViewInvoice && (
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm no-print"

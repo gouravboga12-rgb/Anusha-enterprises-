@@ -218,9 +218,7 @@ export const NewPurchaseModal = ({
       setError('');
       onClose();
 
-      if (generateInvoice && onViewInvoice) {
-        onViewInvoice(pur);
-      }
+      
     } catch (err) {
       setError(err.message || 'Failed to record supplier purchase');
     }
@@ -958,23 +956,7 @@ export const NewPurchaseModal = ({
             <button type="button" className="btn btn-secondary" onClick={handleClose}>
               Cancel
             </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={(e) => handleSubmit(e, true)}
-              style={{
-                background: '#f0f9ff',
-                color: '#0284c7',
-                borderColor: '#bae6fd',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-              title="Save purchase and immediately open printable invoice"
-            >
-              <FileText size={16} /> Save & Generate Invoice
-            </button>
+            
             <button type="submit" className="btn btn-primary" style={{ fontWeight: 700 }}>
               Save Purchase & Add to Stock
             </button>
