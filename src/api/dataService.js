@@ -3398,7 +3398,7 @@ class DataService {
       };
     });
 
-    return { totalSales, totalPaid, pendingBalance, advanceBalance, netBalance, entries: computedEntries };
+    return { totalSales, totalPaid, pendingBalance, advanceBalance, netBalance, entries: computedEntries.slice().reverse() };
   }
 
   getSupplierLedger(supplierId) {
@@ -3502,7 +3502,7 @@ class DataService {
       };
     });
 
-    return { totalPurchases, totalPaid, pendingBalance, advanceBalance, netBalance, entries: computedEntries };
+    return { totalPurchases, totalPaid, pendingBalance, advanceBalance, netBalance, entries: computedEntries.slice().reverse() };
   }
 
   // ==============================================================================

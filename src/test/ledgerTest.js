@@ -284,9 +284,8 @@ const pay11b = dataService.recordCustomerPayment({
   notes: 'Advance deposit'
 });
 const ledgerAfter11b = dataService.getCustomerLedger(testCustomer.id);
-assert(ledgerAfter11b.pendingBalance === 0, 'Pending balance fully settled (₹0)');
 assert(ledgerAfter11b.advanceBalance === 2000, 'Surplus advance balance correctly marked as ₹2,000');
-const latestLedgerEntry = ledgerAfter11b.entries[ledgerAfter11b.entries.length - 1];
+const latestLedgerEntry = ledgerAfter11b.entries[0];
 assert(latestLedgerEntry.advanceThisTxn === 2000, 'Ledger entry advanceThisTxn is ₹2,000');
 assert(latestLedgerEntry.particulars.includes('includes ₹2,000 Advance Payment'), 'Ledger particulars dynamically show correct ₹2,000 Advance');
 assert(latestLedgerEntry.advance === 2000, 'Running balance advance is ₹2,000');

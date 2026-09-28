@@ -55,7 +55,7 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
         <div>
           <h1 style={{ fontSize: '20px' }}>Supplier Ledger (Vendor Account Passbook)</h1>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-            Inward purchase bills, payment vouchers dispatched, and running payable balances.
+            Inward purchase bills, payment vouchers dispatched, and running payable balances (newest transactions first).
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>

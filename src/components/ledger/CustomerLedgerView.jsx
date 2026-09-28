@@ -55,7 +55,7 @@ export const CustomerLedgerView = ({ dataService, onSelectCustomer, onOpenPaymen
         <div>
           <h1 style={{ fontSize: '20px' }}>Customer Ledger (Statement of Accounts)</h1>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-            Complete chronological record of sales bills, installment payments, and live running balance.
+            Complete record of sales bills, installment payments, and live running balance (newest transactions first).
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
