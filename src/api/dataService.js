@@ -663,14 +663,25 @@ class DataService {
       const auditData = auditRes?.data || [];
       const walletData = walletRes?.data || [];
 
-      // Normalize products
-      this.products = prods.map((p) => ({
-        ...p,
-        hsn_code: (p.hsn_code || p.hsn || '').trim(),
-        current_stock: Number(p.current_stock) || 0,
-        purchase_price: Number(p.purchase_price) || 0,
-        selling_price: Number(p.selling_price) || 0
-      }));
+      // Normalize products with resilient display_order
+      this.products = prods.map((p) => {
+        let order = (p.display_order !== undefined && p.display_order !== null) ? Number(p.display_order) : null;
+        if (order === null || isNaN(order)) {
+          const match = (p.description || '').match(/\[Order:\s*(\d+)\]/i);
+          if (match) order = parseInt(match[1], 10);
+        }
+        if (order === null || isNaN(order)) {
+          order = 999;
+        }
+        return {
+          ...p,
+          display_order: order,
+          hsn_code: (p.hsn_code || p.hsn || '').trim(),
+          current_stock: Number(p.current_stock) || 0,
+          purchase_price: Number(p.purchase_price) || 0,
+          selling_price: Number(p.selling_price) || 0
+        };
+      });
 
       this.customers = custs.filter((c) => c && c.status !== 'archived');
       this.suppliers = supps.filter((s) => s && s.status !== 'archived');
@@ -707,6 +718,23 @@ class DataService {
       this.payments = [...unifiedCustomerPayments, ...unifiedSupplierPayments].sort((a, b) =>
         new Date(b.created_at || b.date) - new Date(a.created_at || a.date)
       );
+
+      // Re-synchronize live bill payment balances against actual payment records
+      this.sales.forEach((s) => {
+        const linked = this.getSalePayments(s.id);
+        const totalPaid = linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        s.paid_amount = totalPaid;
+        s.pending_amount = Math.max(0, s.total_amount - totalPaid);
+        s.payment_status = s.pending_amount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
+      });
+
+      this.purchases.forEach((pur) => {
+        const linked = this.getPurchasePayments(pur.id);
+        const totalPaid = linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        pur.paid_amount = totalPaid;
+        pur.pending_amount = Math.max(0, pur.total_amount - totalPaid);
+        pur.payment_status = pur.pending_amount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
+      });
 
       this.adjustments = adjs.map((a) => ({ ...a, quantity: Number(a.quantity) || 0 }));
 
@@ -1862,16 +1890,58 @@ class DataService {
   // PRODUCTS
   // ==============================================================================
   getProducts() {
-    return (this.products || []).filter((p) => p && p.is_active !== false);
+    const list = (this.products || []).filter((p) => p && p.is_active !== false);
+    return list.slice().sort((a, b) => {
+      const orderA = (a.display_order !== undefined && a.display_order !== null && !isNaN(a.display_order)) ? Number(a.display_order) : 999;
+      const orderB = (b.display_order !== undefined && b.display_order !== null && !isNaN(b.display_order)) ? Number(b.display_order) : 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.name || '').localeCompare(b.name || '');
+    });
   }
 
   getProductById(id) {
     return this.products.find((p) => p.id === id);
   }
 
+  setProductOrder(productId, orderNo) {
+    const prod = this.getProductById(productId);
+    if (!prod) return;
+    const numOrder = (orderNo !== undefined && orderNo !== null && orderNo !== '' && !isNaN(orderNo)) ? Number(orderNo) : 999;
+    prod.display_order = numOrder;
+
+    let cleanDesc = (prod.description || '').replace(/\s*\[Order:\s*\d+\]/gi, '').trim();
+    if (numOrder !== 999) {
+      cleanDesc = cleanDesc ? `${cleanDesc} [Order: ${numOrder}]` : `[Order: ${numOrder}]`;
+    }
+    prod.description = cleanDesc;
+
+    this.saveCache();
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      supabase.from('products').update({ display_order: numOrder, description: cleanDesc }).eq('id', productId)
+        .then(({ error }) => {
+          if (error && (error.code === '42703' || error.message?.includes('display_order'))) {
+            supabase.from('products').update({ description: cleanDesc }).eq('id', productId).then();
+          }
+        })
+        .catch(console.warn);
+    }
+  }
+
   saveProduct(productData, currentUser) {
     const isNew = !productData.id;
     const prodId = productData.id || 'prod-' + Date.now();
+
+    let displayOrder = productData.display_order !== undefined && productData.display_order !== '' && productData.display_order !== null
+      ? Number(productData.display_order)
+      : (productData.order_no !== undefined && productData.order_no !== '' ? Number(productData.order_no) : 999);
+    if (isNaN(displayOrder)) displayOrder = 999;
+
+    let cleanDesc = (productData.description || '').replace(/\s*\[Order:\s*\d+\]/gi, '').trim();
+    if (displayOrder !== 999) {
+      cleanDesc = cleanDesc ? `${cleanDesc} [Order: ${displayOrder}]` : `[Order: ${displayOrder}]`;
+    }
 
     const dbRecord = {
       id: prodId,
@@ -1889,7 +1959,8 @@ class DataService {
       image_url: productData.image_url || null,
       cloudinary_public_id: productData.cloudinary_public_id || null,
       is_active: productData.is_active !== undefined ? productData.is_active : true,
-      description: productData.description || null,
+      display_order: displayOrder,
+      description: cleanDesc || null,
       updated_at: new Date().toISOString()
     };
 
@@ -1897,26 +1968,40 @@ class DataService {
     if (isNew) {
       saved = { ...dbRecord, created_at: new Date().toISOString() };
       this.products = [saved, ...this.products];
-      this.logActivity(currentUser, 'CREATE', 'Products', prodId, dbRecord.name, `Created product: ${dbRecord.name}`);
+      this.logActivity(currentUser, 'CREATE', 'Products', prodId, dbRecord.name, `Created product: ${dbRecord.name} (Order: #${displayOrder})`);
     } else {
       saved = { ...this.getProductById(prodId), ...dbRecord };
       this.products = this.products.map((p) => (p.id === prodId ? saved : p));
-      this.logActivity(currentUser, 'UPDATE', 'Products', prodId, dbRecord.name, `Updated product: ${dbRecord.name}`);
+      this.logActivity(currentUser, 'UPDATE', 'Products', prodId, dbRecord.name, `Updated product: ${dbRecord.name} (Order: #${displayOrder})`);
     }
 
     // Synchronize godown stock so godowns match edited product quantity
     this._syncProductStockToGodowns(prodId, dbRecord.current_stock);
 
+    this.saveCache();
     this.notify();
 
     if (isSupabaseConfigured) {
+      const { display_order, ...withoutOrder } = dbRecord;
       if (isNew) {
         supabase.from('products').insert([{ ...dbRecord, created_at: saved.created_at }])
-          .then(({ error: insErr }) => { if (insErr) console.warn('saveProduct insert error:', insErr); })
+          .then(({ error: insErr }) => {
+            if (insErr && (insErr.code === '42703' || insErr.message?.includes('display_order'))) {
+              supabase.from('products').insert([{ ...withoutOrder, created_at: saved.created_at }]).then();
+            } else if (insErr) {
+              console.warn('saveProduct insert error:', insErr);
+            }
+          })
           .catch((e) => console.warn('saveProduct exception:', e));
       } else {
         supabase.from('products').update(dbRecord).eq('id', prodId)
-          .then(({ error: updErr }) => { if (updErr) console.warn('saveProduct update error:', updErr); })
+          .then(({ error: updErr }) => {
+            if (updErr && (updErr.code === '42703' || updErr.message?.includes('display_order'))) {
+              supabase.from('products').update(withoutOrder).eq('id', prodId).then();
+            } else if (updErr) {
+              console.warn('saveProduct update error:', updErr);
+            }
+          })
           .catch((e) => console.warn('saveProduct exception:', e));
       }
     }
@@ -2467,16 +2552,19 @@ class DataService {
       paid_amount: newSale.paid_amount, pending_amount: newSale.pending_amount,
       payment_status: newSale.payment_status, notes: storageNotes, recorded_by: newSale.recorded_by
     }]).then(() => {
-      supabase.from('customer_sale_items').insert(
-        cleanItems.map((i) => {
-          const row = {
-            sale_id: saleId, product_id: i.product_id, product_name: i.product_name,
-            quantity: i.quantity, unit: i.unit, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
-          };
-          if (i.hsn_code) row.hsn_code = i.hsn_code;
-          return row;
-        })
-      ).then().catch((e) => console.warn('customer_sale_items insert error:', e));
+      const itemRows = cleanItems.map((i, idx) => {
+        const row = {
+          id: i.id || `item-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 6)}`,
+          sale_id: saleId, product_id: i.product_id, product_name: i.product_name,
+          quantity: i.quantity, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
+        };
+        if (i.hsn_code) row.hsn_code = i.hsn_code;
+        if (i.unit) row.unit = i.unit;
+        return row;
+      });
+      supabase.from('customer_sale_items').insert(itemRows)
+        .then(({ error }) => { if (error) console.warn('customer_sale_items insert warning:', error); })
+        .catch((e) => console.warn('customer_sale_items insert error:', e));
 
       if (newPayment) {
         supabase.from('customer_payments').insert([{
@@ -2665,16 +2753,17 @@ class DataService {
       notes: storageNotes
     }).eq('id', saleId).then(async () => {
       await supabase.from('customer_sale_items').delete().eq('sale_id', saleId);
-      await supabase.from('customer_sale_items').insert(
-        cleanItems.map((i) => {
-          const row = {
-            sale_id: saleId, product_id: i.product_id, product_name: i.product_name,
-            quantity: i.quantity, unit: i.unit, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
-          };
-          if (i.hsn_code) row.hsn_code = i.hsn_code;
-          return row;
-        })
-      );
+      const itemRows = cleanItems.map((i, idx) => {
+        const row = {
+          id: i.id || `item-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 6)}`,
+          sale_id: saleId, product_id: i.product_id, product_name: i.product_name,
+          quantity: i.quantity, selling_price: i.selling_price, total: i.total, godown_id: i.godown_id
+        };
+        if (i.hsn_code) row.hsn_code = i.hsn_code;
+        if (i.unit) row.unit = i.unit;
+        return row;
+      });
+      await supabase.from('customer_sale_items').insert(itemRows);
     }).catch((e) => console.warn('updateSale error:', e));
 
     return updatedSale;
@@ -2855,6 +2944,7 @@ class DataService {
             product_id: i.product_id,
             product_name: i.product_name,
             quantity: i.quantity,
+            unit: i.unit || 'Units',
             purchase_price: i.purchase_price,
             total: i.total,
             godown_id: i.godown_id
@@ -3013,9 +3103,10 @@ class DataService {
     }).eq('id', purId).then(async () => {
       await supabase.from('supplier_purchase_items').delete().eq('purchase_id', purId);
       await supabase.from('supplier_purchase_items').insert(
-        cleanItems.map((i) => ({
-          id: i.id, purchase_id: purId, product_id: i.product_id, product_name: i.product_name,
-          quantity: i.quantity, unit: i.unit, purchase_price: i.purchase_price, total: i.total, godown_id: i.godown_id
+        cleanItems.map((i, idx) => ({
+          id: i.id || `pitem-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 6)}`,
+          purchase_id: purId, product_id: i.product_id, product_name: i.product_name,
+          quantity: i.quantity, unit: i.unit || 'Units', purchase_price: i.purchase_price, total: i.total, godown_id: i.godown_id
         }))
       );
     }).catch((e) => console.warn('updatePurchase error:', e));
@@ -3078,6 +3169,7 @@ class DataService {
     this.logActivity(currentUser, 'PAYMENT', 'Payments', payId, receiptNo,
       `Customer payment ₹${amt} from ${cust?.name || 'Customer'} via ${payData.payment_mode || 'Cash'}`
     );
+    this.saveCache();
     this.notify();
 
     supabase.from('customer_payments').insert([{
@@ -3121,6 +3213,7 @@ class DataService {
     this.logActivity(currentUser, 'PAYMENT', 'Payments', payId, receiptNo,
       `Supplier payment ₹${amt} to ${supp?.company_name || 'Supplier'} via ${payData.payment_mode || 'Bank Transfer'}`
     );
+    this.saveCache();
     this.notify();
 
     supabase.from('supplier_payments').insert([{
@@ -3137,7 +3230,7 @@ class DataService {
     const sale = this.getSaleById(saleId);
     if (!sale) return;
     const linked = this.getSalePayments(saleId);
-    const totalPaid = linked.reduce((acc, p) => acc + (p.amount || 0), 0);
+    const totalPaid = linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
     const pendingAmount = Math.max(0, sale.total_amount - totalPaid);
     const custLedger = this.getCustomerLedger ? this.getCustomerLedger(sale.customer_id) : null;
     const custAdv = custLedger ? (custLedger.advanceBalance || 0) : 0;
@@ -3147,6 +3240,7 @@ class DataService {
     sale.pending_amount = pendingAmount;
     sale.advance_amount = advanceAmount;
     sale.payment_status = paymentStatus;
+    this.saveCache();
     try {
       supabase.from('customer_sales').update({ paid_amount: totalPaid, pending_amount: pendingAmount, payment_status: paymentStatus }).eq('id', saleId).then();
     } catch { }
@@ -3156,7 +3250,7 @@ class DataService {
     const pur = this.getPurchaseById(purchaseId);
     if (!pur) return;
     const linked = this.getPurchasePayments(purchaseId);
-    const totalPaid = linked.reduce((acc, p) => acc + (p.amount || 0), 0);
+    const totalPaid = linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
     const pendingAmount = Math.max(0, pur.total_amount - totalPaid);
     const suppLedger = this.getSupplierLedger ? this.getSupplierLedger(pur.supplier_id) : null;
     const suppAdv = suppLedger ? (suppLedger.advanceBalance || 0) : 0;
@@ -3166,19 +3260,62 @@ class DataService {
     pur.pending_amount = pendingAmount;
     pur.advance_amount = advanceAmount;
     pur.payment_status = paymentStatus;
+    this.saveCache();
     try {
       supabase.from('supplier_purchases').update({ paid_amount: totalPaid, pending_amount: pendingAmount, payment_status: paymentStatus }).eq('id', purchaseId).then();
     } catch { }
   }
 
+  updatePayment(id, updateData, currentUser) {
+    const payment = this.getPaymentById(id);
+    if (!payment) throw new Error('Payment record not found');
+    const oldAmount = payment.amount;
+    const newAmount = updateData.amount !== undefined ? (Number(updateData.amount) || 0) : oldAmount;
+    if (newAmount <= 0) throw new Error('Payment amount must be greater than 0');
+
+    const updated = {
+      ...payment,
+      ...updateData,
+      amount: newAmount,
+      payment_mode: updateData.payment_mode || payment.payment_mode || 'Cash',
+      reference_no: updateData.reference_no !== undefined ? updateData.reference_no : (payment.reference_no || ''),
+      date: updateData.date || payment.date,
+      time: updateData.time || payment.time,
+      notes: updateData.notes !== undefined ? updateData.notes : payment.notes,
+      updated_at: new Date().toISOString()
+    };
+
+    this.payments = this.payments.map((p) => (p.id === id ? updated : p));
+    if (updated.sale_id) this.syncSalePaymentTotals(updated.sale_id);
+    if (updated.purchase_id) this.syncPurchasePaymentTotals(updated.purchase_id);
+    this.logActivity(currentUser, 'UPDATE', 'Payments', id, payment.receipt_no, `Updated payment ${payment.receipt_no}: ₹${oldAmount} → ₹${newAmount}`);
+    this.saveCache();
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      const targetTable = updated.type === 'customer_payment' ? 'customer_payments' : 'supplier_payments';
+      const payload = {
+        amount: updated.amount,
+        payment_mode: updated.payment_mode,
+        reference_no: updated.reference_no,
+        date: updated.date,
+        time: updated.time,
+        notes: updated.notes
+      };
+      supabase.from(targetTable).update(payload).eq('id', id).then().catch(console.warn);
+    }
+    return updated;
+  }
+
   deletePayment(id, currentUser) {
-    if (!this.canDelete(currentUser)) throw new Error('Permission denied.');
+    if (currentUser && !this.canDelete(currentUser)) throw new Error('Permission denied.');
     const payment = this.getPaymentById(id);
     if (!payment) return;
     this.payments = this.payments.filter((p) => p.id !== id);
     if (payment.sale_id) this.syncSalePaymentTotals(payment.sale_id);
     else if (payment.purchase_id) this.syncPurchasePaymentTotals(payment.purchase_id);
     this.logActivity(currentUser, 'DELETE', 'Payments', id, payment.receipt_no, `Deleted payment ${payment.receipt_no}`);
+    this.saveCache();
     this.notify();
     if (payment.type === 'customer_payment') {
       supabase.from('customer_payments').delete().eq('id', id).then().catch(console.warn);

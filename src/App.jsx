@@ -613,6 +613,7 @@ export const App = () => {
         }}
         sale={selectedBillSale}
         dataService={dataService}
+        currentUser={currentUser}
         onAddPayment={(sale) => {
           setIsBillDetailsOpen(false);
           openPayment(sale.customer_id, 'customer', sale.id);
@@ -650,6 +651,7 @@ export const App = () => {
         }}
         purchase={selectedPurchaseDoc}
         dataService={dataService}
+        currentUser={currentUser}
         onAddPayment={(pur) => {
           setIsPurchaseDetailsOpen(false);
           openPayment(pur.supplier_id, 'supplier', pur.id);

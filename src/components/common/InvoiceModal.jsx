@@ -14,6 +14,8 @@ export const InvoiceModal = ({
   onEdit
 }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isEditingInvoiceNo, setIsEditingInvoiceNo] = useState(false);
+  const [newInvoiceNoInput, setNewInvoiceNoInput] = useState('');
   const [isEditingVehicle, setIsEditingVehicle] = useState(false);
   const [newVehicleInput, setNewVehicleInput] = useState('');
   const [isEditingEway, setIsEditingEway] = useState(false);
@@ -57,7 +59,7 @@ export const InvoiceModal = ({
   const saleFromStore = dataService?.getSaleById ? (dataService.getSaleById(doc.id) || dataService.getSaleById(doc.invoice_no)) : null;
   const activeDoc = (doc.items && doc.items.length > 0) ? doc : (saleFromStore || doc);
   const customer = dataService?.getCustomerById(activeDoc.customer_id || doc.customer_id);
-  const docNo = activeDoc.invoice_no || doc.invoice_no || 'INV';
+  const docNo = (activeDoc.invoice_no || doc.invoice_no || '').trim();
   const items = (activeDoc.items && activeDoc.items.length > 0) ? activeDoc.items : (doc.items || []);
 
   // Calculate 18% GST (9% CGST + 9% SGST)
@@ -79,6 +81,16 @@ export const InvoiceModal = ({
 
   // Customer Address: prioritize invoice-specific address then customer master address
   const customerAddress = (doc.customer_address || customer?.address || '').trim();
+
+  const handleSaveInvoiceNo = () => {
+    try {
+      const inv = newInvoiceNoInput.trim();
+      dataService?.updateSale(doc.id, { invoice_no: inv }, 'Invoice number updated from invoice view');
+      setIsEditingInvoiceNo(false);
+    } catch (e) {
+      console.error('Failed to update invoice number:', e);
+    }
+  };
 
   const handleSaveVehicle = () => {
     try {
@@ -201,7 +213,7 @@ export const InvoiceModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Sales Invoice — ${docNo}`}
+      title={docNo ? `Sales Invoice — ${docNo}` : 'Sales Invoice'}
       maxWidth="860px"
     >
       <div>
@@ -222,7 +234,7 @@ export const InvoiceModal = ({
             <span className="badge badge-active" style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 700 }}>
               Customer Tax Invoice
             </span>
-            <strong style={{ fontSize: '15px', color: '#0f172a' }}>{docNo}</strong>
+            {docNo ? <strong style={{ fontSize: '15px', color: '#0f172a' }}>{docNo}</strong> : null}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -345,9 +357,92 @@ export const InvoiceModal = ({
                 }}>
                   TAX INVOICE
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                  {docNo}
-                </div>
+                {/* Invoice Number Custom Field (Input style matching E-Way & Vehicle No) */}
+                {isEditingInvoiceNo ? (
+                  <div className="no-print" style={{ marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ fontSize: '12px', padding: '2px 6px', width: '130px', fontWeight: 800, textTransform: 'uppercase' }}
+                      placeholder="Invoice #"
+                      value={newInvoiceNoInput}
+                      onChange={(e) => setNewInvoiceNoInput(e.target.value)}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: '11px', padding: '2px 6px', fontWeight: 700 }}
+                      onClick={handleSaveInvoiceNo}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '11px', padding: '2px 6px' }}
+                      onClick={() => setIsEditingInvoiceNo(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : docNo ? (
+                  <div style={{
+                    fontSize: '18px',
+                    fontWeight: 900,
+                    color: '#0f172a',
+                    letterSpacing: '-0.01em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: '5px'
+                  }}>
+                    <span>{docNo}</span>
+                    <button
+                      type="button"
+                      className="no-print"
+                      onClick={() => {
+                        setNewInvoiceNoInput(docNo);
+                        setIsEditingInvoiceNo(true);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#0284c7',
+                        marginLeft: '3px',
+                        padding: '0 2px',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                      }}
+                      title="Edit Invoice Number"
+                    >
+                      <Edit size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="no-print" style={{ marginTop: '3px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewInvoiceNoInput('');
+                        setIsEditingInvoiceNo(true);
+                      }}
+                      style={{
+                        background: '#f8fafc',
+                        border: '1px dashed #0284c7',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        color: '#0284c7',
+                        fontSize: '10.5px',
+                        padding: '2px 8px',
+                        fontWeight: 700
+                      }}
+                    >
+                      + Add Invoice No
+                    </button>
+                  </div>
+                )}
 
                 {/* E-way Number Custom Field (Below Invoice Number) */}
                 {isEditingEway ? (

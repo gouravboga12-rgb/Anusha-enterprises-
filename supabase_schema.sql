@@ -58,9 +58,11 @@ CREATE TABLE IF NOT EXISTS public.products (
     cloudinary_public_id VARCHAR(255),
     is_active BOOLEAN DEFAULT TRUE,
     description TEXT,
+    display_order INTEGER DEFAULT 99,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 99;
 
 -- 5. CUSTOMER SALES (Header)
 CREATE TABLE IF NOT EXISTS public.customer_sales (

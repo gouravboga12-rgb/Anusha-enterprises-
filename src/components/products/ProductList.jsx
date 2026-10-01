@@ -100,6 +100,7 @@ export const ProductList = ({
           <table className="data-table">
             <thead>
               <tr>
+                <th style={{ width: '75px', textAlign: 'center' }}>Order #</th>
                 <th>Product</th>
                 <th>SKU</th>
                 <th>HSN Code</th>
@@ -114,7 +115,7 @@ export const ProductList = ({
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '32px', color: '#64748b' }}>
                     No products found.
                   </td>
                 </tr>
@@ -125,6 +126,40 @@ export const ProductList = ({
 
                   return (
                     <tr key={prod.id}>
+                      <td style={{ width: '75px', textAlign: 'center' }}>
+                        <input
+                          type="number"
+                          min="1"
+                          max="999"
+                          defaultValue={prod.display_order ?? 99}
+                          key={prod.id + '_' + (prod.display_order ?? 99)}
+                          className="form-input"
+                          style={{
+                            width: '54px',
+                            padding: '4px',
+                            fontSize: '12px',
+                            textAlign: 'center',
+                            fontWeight: 700,
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            background: '#f8fafc',
+                            margin: '0 auto',
+                            display: 'block'
+                          }}
+                          title="Set product display order (1 appears first at top). Press Enter or click outside to save."
+                          onBlur={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val) && val !== prod.display_order) {
+                              dataService.setProductOrder(prod.id, val);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.target.blur();
+                            }
+                          }}
+                        />
+                      </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <img
@@ -275,7 +310,10 @@ export const ProductList = ({
                       }}
                     />
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span className="badge" style={{ fontSize: '10px', padding: '1px 6px', background: '#f1f5f9', color: '#475569', fontWeight: 700 }} title="Order Priority">
+                          #{prod.display_order ?? 99}
+                        </span>
                         <span className="badge badge-active" style={{ fontSize: '10px', padding: '1px 6px' }}>
                           {prod.sku}
                         </span>

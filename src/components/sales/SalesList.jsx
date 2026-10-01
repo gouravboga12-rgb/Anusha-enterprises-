@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, Search, ShoppingCart, Receipt, Eye, FileText, Edit2, Calendar, X } from 'lucide-react';
+import { PlusCircle, Search, ShoppingCart, Receipt, BookOpen, FileText, Edit2, Calendar, X } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const toYYYYMMDD = (dateStr) => {
@@ -317,11 +317,11 @@ export const SalesList = ({
                           )}
                           <button
                             className="btn btn-secondary btn-sm"
-                            style={{ padding: '4px 8px' }}
+                            style={{ padding: '4px 8px', fontSize: '11px', color: '#4338ca', borderColor: '#c7d2fe', background: '#eef2ff', fontWeight: 600 }}
                             onClick={() => onSelectCustomer(sale.customer_id)}
-                            title="View Customer Profile"
+                            title="View Customer Ledger & Statement"
                           >
-                            <Eye size={13} />
+                            <BookOpen size={13} /> Ledger
                           </button>
                         </div>
                       </td>
@@ -462,11 +462,11 @@ export const SalesList = ({
                   )}
                   <button
                     className="btn btn-secondary btn-sm"
-                    style={{ padding: '6px 10px' }}
+                    style={{ padding: '6px 10px', fontSize: '12px', color: '#4338ca', borderColor: '#c7d2fe', background: '#eef2ff', fontWeight: 600 }}
                     onClick={() => onSelectCustomer(sale.customer_id)}
-                    title="View Customer Profile"
+                    title="View Customer Ledger & Statement"
                   >
-                    <Eye size={13} />
+                    <BookOpen size={13} /> Ledger
                   </button>
                 </div>
               </div>

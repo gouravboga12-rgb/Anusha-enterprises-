@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, PlusCircle, Phone, MapPin, Eye, Edit, ShoppingBag, Truck, Trash2, Receipt } from 'lucide-react';
+import { Search, PlusCircle, Phone, MapPin, BookOpen, Edit, ShoppingBag, Truck, Trash2, Receipt } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
 export const SupplierList = ({
@@ -185,7 +185,7 @@ export const SupplierList = ({
                             onClick={() => onSelectSupplier(supp.id)}
                             title="View Supplier Ledger"
                           >
-                            <Eye size={13} /> Ledger
+                            <BookOpen size={13} /> Ledger
                           </button>
                           <button
                             className="btn btn-primary btn-sm"
@@ -319,7 +319,7 @@ export const SupplierList = ({
                     style={{ flex: '1 1 auto', minWidth: '70px' }}
                     onClick={() => onSelectSupplier(supp.id)}
                   >
-                    <Eye size={14} /> Ledger
+                    <BookOpen size={14} /> Ledger
                   </button>
                   <button
                     className="btn btn-primary btn-sm"

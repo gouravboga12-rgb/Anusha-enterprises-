@@ -20,6 +20,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
     sku: '',
     hsn_code: '',
     name: '',
+    display_order: 99,
     current_stock: 0,
     unit: 'Boxes',
     purchase_price: '',
@@ -34,7 +35,11 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
 
   useEffect(() => {
     if (product) {
-      setFormData({ ...product, hsn_code: product.hsn_code || product.hsn || '' });
+      setFormData({
+        ...product,
+        hsn_code: product.hsn_code || product.hsn || '',
+        display_order: product.display_order ?? 99
+      });
       const isStd = STANDARD_UNITS.some(
         (u) => u.value.toLowerCase() === (product.unit || '').toLowerCase()
       );
@@ -50,6 +55,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
         sku: '',
         hsn_code: '',
         name: '',
+        display_order: 99,
         current_stock: 0,
         unit: 'Boxes',
         purchase_price: '',
@@ -77,6 +83,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
     if (onSave) {
       await onSave({
         ...formData,
+        display_order: formData.display_order !== '' && formData.display_order !== undefined ? Number(formData.display_order) : 99,
         unit: finalUnit,
         hsn_code: (formData.hsn_code || '').trim(),
         current_stock: formData.current_stock !== '' && formData.current_stock !== undefined ? Number(formData.current_stock) : 0,
@@ -170,16 +177,31 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
           </div>
         </div>
 
-        <div className="form-group">
-          <label className="form-label">Product Name *</label>
-          <input
-            type="text"
-            className="form-input"
-            required
-            placeholder="e.g. Ideal Boost Box"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
+        <div className="form-row">
+          <div className="form-group" style={{ maxWidth: '140px' }}>
+            <label className="form-label">Order # (Priority)</label>
+            <input
+              type="number"
+              min="1"
+              max="999"
+              className="form-input"
+              placeholder="e.g. 1"
+              value={formData.display_order ?? ''}
+              onChange={(e) => setFormData({ ...formData, display_order: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
+              title="Catalog display order: 1 = Top of list, 2 = Second, etc."
+            />
+          </div>
+          <div className="form-group" style={{ flex: 1 }}>
+            <label className="form-label">Product Name *</label>
+            <input
+              type="text"
+              className="form-input"
+              required
+              placeholder="e.g. Ideal Boost Box"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
         </div>
 
         <div className="form-row">
