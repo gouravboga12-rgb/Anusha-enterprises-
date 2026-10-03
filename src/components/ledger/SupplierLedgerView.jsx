@@ -311,7 +311,7 @@ export const SupplierLedgerView = ({ dataService, onSelectSupplier, onOpenPaymen
                         <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           {entry.items_detail.map((itm, idx) => (
                             <div key={idx} style={{ fontSize: '11px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>• <strong style={{ color: '#0f172a' }}>{itm.product_name}</strong>: <strong>{itm.quantity} {itm.unit}</strong> × ₹{itm.purchase_price} = <strong>₹{itm.total}</strong></span>
+                              <span>• <strong style={{ color: '#0f172a' }}>{itm.product_name}</strong>: <strong>{itm.quantity} {itm.unit}</strong> × {formatCurrency(itm.purchase_price)} = <strong>{formatCurrency(itm.total)}</strong></span>
                               {itm.godown && (
                                 <span style={{ color: '#0284c7', fontSize: '10.5px' }}>[{itm.godown}]</span>
                               )}

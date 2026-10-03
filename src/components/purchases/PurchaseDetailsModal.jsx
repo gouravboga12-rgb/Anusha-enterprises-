@@ -211,58 +211,20 @@ export const PurchaseDetailsModal = ({
               Note: {purchase.notes}
             </div>
           )}
-          {/* GST Financial Breakdown Box (Clarifying 18% GST math) */}
-          {(() => {
-            const subtotal = purchase.items && purchase.items.length > 0
-              ? purchase.items.reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0), 0)
-              : (Number(purchase.subtotal) || Math.round((totalAmount / 1.18) * 100) / 100);
-            const cgst = purchase.cgst_amount !== undefined && purchase.cgst_amount !== null
-              ? Number(purchase.cgst_amount)
-              : Math.round(subtotal * 0.09 * 100) / 100;
-            const sgst = purchase.sgst_amount !== undefined && purchase.sgst_amount !== null
-              ? Number(purchase.sgst_amount)
-              : Math.round(subtotal * 0.09 * 100) / 100;
-            const purchaseTotal = totalAmount || Math.round((subtotal + cgst + sgst) * 100) / 100;
-
-            return (
-              <div style={{
-                background: '#f8fafc',
-                border: '1.5px solid #cbd5e1',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                marginTop: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#475569' }}>
-                  <span>Subtotal (Taxable Amount):</span>
-                  <strong style={{ color: '#0f172a' }}>{formatCurrency(subtotal)}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#475569' }}>
-                  <span>Central GST (CGST 9%):</span>
-                  <span style={{ fontWeight: 600, color: '#334155' }}>+{formatCurrency(cgst)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#475569' }}>
-                  <span>State GST (SGST 9%):</span>
-                  <span style={{ fontWeight: 600, color: '#334155' }}>+{formatCurrency(sgst)}</span>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '14px',
-                  fontWeight: 800,
-                  color: '#0f172a',
-                  borderTop: '1px dashed #cbd5e1',
-                  paddingTop: '6px',
-                  marginTop: '2px'
-                }}>
-                  <span>Total Purchase Value (Inc. 18% GST):</span>
-                  <span style={{ color: '#0284c7' }}>{formatCurrency(purchaseTotal)}</span>
-                </div>
-              </div>
-            );
-          })()}
+          {/* Total Purchase Amount Summary Box (No GST) */}
+          <div style={{
+            background: '#f8fafc',
+            border: '1.5px solid #cbd5e1',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginTop: '12px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Total Purchase Amount:</span>
+            <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>{formatCurrency(totalAmount)}</span>
+          </div>
         </div>
 
         {/* Payment History Section */}
@@ -335,7 +297,7 @@ export const PurchaseDetailsModal = ({
                           </label>
                           <input
                             type="number"
-                            min="1"
+                            min="0.01"
                             step="any"
                             className="form-input"
                             style={{ padding: '6px 8px', fontSize: '13px' }}

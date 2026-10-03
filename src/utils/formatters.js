@@ -1,10 +1,13 @@
 // Currency and Date formatting utilities for Anusha Enterprises CRM
 
+export const roundCurrency = (val) => Math.round((Number(val) || 0) * 100) / 100;
+
 export const formatCurrency = (amount) => {
   const num = Number(amount) || 0;
+  const hasDecimals = Math.abs(num % 1) > 0.0001;
   return '₹' + num.toLocaleString('en-IN', {
     maximumFractionDigits: 2,
-    minimumFractionDigits: 0
+    minimumFractionDigits: hasDecimals ? 2 : 0
   });
 };
 

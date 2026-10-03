@@ -148,7 +148,8 @@ export const ManualAdjustmentModal = ({ isOpen, onClose, dataService, onAdjustme
               type="number"
               className="form-input"
               required
-              min="1"
+              min="0.01"
+              step="any"
               placeholder="e.g. 10"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}

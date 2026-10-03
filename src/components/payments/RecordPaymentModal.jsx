@@ -136,10 +136,10 @@ export const RecordPaymentModal = ({
   const targetPreviousPaid = selectedSale ? selectedSale.paid_amount : (selectedPurchase ? selectedPurchase.paid_amount : 0);
   const targetPendingBefore = selectedSale ? selectedSale.pending_amount : (selectedPurchase ? selectedPurchase.pending_amount : partyPendingTotal);
   
-  const projectedPaid = targetPreviousPaid + numAmount;
-  const projectedRemaining = Math.max(0, targetPendingBefore - numAmount);
-  const surplusAdvance = Math.max(0, numAmount - partyPendingTotal);
-  const clearedOldDue = Math.min(numAmount, partyPendingTotal);
+  const projectedPaid = Math.round((targetPreviousPaid + numAmount) * 100) / 100;
+  const projectedRemaining = Math.round(Math.max(0, targetPendingBefore - numAmount) * 100) / 100;
+  const surplusAdvance = Math.round(Math.max(0, numAmount - partyPendingTotal) * 100) / 100;
+  const clearedOldDue = Math.round(Math.min(numAmount, partyPendingTotal) * 100) / 100;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -483,16 +483,19 @@ export const RecordPaymentModal = ({
                 >
                   Full Due ({formatCurrency(targetPendingBefore)})
                 </button>
-                {targetPendingBefore >= 2000 && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    style={{ fontSize: '11px', padding: '2px 8px' }}
-                    onClick={() => setAmount(String(Math.floor(targetPendingBefore / 2)))}
-                  >
-                    50% ({formatCurrency(Math.floor(targetPendingBefore / 2))})
-                  </button>
-                )}
+                {targetPendingBefore >= 2000 && (() => {
+                  const halfVal = Math.round((targetPendingBefore / 2) * 100) / 100;
+                  return (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '11px', padding: '2px 8px' }}
+                      onClick={() => setAmount(String(halfVal))}
+                    >
+                      50% ({formatCurrency(halfVal)})
+                    </button>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -504,7 +507,8 @@ export const RecordPaymentModal = ({
               type="number"
               className="form-input"
               required
-              min="1"
+              min="0.01"
+              step="any"
               placeholder="e.g. 5000"
               style={{ paddingLeft: '28px', fontSize: '16px', fontWeight: 700 }}
               value={amount}

@@ -93,9 +93,9 @@ export const EditPurchaseModal = ({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const totalBillAmount = items.reduce((acc, item) => {
+  const totalBillAmount = Math.round(items.reduce((acc, item) => {
     return acc + (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0);
-  }, 0);
+  }, 0) * 100) / 100;
 
   const oldQtyMap = {};
   purchase.items.forEach((item) => {
@@ -407,7 +407,8 @@ export const EditPurchaseModal = ({
                           <input
                             type="number"
                             className="form-input"
-                            min="1"
+                            min="0.01"
+                            step="any"
                             style={{ width: '65px' }}
                             value={item.quantity}
                             onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
@@ -447,7 +448,7 @@ export const EditPurchaseModal = ({
                           type="number"
                           className="form-input"
                           min="0"
-                          step="0.01"
+                          step="any"
                           value={item.purchase_price}
                           onChange={(e) => handleItemChange(idx, 'purchase_price', e.target.value)}
                         />

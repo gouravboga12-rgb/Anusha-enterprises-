@@ -211,6 +211,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
               type="number"
               className="form-input"
               min="0"
+              step="any"
               placeholder="e.g. 450"
               value={formData.purchase_price}
               onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
@@ -222,6 +223,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
               type="number"
               className="form-input"
               min="0"
+              step="any"
               placeholder="e.g. 650"
               value={formData.selling_price}
               onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
@@ -236,6 +238,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
               type="number"
               className="form-input"
               min="0"
+              step="any"
               placeholder="0"
               value={formData.current_stock === 0 ? '0' : (formData.current_stock ?? '')}
               onChange={(e) => setFormData({ ...formData, current_stock: e.target.value })}
@@ -247,6 +250,7 @@ export const ProductFormModal = ({ isOpen, onClose, product, onSave, zIndex = 11
               type="number"
               className="form-input"
               min="0"
+              step="any"
               value={formData.min_stock_alert === 0 ? '0' : (formData.min_stock_alert ?? '')}
               onChange={(e) => setFormData({ ...formData, min_stock_alert: e.target.value })}
             />

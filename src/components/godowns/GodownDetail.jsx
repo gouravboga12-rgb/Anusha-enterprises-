@@ -204,7 +204,7 @@ export const GodownDetail = ({ godownId, dataService, currentUser, onBack, onOpe
                   title: `Purchase from ${supp?.company_name || 'Supplier'}`,
                   ref: p.purchase_no,
                   detail: p.items.filter(i => i.godown_id === godownId || !i.godown_id)
-                    .map(i => `${i.product_name}: +${i.quantity} × ₹${i.purchase_price} = ₹${i.total}`).join('\n')
+                    .map(i => `${i.product_name}: +${i.quantity} × ${formatCurrency(i.purchase_price)} = ${formatCurrency(i.total)}`).join('\n')
                 });
               });
             }
@@ -218,7 +218,7 @@ export const GodownDetail = ({ godownId, dataService, currentUser, onBack, onOpe
                   color: '#dc2626', bg: '#fef2f2',
                   title: `Sale to ${cust?.name || 'Customer'}`,
                   ref: s.invoice_no,
-                  detail: relevantItems.map(i => `${i.product_name}: -${i.quantity} × ₹${i.selling_price} = ₹${i.total}`).join('\n')
+                  detail: relevantItems.map(i => `${i.product_name}: -${i.quantity} × ${formatCurrency(i.selling_price)} = ${formatCurrency(i.total)}`).join('\n')
                 });
               });
             }

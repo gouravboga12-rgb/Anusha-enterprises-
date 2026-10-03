@@ -98,12 +98,12 @@ export const EditSaleModal = ({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const taxableSubtotal = items.reduce((acc, item) => {
+  const taxableSubtotal = Math.round(items.reduce((acc, item) => {
     return acc + (Number(item.quantity) || 0) * (Number(item.selling_price) || 0);
-  }, 0);
+  }, 0) * 100) / 100;
   const cgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
   const sgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
-  const totalBillAmount = taxableSubtotal + cgstAmount + sgstAmount;
+  const totalBillAmount = Math.round((taxableSubtotal + cgstAmount + sgstAmount) * 100) / 100;
 
   // Map old quantities for reference & stock delta calculation
   const oldQtyMap = {};
@@ -356,7 +356,8 @@ export const EditSaleModal = ({
                           <input
                             type="number"
                             className="form-input"
-                            min="1"
+                            min="0.01"
+                            step="any"
                             style={{
                               width: '65px',
                               borderColor: isExceeding ? '#ef4444' : undefined,
@@ -405,7 +406,7 @@ export const EditSaleModal = ({
                           type="number"
                           className="form-input"
                           min="0"
-                          step="0.01"
+                          step="any"
                           value={item.selling_price}
                           onChange={(e) => handleItemChange(idx, 'selling_price', e.target.value)}
                         />

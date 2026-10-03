@@ -95,16 +95,16 @@ export const DailyTransactions = ({ dataService, onViewInvoice }) => {
 
     // 1. Sales Records (Dispatched Goods)
     salesInRange.forEach((s) => {
-      totSales += Number(s.total_amount) || 0;
+      totSales = Math.round((totSales + (Number(s.total_amount) || 0)) * 100) / 100;
       const cust = dataService.getCustomerById(s.customer_id);
       const itemLines = (s.items || []).map((i) => {
         const prod = dataService.getProductById(i.product_id);
         const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
         const g = dataService.getGodownById(i.godown_id);
-        return `${i.product_name}: ${i.quantity} ${unit} × ₹${Number(i.selling_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}${g ? ` [${g.name}]` : ''}`;
+        return `${i.product_name}: ${i.quantity} ${unit} × ${formatCurrency(i.selling_price)} = ${formatCurrency(i.total)}${g ? ` [${g.name}]` : ''}`;
       });
       if (s.cgst_amount > 0 || s.sgst_amount > 0) {
-        itemLines.push(`GST (18%): CGST 9% (₹${s.cgst_amount}) + SGST 9% (₹${s.sgst_amount})`);
+        itemLines.push(`GST (18%): CGST 9% (${formatCurrency(s.cgst_amount)}) + SGST 9% (${formatCurrency(s.sgst_amount)})`);
       }
       allEvents.push({
         id: s.id,
@@ -126,13 +126,13 @@ export const DailyTransactions = ({ dataService, onViewInvoice }) => {
 
     // 2. Purchases Records (Received Goods)
     purchasesInRange.forEach((p) => {
-      totPurchases += Number(p.total_amount) || 0;
+      totPurchases = Math.round((totPurchases + (Number(p.total_amount) || 0)) * 100) / 100;
       const supp = dataService.getSupplierById(p.supplier_id);
       const godown = dataService.getGodownById(p.godown_id);
       const itemLines = (p.items || []).map((i) => {
         const prod = dataService.getProductById(i.product_id);
         const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
-        return `${i.product_name}: ${i.quantity} ${unit} × ₹${Number(i.purchase_price).toLocaleString('en-IN')} = ₹${Number(i.total).toLocaleString('en-IN')}`;
+        return `${i.product_name}: ${i.quantity} ${unit} × ${formatCurrency(i.purchase_price)} = ${formatCurrency(i.total)}`;
       });
       allEvents.push({
         id: p.id,
@@ -156,9 +156,9 @@ export const DailyTransactions = ({ dataService, onViewInvoice }) => {
     // 3. Financial Inflow & Outflow Totals (from payments in the same period)
     paymentsInRange.forEach((pay) => {
       if (pay.type === 'customer_payment') {
-        totInflow += Number(pay.amount) || 0;
+        totInflow = Math.round((totInflow + (Number(pay.amount) || 0)) * 100) / 100;
       } else {
-        totOutflow += Number(pay.amount) || 0;
+        totOutflow = Math.round((totOutflow + (Number(pay.amount) || 0)) * 100) / 100;
       }
     });
 
@@ -171,7 +171,7 @@ export const DailyTransactions = ({ dataService, onViewInvoice }) => {
       totalPurchasesAmount: totPurchases,
       cashInflow: totInflow,
       cashOutflow: totOutflow,
-      netCashMovement: totInflow - totOutflow
+      netCashMovement: Math.round((totInflow - totOutflow) * 100) / 100
     };
   }, [dataService, dateMode, selectedDate, fromDate, toDate]);
 

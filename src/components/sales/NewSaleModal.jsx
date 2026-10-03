@@ -128,12 +128,12 @@ export const NewSaleModal = ({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const taxableSubtotal = items.reduce((acc, item) => {
+  const taxableSubtotal = Math.round(items.reduce((acc, item) => {
     return acc + (Number(item.quantity) || 0) * (Number(item.selling_price) || 0);
-  }, 0);
+  }, 0) * 100) / 100;
   const cgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
   const sgstAmount = Math.round(taxableSubtotal * 0.09 * 100) / 100;
-  const totalBillAmount = taxableSubtotal + cgstAmount + sgstAmount;
+  const totalBillAmount = Math.round((taxableSubtotal + cgstAmount + sgstAmount) * 100) / 100;
 
   const customerLedger = customerId ? dataService.getCustomerLedger(customerId) : null;
   const previousBalance = customerLedger ? (customerLedger.pendingBalance || 0) : 0;
@@ -141,12 +141,12 @@ export const NewSaleModal = ({
 
   const numPayment = Number(initialPayment) || 0;
   // Deduct old unpaid customer amount and absorb existing advance
-  const totalCustomerObligation = Math.max(0, (previousBalance - existingAdvance) + totalBillAmount);
-  const thisBillEffectiveCovered = Math.min(totalBillAmount, Math.max(0, existingAdvance + numPayment - previousBalance));
-  const thisBillPending = Math.max(0, totalBillAmount - thisBillEffectiveCovered);
+  const totalCustomerObligation = Math.round(Math.max(0, (previousBalance - existingAdvance) + totalBillAmount) * 100) / 100;
+  const thisBillEffectiveCovered = Math.round(Math.min(totalBillAmount, Math.max(0, existingAdvance + numPayment - previousBalance)) * 100) / 100;
+  const thisBillPending = Math.round(Math.max(0, totalBillAmount - thisBillEffectiveCovered) * 100) / 100;
 
   // Net calculation accounting for existing advance and current payment
-  const netBalanceAfter = (previousBalance - existingAdvance) + (totalBillAmount - numPayment);
+  const netBalanceAfter = Math.round(((previousBalance - existingAdvance) + (totalBillAmount - numPayment)) * 100) / 100;
   const finalDueAfter = Math.max(0, netBalanceAfter);
   const finalAdvanceAfter = Math.max(0, -netBalanceAfter);
   const appliedToOldDue = Math.min(numPayment, previousBalance);
@@ -527,7 +527,8 @@ export const NewSaleModal = ({
                             <input
                               type="number"
                               className="form-input"
-                              min="1"
+                              min="0.01"
+                              step="any"
                               style={{
                                 width: '65px',
                                 borderColor: isExceeding ? '#ef4444' : undefined,
@@ -577,6 +578,7 @@ export const NewSaleModal = ({
                             type="number"
                             className="form-input"
                             min="0"
+                            step="any"
                             value={item.selling_price}
                             onChange={(e) => handleItemChange(idx, 'selling_price', e.target.value)}
                           />
@@ -691,7 +693,8 @@ export const NewSaleModal = ({
                           <input
                             type="number"
                             className="form-input"
-                            min="1"
+                            min="0.01"
+                            step="any"
                             style={{
                               width: '60px',
                               borderColor: isExceeding ? '#ef4444' : undefined,
@@ -741,6 +744,7 @@ export const NewSaleModal = ({
                           type="number"
                           className="form-input"
                           min="0"
+                          step="any"
                           style={{ width: '100%' }}
                           value={item.selling_price}
                           onChange={(e) => handleItemChange(idx, 'selling_price', e.target.value)}
@@ -795,6 +799,7 @@ export const NewSaleModal = ({
                 type="number"
                 className="form-input"
                 min="0"
+                step="any"
                 placeholder="0 if credit or enter amount (supports advance)"
                 value={initialPayment}
                 onChange={(e) => setInitialPayment(e.target.value)}

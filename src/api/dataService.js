@@ -12,7 +12,7 @@ import {
   initialPayments,
   initialAdjustments
 } from '../mock/initialData.js';
-import { generateId, getTodayDateString, getCurrentTimeString } from '../utils/formatters.js';
+import { generateId, getTodayDateString, getCurrentTimeString, formatCurrency, roundCurrency } from '../utils/formatters.js';
 
 // Simple hash function for password storage (production should use bcrypt via edge function)
 const simpleHash = (str) => {
@@ -278,26 +278,28 @@ class DataService {
     const parsed = parseNotesAndVehicle(s.notes, s.vehicle_no, s.eway_no, s.customer_address);
     const cleanItems = incomingItems.map((i) => {
       const prod = this.getProductById ? this.getProductById(i.product_id) : null;
+      const qty = Number(i.quantity) || 0;
+      const price = Number(i.selling_price) || 0;
       return {
         ...i,
         unit: (i.unit && String(i.unit).trim()) || prod?.unit || 'Units',
         hsn_code: (i.hsn_code && String(i.hsn_code).trim()) || (i.hsn && String(i.hsn).trim()) || prod?.hsn_code || '',
-        quantity: Number(i.quantity) || 0,
-        selling_price: Number(i.selling_price) || 0,
-        total: Number(i.total) || ((Number(i.quantity) || 0) * (Number(i.selling_price) || 0))
+        quantity: qty,
+        selling_price: price,
+        total: Number(i.total) ? roundCurrency(i.total) : roundCurrency(qty * price)
       };
     });
 
-    const subtotal = Number(s.subtotal) || cleanItems.reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.selling_price) || 0), 0);
-    const cgstAmount = Number(s.cgst_amount) || Math.round(subtotal * 0.09 * 100) / 100;
-    const sgstAmount = Number(s.sgst_amount) || Math.round(subtotal * 0.09 * 100) / 100;
-    const totalGst = cgstAmount + sgstAmount;
-    const calculatedWithGst = Math.round((subtotal + totalGst) * 100) / 100;
-    const rawTotal = Number(s.total_amount) || 0;
+    const subtotal = Number(s.subtotal) ? roundCurrency(s.subtotal) : roundCurrency(cleanItems.reduce((acc, i) => acc + (i.total || 0), 0));
+    const cgstAmount = Number(s.cgst_amount) ? roundCurrency(s.cgst_amount) : roundCurrency(subtotal * 0.09);
+    const sgstAmount = Number(s.sgst_amount) ? roundCurrency(s.sgst_amount) : roundCurrency(subtotal * 0.09);
+    const totalGst = roundCurrency(cgstAmount + sgstAmount);
+    const calculatedWithGst = roundCurrency(subtotal + totalGst);
+    const rawTotal = Number(s.total_amount) ? roundCurrency(s.total_amount) : 0;
     // If stored total_amount is equal to or less than subtotal, GST was omitted -> add 18% GST
     const totalAmount = (rawTotal > subtotal) ? rawTotal : (subtotal > 0 ? calculatedWithGst : rawTotal);
-    const paidAmount = Number(s.paid_amount) || 0;
-    const pendingAmount = Math.max(0, totalAmount - paidAmount);
+    const paidAmount = Number(s.paid_amount) ? roundCurrency(s.paid_amount) : 0;
+    const pendingAmount = roundCurrency(Math.max(0, totalAmount - paidAmount));
     const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
 
@@ -689,32 +691,39 @@ class DataService {
       // Normalize sales with 18% GST (9% CGST + 9% SGST)
       this.sales = salesData.map((s) => this._normalizeSale(s));
 
-      // Normalize purchases
+      // Normalize purchases (strictly without GST)
       this.purchases = purData.map((p) => {
         const parsed = parseNotesAndVehicle(p.notes, p.vehicle_no);
+        const cleanItems = (p.items || []).map((i) => {
+          const prod = this.getProductById(i.product_id);
+          const qty = Number(i.quantity) || 0;
+          const price = Number(i.purchase_price) || 0;
+          return {
+            ...i,
+            unit: (i.unit && String(i.unit).trim()) || prod?.unit || 'Units',
+            quantity: qty,
+            purchase_price: price,
+            total: Number(i.total) ? roundCurrency(i.total) : roundCurrency(qty * price)
+          };
+        });
+        const calcTotal = roundCurrency(cleanItems.reduce((acc, i) => acc + (i.total || 0), 0));
+        const totalAmt = Number(p.total_amount) ? roundCurrency(p.total_amount) : calcTotal;
+        const paidAmt = Number(p.paid_amount) ? roundCurrency(p.paid_amount) : 0;
+        const pendingAmt = roundCurrency(Math.max(0, totalAmt - paidAmt));
         return {
           ...p,
           notes: parsed.notes,
           vehicle_no: parsed.vehicle_no,
-          total_amount: Number(p.total_amount) || 0,
-          paid_amount: Number(p.paid_amount) || 0,
-          pending_amount: Number(p.pending_amount) || 0,
-          items: (p.items || []).map((i) => {
-            const prod = this.getProductById(i.product_id);
-            return {
-              ...i,
-              unit: (i.unit && String(i.unit).trim()) || prod?.unit || 'Units',
-              quantity: Number(i.quantity) || 0,
-              purchase_price: Number(i.purchase_price) || 0,
-              total: Number(i.total) || 0
-            };
-          })
+          total_amount: totalAmt,
+          paid_amount: paidAmt,
+          pending_amount: pendingAmt,
+          items: cleanItems
         };
       });
 
       // Payments
-      const unifiedCustomerPayments = custPayments.map((p) => ({ ...p, type: 'customer_payment', amount: Number(p.amount) || 0 }));
-      const unifiedSupplierPayments = suppPayments.map((p) => ({ ...p, type: 'supplier_payment', amount: Number(p.amount) || 0 }));
+      const unifiedCustomerPayments = custPayments.map((p) => ({ ...p, type: 'customer_payment', amount: roundCurrency(p.amount) }));
+      const unifiedSupplierPayments = suppPayments.map((p) => ({ ...p, type: 'supplier_payment', amount: roundCurrency(p.amount) }));
       this.payments = [...unifiedCustomerPayments, ...unifiedSupplierPayments].sort((a, b) =>
         new Date(b.created_at || b.date) - new Date(a.created_at || a.date)
       );
@@ -722,17 +731,17 @@ class DataService {
       // Re-synchronize live bill payment balances against actual payment records
       this.sales.forEach((s) => {
         const linked = this.getSalePayments(s.id);
-        const totalPaid = linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        const totalPaid = roundCurrency(linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
         s.paid_amount = totalPaid;
-        s.pending_amount = Math.max(0, s.total_amount - totalPaid);
+        s.pending_amount = roundCurrency(Math.max(0, s.total_amount - totalPaid));
         s.payment_status = s.pending_amount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
       });
 
       this.purchases.forEach((pur) => {
         const linked = this.getPurchasePayments(pur.id);
-        const totalPaid = linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        const totalPaid = roundCurrency(linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
         pur.paid_amount = totalPaid;
-        pur.pending_amount = Math.max(0, pur.total_amount - totalPaid);
+        pur.pending_amount = roundCurrency(Math.max(0, pur.total_amount - totalPaid));
         pur.payment_status = pur.pending_amount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
       });
 
@@ -2419,35 +2428,37 @@ class DataService {
       const prod = this.getProductById(i.product_id);
       const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
       const hsnCode = (i.hsn_code && String(i.hsn_code).trim()) || (i.hsn && String(i.hsn).trim()) || prod?.hsn_code || '';
+      const qty = Number(i.quantity) || 0;
+      const price = Number(i.selling_price) || 0;
       return {
         id: `item-${Date.now()}-${idx}`,
         sale_id: saleId,
         product_id: i.product_id,
         product_name: i.product_name || prod?.name || 'Product',
         hsn_code: hsnCode,
-        quantity: Number(i.quantity) || 0,
+        quantity: qty,
         unit: unit,
-        selling_price: Number(i.selling_price) || 0,
-        total: (Number(i.quantity) || 0) * (Number(i.selling_price) || 0),
+        selling_price: price,
+        total: roundCurrency(qty * price),
         godown_id: i.godown_id || null
       };
     });
 
     // 3. 18% GST (9% CGST + 9% SGST) Calculation
-    const subtotal = cleanItems.reduce((acc, item) => acc + item.total, 0);
-    const cgstAmount = Math.round(subtotal * 0.09 * 100) / 100;
-    const sgstAmount = Math.round(subtotal * 0.09 * 100) / 100;
-    const totalGst = cgstAmount + sgstAmount;
-    const calculatedTotal = subtotal + totalGst;
+    const subtotal = roundCurrency(cleanItems.reduce((acc, item) => acc + item.total, 0));
+    const cgstAmount = roundCurrency(subtotal * 0.09);
+    const sgstAmount = roundCurrency(subtotal * 0.09);
+    const totalGst = roundCurrency(cgstAmount + sgstAmount);
+    const calculatedTotal = roundCurrency(subtotal + totalGst);
     const totalAmount = saleData.total_amount !== undefined && saleData.total_amount !== null && Number(saleData.total_amount) > 0
-      ? Number(saleData.total_amount)
+      ? roundCurrency(saleData.total_amount)
       : (saleData.apply_gst || saleData.cgst_amount ? calculatedTotal : subtotal);
     const finalCgst = saleData.cgst_amount !== undefined && saleData.cgst_amount !== null
-      ? Number(saleData.cgst_amount)
-      : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (saleData.apply_gst ? cgstAmount : 0));
+      ? roundCurrency(saleData.cgst_amount)
+      : (totalAmount > subtotal ? roundCurrency((totalAmount - subtotal) / 2) : (saleData.apply_gst ? cgstAmount : 0));
     const finalSgst = saleData.sgst_amount !== undefined && saleData.sgst_amount !== null
-      ? Number(saleData.sgst_amount)
-      : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (saleData.apply_gst ? sgstAmount : 0));
+      ? roundCurrency(saleData.sgst_amount)
+      : (totalAmount > subtotal ? roundCurrency((totalAmount - subtotal) / 2) : (saleData.apply_gst ? sgstAmount : 0));
 
     // Deduct old unpaid customer amount and absorb existing advance:
     const priorLedger = this.getCustomerLedger ? this.getCustomerLedger(saleData.customer_id) : null;
@@ -2455,11 +2466,11 @@ class DataService {
     const priorAdvance = priorLedger ? (priorLedger.advanceBalance || 0) : 0; // Old advance amount
 
     // Total net customer obligation before this payment
-    const netDueBeforePayment = (priorPending - priorAdvance) + totalAmount;
-    const trueAdvance = Math.max(0, initialPay - netDueBeforePayment);
+    const netDueBeforePayment = roundCurrency((priorPending - priorAdvance) + totalAmount);
+    const trueAdvance = roundCurrency(Math.max(0, initialPay - netDueBeforePayment));
     // Effective credit applied to this bill (after deducting any old unpaid due)
-    const effectivePaidForThisBill = Math.min(totalAmount, Math.max(0, priorAdvance + initialPay - priorPending));
-    const pendingAmount = Math.max(0, totalAmount - effectivePaidForThisBill);
+    const effectivePaidForThisBill = roundCurrency(Math.min(totalAmount, Math.max(0, priorAdvance + initialPay - priorPending)));
+    const pendingAmount = roundCurrency(Math.max(0, totalAmount - effectivePaidForThisBill));
     const advanceAmount = trueAdvance;
     const paymentStatus = pendingAmount === 0 ? 'Paid' : (effectivePaidForThisBill > 0 ? 'Partially Paid' : 'Pending');
 
@@ -2676,38 +2687,40 @@ class DataService {
       const prod = this.getProductById(i.product_id);
       const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
       const hsnCode = (i.hsn_code && String(i.hsn_code).trim()) || (i.hsn && String(i.hsn).trim()) || prod?.hsn_code || '';
+      const qty = Number(i.quantity) || 0;
+      const price = Number(i.selling_price) || 0;
       return {
         id: i.id || `item-${Date.now()}-${idx}`,
         sale_id: saleId,
         product_id: i.product_id,
         product_name: i.product_name || prod?.name || 'Product',
         hsn_code: hsnCode,
-        quantity: Number(i.quantity) || 0,
+        quantity: qty,
         unit: unit,
-        selling_price: Number(i.selling_price) || 0,
-        total: (Number(i.quantity) || 0) * (Number(i.selling_price) || 0),
+        selling_price: price,
+        total: roundCurrency(qty * price),
         godown_id: i.godown_id || null
       };
     });
 
-    const subtotal = cleanItems.reduce((acc, i) => acc + i.total, 0);
-    const cgstAmount = Math.round(subtotal * 0.09 * 100) / 100;
-    const sgstAmount = Math.round(subtotal * 0.09 * 100) / 100;
-    const totalGst = cgstAmount + sgstAmount;
-    const calculatedTotal = subtotal + totalGst;
+    const subtotal = roundCurrency(cleanItems.reduce((acc, i) => acc + i.total, 0));
+    const cgstAmount = roundCurrency(subtotal * 0.09);
+    const sgstAmount = roundCurrency(subtotal * 0.09);
+    const totalGst = roundCurrency(cgstAmount + sgstAmount);
+    const calculatedTotal = roundCurrency(subtotal + totalGst);
     const totalAmount = updatedData.total_amount !== undefined && updatedData.total_amount !== null && Number(updatedData.total_amount) > 0
-      ? Number(updatedData.total_amount)
+      ? roundCurrency(updatedData.total_amount)
       : (updatedData.apply_gst || updatedData.cgst_amount ? calculatedTotal : subtotal);
     const finalCgst = updatedData.cgst_amount !== undefined && updatedData.cgst_amount !== null
-      ? Number(updatedData.cgst_amount)
-      : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (updatedData.apply_gst ? cgstAmount : 0));
+      ? roundCurrency(updatedData.cgst_amount)
+      : (totalAmount > subtotal ? roundCurrency((totalAmount - subtotal) / 2) : (updatedData.apply_gst ? cgstAmount : 0));
     const finalSgst = updatedData.sgst_amount !== undefined && updatedData.sgst_amount !== null
-      ? Number(updatedData.sgst_amount)
-      : (totalAmount > subtotal ? Math.round((totalAmount - subtotal) / 2 * 100) / 100 : (updatedData.apply_gst ? sgstAmount : 0));
+      ? roundCurrency(updatedData.sgst_amount)
+      : (totalAmount > subtotal ? roundCurrency((totalAmount - subtotal) / 2) : (updatedData.apply_gst ? sgstAmount : 0));
 
     const linkedPayments = this.getSalePayments(saleId);
-    const paidAmount = linkedPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const pendingAmount = Math.max(0, totalAmount - paidAmount);
+    const paidAmount = roundCurrency(linkedPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+    const pendingAmount = roundCurrency(Math.max(0, totalAmount - paidAmount));
     const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
     const vehicleNo = updatedData.vehicle_no !== undefined ? (updatedData.vehicle_no || '').trim() : (existingSale.vehicle_no || '').trim();
@@ -2809,8 +2822,8 @@ class DataService {
     const initialPay = Math.max(0, Number(purData.initial_payment) || 0);
     const godownId = purData.godown_id || this.getDefaultGodown()?.id || null;
 
-    const totalAmount = purData.items.reduce((acc, item) =>
-      acc + (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0), 0);
+    const totalAmount = roundCurrency(purData.items.reduce((acc, item) =>
+      acc + (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0), 0));
 
     const supp = this.getSupplierById(purData.supplier_id);
     const canonicalSupplierId = supp ? supp.id : purData.supplier_id;
@@ -2820,25 +2833,27 @@ class DataService {
     const priorPending = priorLedger ? (priorLedger.pendingBalance || 0) : 0; // Old unpaid to supplier
     const priorAdvance = priorLedger ? (priorLedger.advanceBalance || 0) : 0; // Old advance with supplier
 
-    const netDueBeforePayment = (priorPending - priorAdvance) + totalAmount;
-    const trueAdvance = Math.max(0, initialPay - netDueBeforePayment);
-    const effectivePaidForThisBill = Math.min(totalAmount, Math.max(0, priorAdvance + initialPay - priorPending));
-    const pendingAmount = Math.max(0, totalAmount - effectivePaidForThisBill);
+    const netDueBeforePayment = roundCurrency((priorPending - priorAdvance) + totalAmount);
+    const trueAdvance = roundCurrency(Math.max(0, initialPay - netDueBeforePayment));
+    const effectivePaidForThisBill = roundCurrency(Math.min(totalAmount, Math.max(0, priorAdvance + initialPay - priorPending)));
+    const pendingAmount = roundCurrency(Math.max(0, totalAmount - effectivePaidForThisBill));
     const advanceAmount = trueAdvance;
     const paymentStatus = pendingAmount === 0 ? 'Paid' : (effectivePaidForThisBill > 0 ? 'Partially Paid' : 'Pending');
 
     const cleanItems = purData.items.map((i, idx) => {
       const prod = this.getProductById(i.product_id);
       const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+      const qty = Number(i.quantity) || 0;
+      const price = Number(i.purchase_price) || 0;
       return {
         id: `pitem-${Date.now()}-${idx}`,
         purchase_id: purId,
         product_id: i.product_id,
         product_name: i.product_name || prod?.name || 'Product',
-        quantity: Number(i.quantity) || 0,
+        quantity: qty,
         unit: unit,
-        purchase_price: Number(i.purchase_price) || 0,
-        total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0),
+        purchase_price: price,
+        total: roundCurrency(qty * price),
         godown_id: i.godown_id || godownId
       };
     });
@@ -3019,15 +3034,17 @@ class DataService {
     const cleanItems = newItems.map((i, idx) => {
       const prod = this.getProductById(i.product_id);
       const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+      const qty = Number(i.quantity) || 0;
+      const price = Number(i.purchase_price) || 0;
       return {
         id: i.id || `pitem-${Date.now()}-${idx}`,
         purchase_id: purId,
         product_id: i.product_id,
         product_name: i.product_name || prod?.name || 'Product',
-        quantity: Number(i.quantity) || 0,
+        quantity: qty,
         unit: unit,
-        purchase_price: Number(i.purchase_price) || 0,
-        total: (Number(i.quantity) || 0) * (Number(i.purchase_price) || 0),
+        purchase_price: price,
+        total: roundCurrency(qty * price),
         godown_id: i.godown_id || newGodownId
       };
     });
@@ -3070,10 +3087,10 @@ class DataService {
       }
     }
 
-    const totalAmount = cleanItems.reduce((acc, i) => acc + i.total, 0);
+    const totalAmount = roundCurrency(cleanItems.reduce((acc, i) => acc + i.total, 0));
     const linkedPayments = this.getPurchasePayments(purId);
-    const paidAmount = linkedPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const pendingAmount = Math.max(0, totalAmount - paidAmount);
+    const paidAmount = roundCurrency(linkedPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+    const pendingAmount = roundCurrency(Math.max(0, totalAmount - paidAmount));
     const paymentStatus = pendingAmount === 0 ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Pending';
 
     const vehicleNo = updatedData.vehicle_no !== undefined ? (updatedData.vehicle_no || '').trim() : (existingPur.vehicle_no || '').trim();
@@ -3141,12 +3158,12 @@ class DataService {
   recordCustomerPayment(payData, currentUser) {
     const payId = 'pay-' + Date.now();
     const receiptNo = `REC-${Math.floor(100 + Math.random() * 900)}`;
-    const amt = Number(payData.amount) || 0;
+    const amt = roundCurrency(payData.amount);
 
     const priorLedger = this.getCustomerLedger ? this.getCustomerLedger(payData.customer_id) : null;
     const priorPending = priorLedger ? (priorLedger.pendingBalance || 0) : 0;
-    const trueAdvance = Math.max(0, amt - priorPending);
-    const advTag = trueAdvance > 0 ? ` (includes ₹${Number(trueAdvance).toLocaleString('en-IN')} Advance Payment)` : '';
+    const trueAdvance = roundCurrency(Math.max(0, amt - priorPending));
+    const advTag = trueAdvance > 0 ? ` (includes ${formatCurrency(trueAdvance)} Advance Payment)` : '';
     let payNotes = (payData.notes || '').replace(/\s*\(includes\s+₹?[0-9,.]+\s+Advance\s+Payment\)/gi, '').trim();
     if (advTag && !payNotes.includes('Advance Payment')) {
       payNotes = payNotes ? `${payNotes}${advTag}` : advTag.trim();
@@ -3167,7 +3184,7 @@ class DataService {
 
     const cust = this.getCustomerById(payData.customer_id);
     this.logActivity(currentUser, 'PAYMENT', 'Payments', payId, receiptNo,
-      `Customer payment ₹${amt} from ${cust?.name || 'Customer'} via ${payData.payment_mode || 'Cash'}`
+      `Customer payment ${formatCurrency(amt)} from ${cust?.name || 'Customer'} via ${payData.payment_mode || 'Cash'}`
     );
     this.saveCache();
     this.notify();
@@ -3185,12 +3202,12 @@ class DataService {
   recordSupplierPayment(payData, currentUser) {
     const payId = 'pay-' + Date.now();
     const receiptNo = `VOUCH-${Math.floor(100 + Math.random() * 900)}`;
-    const amt = Number(payData.amount) || 0;
+    const amt = roundCurrency(payData.amount);
 
     const priorLedger = this.getSupplierLedger ? this.getSupplierLedger(payData.supplier_id) : null;
     const priorPending = priorLedger ? (priorLedger.pendingBalance || 0) : 0;
-    const trueAdvance = Math.max(0, amt - priorPending);
-    const advTag = trueAdvance > 0 ? ` (includes ₹${Number(trueAdvance).toLocaleString('en-IN')} Advance Payment)` : '';
+    const trueAdvance = roundCurrency(Math.max(0, amt - priorPending));
+    const advTag = trueAdvance > 0 ? ` (includes ${formatCurrency(trueAdvance)} Advance Payment)` : '';
     let payNotes = (payData.notes || '').replace(/\s*\(includes\s+₹?[0-9,.]+\s+Advance\s+Payment\)/gi, '').trim();
     if (advTag && !payNotes.includes('Advance Payment')) {
       payNotes = payNotes ? `${payNotes}${advTag}` : advTag.trim();
@@ -3211,7 +3228,7 @@ class DataService {
 
     const supp = this.getSupplierById(payData.supplier_id);
     this.logActivity(currentUser, 'PAYMENT', 'Payments', payId, receiptNo,
-      `Supplier payment ₹${amt} to ${supp?.company_name || 'Supplier'} via ${payData.payment_mode || 'Bank Transfer'}`
+      `Supplier payment ${formatCurrency(amt)} to ${supp?.company_name || 'Supplier'} via ${payData.payment_mode || 'Bank Transfer'}`
     );
     this.saveCache();
     this.notify();
@@ -3230,11 +3247,11 @@ class DataService {
     const sale = this.getSaleById(saleId);
     if (!sale) return;
     const linked = this.getSalePayments(saleId);
-    const totalPaid = linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-    const pendingAmount = Math.max(0, sale.total_amount - totalPaid);
+    const totalPaid = roundCurrency(linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+    const pendingAmount = roundCurrency(Math.max(0, sale.total_amount - totalPaid));
     const custLedger = this.getCustomerLedger ? this.getCustomerLedger(sale.customer_id) : null;
     const custAdv = custLedger ? (custLedger.advanceBalance || 0) : 0;
-    const advanceAmount = Math.min(Math.max(0, totalPaid - sale.total_amount), custAdv);
+    const advanceAmount = roundCurrency(Math.min(Math.max(0, totalPaid - sale.total_amount), custAdv));
     const paymentStatus = pendingAmount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
     sale.paid_amount = totalPaid;
     sale.pending_amount = pendingAmount;
@@ -3250,11 +3267,11 @@ class DataService {
     const pur = this.getPurchaseById(purchaseId);
     if (!pur) return;
     const linked = this.getPurchasePayments(purchaseId);
-    const totalPaid = linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-    const pendingAmount = Math.max(0, pur.total_amount - totalPaid);
+    const totalPaid = roundCurrency(linked.reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+    const pendingAmount = roundCurrency(Math.max(0, pur.total_amount - totalPaid));
     const suppLedger = this.getSupplierLedger ? this.getSupplierLedger(pur.supplier_id) : null;
     const suppAdv = suppLedger ? (suppLedger.advanceBalance || 0) : 0;
-    const advanceAmount = Math.min(Math.max(0, totalPaid - pur.total_amount), suppAdv);
+    const advanceAmount = roundCurrency(Math.min(Math.max(0, totalPaid - pur.total_amount), suppAdv));
     const paymentStatus = pendingAmount === 0 ? 'Paid' : totalPaid > 0 ? 'Partially Paid' : 'Pending';
     pur.paid_amount = totalPaid;
     pur.pending_amount = pendingAmount;
@@ -3270,7 +3287,7 @@ class DataService {
     const payment = this.getPaymentById(id);
     if (!payment) throw new Error('Payment record not found');
     const oldAmount = payment.amount;
-    const newAmount = updateData.amount !== undefined ? (Number(updateData.amount) || 0) : oldAmount;
+    const newAmount = updateData.amount !== undefined ? roundCurrency(updateData.amount) : oldAmount;
     if (newAmount <= 0) throw new Error('Payment amount must be greater than 0');
 
     const updated = {
@@ -3684,9 +3701,9 @@ class DataService {
       p && validIds.has(String(p.customer_id).toLowerCase().trim()) && p.type === 'customer_payment'
     );
 
-    const totalSales = custSales.reduce((acc, s) => acc + (s.total_amount || 0), 0);
-    const totalPaid = custPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const netBalance = totalSales - totalPaid; // positive = customer owes us (due), negative = advance with us
+    const totalSales = roundCurrency(custSales.reduce((acc, s) => acc + (Number(s.total_amount) || 0), 0));
+    const totalPaid = roundCurrency(custPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+    const netBalance = roundCurrency(totalSales - totalPaid); // positive = customer owes us (due), negative = advance with us
     const pendingBalance = Math.max(0, netBalance);
     const advanceBalance = Math.max(0, -netBalance);
 
@@ -3697,23 +3714,26 @@ class DataService {
         const prod = this.getProductById(i.product_id);
         const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
         const g = this.getGodownById(i.godown_id);
+        const qty = Number(i.quantity) || 0;
+        const price = Number(i.selling_price) || 0;
+        const itmTotal = Number(i.total) ? roundCurrency(i.total) : roundCurrency(qty * price);
         return {
           product_name: i.product_name || prod?.name || 'Product',
-          quantity: i.quantity,
+          quantity: qty,
           unit: unit,
-          selling_price: i.selling_price,
-          total: i.total,
+          selling_price: price,
+          total: itmTotal,
           godown: g ? g.name : null
         };
       });
-      const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} ${i.unit} × ₹${i.selling_price} = ₹${i.total}`).join(', ');
+      const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} ${i.unit} × ${formatCurrency(i.selling_price)} = ${formatCurrency(i.total)}`).join(', ');
       const gstNote = (s.cgst_amount > 0 || s.sgst_amount > 0)
-        ? ` + 18% GST (CGST: ₹${s.cgst_amount}, SGST: ₹${s.sgst_amount})`
+        ? ` + 18% GST (CGST: ${formatCurrency(s.cgst_amount)}, SGST: ${formatCurrency(s.sgst_amount)})`
         : '';
       entries.push({
         id: s.id, date: s.date, time: s.time, type: 'SALE',
         reference: s.invoice_no, particulars: `Sales Invoice — ${summary}${gstNote}`,
-        items_detail: itemsDetail, debit: s.total_amount, credit: 0
+        items_detail: itemsDetail, debit: roundCurrency(s.total_amount), credit: 0
       });
     });
 
@@ -3725,7 +3745,7 @@ class DataService {
       entries.push({
         id: p.id, date: p.date, time: p.time, type: 'PAYMENT',
         reference: p.receipt_no, particulars: `Payment Received (${p.payment_mode}) ${refDetail}${notesDetail}`,
-        items_detail: [], debit: 0, credit: p.amount
+        items_detail: [], debit: 0, credit: roundCurrency(p.amount)
       });
     });
 
@@ -3742,7 +3762,7 @@ class DataService {
     let running = 0;
     const computedEntries = entries.map((entry) => {
       const prevRunning = running;
-      running = running + (entry.debit || 0) - (entry.credit || 0);
+      running = roundCurrency(running + (entry.debit || 0) - (entry.credit || 0));
 
       let particulars = entry.particulars;
       let advanceThisTxn = 0;
@@ -3752,15 +3772,15 @@ class DataService {
           // Customer had old unpaid amount = prevRunning.
           // Payment first deducts the old unpaid amount!
           if (entry.credit > prevRunning) {
-            advanceThisTxn = entry.credit - prevRunning;
+            advanceThisTxn = roundCurrency(entry.credit - prevRunning);
           }
         } else {
           // Customer had zero due or already in advance -> entire payment contributes to advance
-          advanceThisTxn = entry.credit;
+          advanceThisTxn = roundCurrency(entry.credit);
         }
 
         if (advanceThisTxn > 0) {
-          particulars = `${particulars} (includes ₹${Number(advanceThisTxn).toLocaleString('en-IN')} Advance Payment)`;
+          particulars = `${particulars} (includes ${formatCurrency(advanceThisTxn)} Advance Payment)`;
         }
       }
 
@@ -3792,9 +3812,9 @@ class DataService {
       p && validIds.has(String(p.supplier_id).toLowerCase().trim()) && p.type === 'supplier_payment'
     );
 
-    const totalPurchases = suppPurchases.reduce((acc, p) => acc + (p.total_amount || 0), 0);
-    const totalPaid = suppPayments.reduce((acc, p) => acc + (p.amount || 0), 0);
-    const netBalance = totalPurchases - totalPaid; // positive = payable to supplier, negative = advance paid to supplier
+    const totalPurchases = roundCurrency(suppPurchases.reduce((acc, p) => acc + (Number(p.total_amount) || 0), 0));
+    const totalPaid = roundCurrency(suppPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0));
+    const netBalance = roundCurrency(totalPurchases - totalPaid); // positive = payable to supplier, negative = advance paid to supplier
     const pendingBalance = Math.max(0, netBalance);
     const advanceBalance = Math.max(0, -netBalance);
 
@@ -3805,20 +3825,23 @@ class DataService {
       const itemsDetail = (p.items || []).map((i) => {
         const prod = this.getProductById(i.product_id);
         const unit = (i.unit && String(i.unit).trim()) || prod?.unit || 'Units';
+        const qty = Number(i.quantity) || 0;
+        const price = Number(i.purchase_price) || 0;
+        const itmTotal = Number(i.total) ? roundCurrency(i.total) : roundCurrency(qty * price);
         return {
           product_name: i.product_name || prod?.name || 'Product',
-          quantity: i.quantity,
+          quantity: qty,
           unit: unit,
-          purchase_price: i.purchase_price,
-          total: i.total,
+          purchase_price: price,
+          total: itmTotal,
           godown: godown ? godown.name : null
         };
       });
-      const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} ${i.unit} × ₹${i.purchase_price} = ₹${i.total}`).join(', ');
+      const summary = itemsDetail.map((i) => `${i.product_name}: ${i.quantity} ${i.unit} × ${formatCurrency(i.purchase_price)} = ${formatCurrency(i.total)}`).join(', ');
       entries.push({
         id: p.id, date: p.date, time: p.time, type: 'PURCHASE',
         reference: p.purchase_no, particulars: `Inward Purchase — ${summary}`,
-        items_detail: itemsDetail, godown: godown?.name, credit: p.total_amount, debit: 0
+        items_detail: itemsDetail, godown: godown?.name, credit: roundCurrency(p.total_amount), debit: 0
       });
     });
 
@@ -3830,7 +3853,7 @@ class DataService {
       entries.push({
         id: p.id, date: p.date, time: p.time, type: 'PAYMENT',
         reference: p.receipt_no, particulars: `Payment Made (${p.payment_mode}) ${refDetail}${notesDetail}`,
-        items_detail: [], credit: 0, debit: p.amount
+        items_detail: [], credit: 0, debit: roundCurrency(p.amount)
       });
     });
 
@@ -3847,7 +3870,7 @@ class DataService {
     let running = 0;
     const computedEntries = entries.map((entry) => {
       const prevRunning = running;
-      running = running + (entry.credit || 0) - (entry.debit || 0);
+      running = roundCurrency(running + (entry.credit || 0) - (entry.debit || 0));
 
       let particulars = entry.particulars;
       let advanceThisTxn = 0;
@@ -3857,14 +3880,14 @@ class DataService {
           // We had old unpaid amount to supplier = prevRunning.
           // Payout first deducts the old unpaid amount!
           if (entry.debit > prevRunning) {
-            advanceThisTxn = entry.debit - prevRunning;
+            advanceThisTxn = roundCurrency(entry.debit - prevRunning);
           }
         } else {
-          advanceThisTxn = entry.debit;
+          advanceThisTxn = roundCurrency(entry.debit);
         }
 
         if (advanceThisTxn > 0) {
-          particulars = `${particulars} (includes ₹${Number(advanceThisTxn).toLocaleString('en-IN')} Advance Payment)`;
+          particulars = `${particulars} (includes ${formatCurrency(advanceThisTxn)} Advance Payment)`;
         }
       }
 

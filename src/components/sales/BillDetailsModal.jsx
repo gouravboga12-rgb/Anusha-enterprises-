@@ -343,6 +343,8 @@ export const BillDetailsModal = ({
                           <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>Amount (₹)</label>
                           <input
                             type="number"
+                            min="0.01"
+                            step="any"
                             className="form-input"
                             style={{ fontSize: '13px', padding: '6px' }}
                             value={editAmount}

@@ -153,9 +153,9 @@ export const NewPurchaseModal = ({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const totalBillAmount = items.reduce((acc, item) => {
+  const totalBillAmount = Math.round(items.reduce((acc, item) => {
     return acc + (Number(item.quantity) || 0) * (Number(item.purchase_price) || 0);
-  }, 0);
+  }, 0) * 100) / 100;
 
   const supplierLedger = supplierId ? dataService.getSupplierLedger(supplierId) : null;
   const previousPayable = supplierLedger ? (supplierLedger.pendingBalance || 0) : 0;
@@ -163,12 +163,12 @@ export const NewPurchaseModal = ({
 
   const numPayment = Number(initialPayment) || 0;
   // Deduct old unpaid supplier payable and absorb existing advance
-  const totalSupplierObligation = Math.max(0, (previousPayable - existingAdvance) + totalBillAmount);
-  const thisBillEffectiveCovered = Math.min(totalBillAmount, Math.max(0, existingAdvance + numPayment - previousPayable));
-  const thisBillPending = Math.max(0, totalBillAmount - thisBillEffectiveCovered);
+  const totalSupplierObligation = Math.round(Math.max(0, (previousPayable - existingAdvance) + totalBillAmount) * 100) / 100;
+  const thisBillEffectiveCovered = Math.round(Math.min(totalBillAmount, Math.max(0, existingAdvance + numPayment - previousPayable)) * 100) / 100;
+  const thisBillPending = Math.round(Math.max(0, totalBillAmount - thisBillEffectiveCovered) * 100) / 100;
 
   // Net calculation accounting for existing advance and current payment
-  const netPayableAfter = (previousPayable - existingAdvance) + (totalBillAmount - numPayment);
+  const netPayableAfter = Math.round(((previousPayable - existingAdvance) + (totalBillAmount - numPayment)) * 100) / 100;
   const finalPayableAfter = Math.max(0, netPayableAfter);
   const finalAdvanceAfter = Math.max(0, -netPayableAfter);
   const appliedToOldPayable = Math.min(numPayment, previousPayable);
@@ -564,7 +564,8 @@ export const NewPurchaseModal = ({
                             <input
                               type="number"
                               className="form-input"
-                              min="1"
+                              min="0.01"
+                              step="any"
                               style={{ width: '65px' }}
                               value={item.quantity}
                               onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
@@ -605,6 +606,7 @@ export const NewPurchaseModal = ({
                             type="number"
                             className="form-input"
                             min="0"
+                            step="any"
                             value={item.purchase_price}
                             onChange={(e) => handleItemChange(idx, 'purchase_price', e.target.value)}
                           />
@@ -744,7 +746,8 @@ export const NewPurchaseModal = ({
                           <input
                             type="number"
                             className="form-input"
-                            min="1"
+                            min="0.01"
+                            step="any"
                             style={{ width: '60px' }}
                             value={item.quantity}
                             onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
@@ -785,6 +788,7 @@ export const NewPurchaseModal = ({
                           type="number"
                           className="form-input"
                           min="0"
+                          step="any"
                           style={{ width: '100%' }}
                           value={item.purchase_price}
                           onChange={(e) => handleItemChange(idx, 'purchase_price', e.target.value)}
@@ -827,6 +831,7 @@ export const NewPurchaseModal = ({
                 type="number"
                 className="form-input"
                 min="0"
+                step="any"
                 placeholder="0 if credit purchase or exceeding for advance"
                 value={initialPayment}
                 onChange={(e) => setInitialPayment(e.target.value)}

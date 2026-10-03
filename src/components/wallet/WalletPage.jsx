@@ -383,7 +383,7 @@ export const WalletPage = ({ dataService, currentUser }) => {
               {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '8px 12px', borderRadius: '6px', marginBottom: '12px', fontSize: '12px' }}>{error}</div>}
               <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label className="form-label">Amount (₹) *</label>
-                <input type="number" className="form-input" min="1" step="0.01" required autoFocus placeholder="e.g. 5000"
+                <input type="number" className="form-input" min="0.01" step="any" required autoFocus placeholder="e.g. 5000"
                   value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
               {activeModal === 'expense' && (

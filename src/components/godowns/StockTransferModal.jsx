@@ -165,7 +165,7 @@ export const StockTransferModal = ({ isOpen, onClose, dataService, currentUser, 
           <div>
             <label className="form-label">Transfer Quantity *</label>
             <input
-              type="number" className="form-input" min="1"
+              type="number" className="form-input" min="0.01" step="any"
               max={availableQty || undefined}
               placeholder={availableQty !== null ? `Max: ${availableQty}` : 'Enter quantity'}
               value={form.quantity}
