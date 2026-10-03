@@ -174,8 +174,11 @@ export const NewPurchaseModal = ({
   const appliedToOldPayable = Math.min(numPayment, previousPayable);
   const appliedFromOldAdvance = Math.min(existingAdvance, totalBillAmount);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = (e, generateInvoice = false) => {
     if (e) e.preventDefault();
+    if (isSubmitting) return;
     setError('');
 
     if (!supplierId) {
@@ -193,14 +196,26 @@ export const NewPurchaseModal = ({
         setError('Please select a product for all line items');
         return;
       }
+      const prod = products.find((p) => p.id === item.product_id);
       const reqQty = Number(item.quantity) || 0;
       if (reqQty <= 0) {
-        setError('Quantity must be greater than 0');
+        setError(`Quantity for "${prod?.name || 'item'}" must be greater than 0`);
+        return;
+      }
+      const itemPrice = Number(item.purchase_price) || 0;
+      if (itemPrice <= 0) {
+        setError(`Please enter a valid purchase price greater than ₹0 for "${prod?.name || 'item'}"`);
         return;
       }
     }
 
+    if (totalBillAmount <= 0) {
+      setError('Total purchase amount must be greater than ₹0. Please enter item quantities and prices.');
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       const pur = dataService.recordPurchase({
         supplier_id: supplierId,
         godown_id: godownId,
@@ -221,10 +236,10 @@ export const NewPurchaseModal = ({
       setReferenceNo('');
       setError('');
       onClose();
-
-      
     } catch (err) {
       setError(err.message || 'Failed to record supplier purchase');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -245,7 +260,15 @@ export const NewPurchaseModal = ({
         title="Record Supplier Inward Purchase (Stock In)"
         maxWidth="840px"
       >
-        <form onSubmit={(e) => handleSubmit(e, false)} autoComplete="off">
+        <form
+          onSubmit={(e) => handleSubmit(e, false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+              e.preventDefault();
+            }
+          }}
+          autoComplete="off"
+        >
           {error && (
             <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
               {error}
@@ -983,12 +1006,21 @@ export const NewPurchaseModal = ({
           </div>
 
           <div className="modal-footer" style={{ margin: '16px -24px -24px', padding: '16px 24px', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn-secondary" onClick={handleClose}>
+            <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={isSubmitting}>
               Cancel
             </button>
             
-            <button type="submit" className="btn btn-primary" style={{ fontWeight: 700 }}>
-              Save Purchase & Add to Stock
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={isSubmitting}
+              style={{
+                fontWeight: 700,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1
+              }}
+            >
+              {isSubmitting ? 'Saving Purchase...' : 'Save Purchase & Add to Stock'}
             </button>
           </div>
         </form>

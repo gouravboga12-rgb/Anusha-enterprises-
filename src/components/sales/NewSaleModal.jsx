@@ -165,8 +165,11 @@ export const NewSaleModal = ({
   }).filter(Boolean);
   const hasStockError = stockErrors.length > 0;
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = (e, generateInvoice = false) => {
     if (e) e.preventDefault();
+    if (isSubmitting) return;
     setError('');
 
     if (!customerId) {
@@ -189,7 +192,7 @@ export const NewSaleModal = ({
       }
     }
 
-    // STRICT GODOWN-LEVEL STOCK VALIDATION: Block transaction if stock is insufficient in selected godown
+    // STRICT GODOWN-LEVEL STOCK & PRICING VALIDATION
     for (const item of items) {
       const prod = products.find((p) => p.id === item.product_id);
       const reqQty = Number(item.quantity) || 0;
@@ -198,7 +201,12 @@ export const NewSaleModal = ({
         return;
       }
       if (reqQty <= 0) {
-        setError(`Quantity for ${prod.name} must be at least 1`);
+        setError(`Quantity for "${prod.name}" must be greater than 0`);
+        return;
+      }
+      const itemPrice = Number(item.selling_price) || 0;
+      if (itemPrice <= 0) {
+        setError(`Please enter a valid selling price greater than ₹0 for "${prod.name}"`);
         return;
       }
       if (!item.godown_id) {
@@ -213,7 +221,13 @@ export const NewSaleModal = ({
       }
     }
 
+    if (totalBillAmount <= 0) {
+      setError('Total bill amount must be greater than ₹0. Please enter product quantities and prices.');
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       const preparedItems = items.map((item) => {
         const prod = products.find((p) => p.id === item.product_id);
         return {
@@ -255,6 +269,8 @@ export const NewSaleModal = ({
       }
     } catch (err) {
       setError(err.message || 'Failed to save customer sale');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -275,7 +291,15 @@ export const NewSaleModal = ({
         title="Create New Customer Sale (Invoice)"
         maxWidth="880px"
       >
-        <form onSubmit={(e) => handleSubmit(e, false)} autoComplete="off">
+        <form
+          onSubmit={(e) => handleSubmit(e, false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+              e.preventDefault();
+            }
+          }}
+          autoComplete="off"
+        >
           {error && (
             <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
               {error}
@@ -973,41 +997,41 @@ export const NewSaleModal = ({
           </div>
 
           <div className="modal-footer" style={{ margin: '16px -24px -24px', padding: '16px 24px', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </button>
             <button
               type="button"
               className="btn btn-secondary"
               onClick={(e) => handleSubmit(e, true)}
-              disabled={hasStockError}
+              disabled={hasStockError || isSubmitting}
               style={{
-                background: hasStockError ? '#f1f5f9' : '#f0f9ff',
-                color: hasStockError ? '#94a3b8' : '#0284c7',
-                borderColor: hasStockError ? '#e2e8f0' : '#bae6fd',
+                background: (hasStockError || isSubmitting) ? '#f1f5f9' : '#f0f9ff',
+                color: (hasStockError || isSubmitting) ? '#94a3b8' : '#0284c7',
+                borderColor: (hasStockError || isSubmitting) ? '#e2e8f0' : '#bae6fd',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                cursor: hasStockError ? 'not-allowed' : 'pointer',
-                opacity: hasStockError ? 0.6 : 1
+                cursor: (hasStockError || isSubmitting) ? 'not-allowed' : 'pointer',
+                opacity: (hasStockError || isSubmitting) ? 0.6 : 1
               }}
               title={hasStockError ? 'Fix stock quantities before saving' : 'Save sale and immediately open printable invoice'}
             >
-              <FileText size={16} /> Save &amp; Generate Invoice
+              <FileText size={16} /> {isSubmitting ? 'Saving...' : 'Save & Generate Invoice'}
             </button>
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={hasStockError}
+              disabled={hasStockError || isSubmitting}
               style={{
                 fontWeight: 700,
-                cursor: hasStockError ? 'not-allowed' : 'pointer',
-                opacity: hasStockError ? 0.6 : 1
+                cursor: (hasStockError || isSubmitting) ? 'not-allowed' : 'pointer',
+                opacity: (hasStockError || isSubmitting) ? 0.6 : 1
               }}
               title={hasStockError ? 'Fix stock quantities before saving' : 'Save sale and update godown stock'}
             >
-              Save Sale &amp; Update Stock
+              {isSubmitting ? 'Saving Sale...' : 'Save Sale & Update Stock'}
             </button>
           </div>
         </form>

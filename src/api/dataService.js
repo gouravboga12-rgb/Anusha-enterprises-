@@ -2783,30 +2783,40 @@ class DataService {
   }
 
   deleteSale(id, currentUser) {
-    if (!this.canDelete(currentUser)) throw new Error('Permission denied.');
+    if (!this.canDelete(currentUser)) throw new Error('Permission denied: You do not have authority to delete sales.');
     const sale = this.getSaleById(id);
     if (!sale) return;
 
     // Restore godown stock
-    for (const item of sale.items) {
+    for (const item of (sale.items || [])) {
+      const qty = Number(item.quantity) || 0;
+      if (qty <= 0) continue;
       const targetG = item.godown_id || this.getDefaultGodown()?.id || (this.godowns[0] && this.godowns[0].id);
       if (targetG) {
-        this._updateGodownStock(targetG, item.product_id, item.quantity);
+        this._updateGodownStock(targetG, item.product_id, qty);
       } else {
         const prod = this.getProductById(item.product_id);
         if (prod) {
-          prod.current_stock += item.quantity;
-          supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', item.product_id).then().catch(console.warn);
+          prod.current_stock = Number(prod.current_stock || 0) + qty;
+          if (isSupabaseConfigured) {
+            supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', item.product_id).then().catch(console.warn);
+          }
         }
       }
     }
 
-    this.logActivity(currentUser, 'DELETE', 'Sales', id, sale.invoice_no, `Deleted sale ${sale.invoice_no}`);
+    this.logActivity(currentUser, 'DELETE', 'Sales', id, sale.invoice_no, `Permanently deleted sale ${sale.invoice_no} (₹${sale.total_amount})`);
     this.sales = this.sales.filter((s) => s.id !== id);
     this.payments = this.payments.filter((p) => p.sale_id !== id);
+    this.saveCache();
     this.notify();
 
-    supabase.from('customer_sales').delete().eq('id', id).then().catch(console.warn);
+    if (isSupabaseConfigured) {
+      supabase.from('customer_payments').delete().eq('sale_id', id).then().catch(console.warn);
+      supabase.from('customer_sale_items').delete().eq('sale_id', id).then(() => {
+        supabase.from('customer_sales').delete().eq('id', id).then().catch(console.warn);
+      }).catch(console.warn);
+    }
   }
 
   // ==============================================================================
@@ -3132,21 +3142,40 @@ class DataService {
   }
 
   deletePurchase(id, currentUser) {
-    if (!this.canDelete(currentUser)) throw new Error('Permission denied.');
+    if (!this.canDelete(currentUser)) throw new Error('Permission denied: You do not have authority to delete purchases.');
     const pur = this.getPurchaseById(id);
     if (!pur) return;
 
-    const godownId = pur.godown_id || this.getDefaultGodown()?.id;
-    for (const item of pur.items) {
-      if (godownId) this._updateGodownStock(godownId, item.product_id, -item.quantity);
+    const defaultGId = this.getDefaultGodown()?.id;
+    for (const item of (pur.items || [])) {
+      const qty = Number(item.quantity) || 0;
+      if (qty <= 0) continue;
+      const targetG = item.godown_id || pur.godown_id || defaultGId;
+      if (targetG) {
+        this._updateGodownStock(targetG, item.product_id, -qty);
+      } else {
+        const prod = this.getProductById(item.product_id);
+        if (prod) {
+          prod.current_stock = Math.max(0, (Number(prod.current_stock) || 0) - qty);
+          if (isSupabaseConfigured) {
+            supabase.from('products').update({ current_stock: prod.current_stock }).eq('id', item.product_id).then().catch(console.warn);
+          }
+        }
+      }
     }
 
-    this.logActivity(currentUser, 'DELETE', 'Purchases', id, pur.purchase_no, `Deleted purchase ${pur.purchase_no}`);
+    this.logActivity(currentUser, 'DELETE', 'Purchases', id, pur.purchase_no, `Permanently deleted purchase ${pur.purchase_no} (₹${pur.total_amount})`);
     this.purchases = this.purchases.filter((p) => p.id !== id);
     this.payments = this.payments.filter((p) => p.purchase_id !== id);
+    this.saveCache();
     this.notify();
 
-    supabase.from('supplier_purchases').delete().eq('id', id).then().catch(console.warn);
+    if (isSupabaseConfigured) {
+      supabase.from('supplier_payments').delete().eq('purchase_id', id).then().catch(console.warn);
+      supabase.from('supplier_purchase_items').delete().eq('purchase_id', id).then(() => {
+        supabase.from('supplier_purchases').delete().eq('id', id).then().catch(console.warn);
+      }).catch(console.warn);
+    }
   }
 
   // ==============================================================================

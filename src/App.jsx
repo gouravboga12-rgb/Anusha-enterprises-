@@ -425,6 +425,7 @@ export const App = () => {
             <SalesList
               sales={dataService.getSales()}
               dataService={dataService}
+              currentUser={currentUser}
               onOpenNewSale={() => openNewSale()}
               onOpenPayment={(cId, type, saleId) => openPayment(cId, type, saleId)}
               onSelectCustomer={(cId) => {
@@ -442,6 +443,7 @@ export const App = () => {
             <PurchasesList
               purchases={dataService.getPurchases()}
               dataService={dataService}
+              currentUser={currentUser}
               onOpenNewPurchase={() => openNewPurchase()}
               onOpenPayment={(sId, type, purId) => openPayment(sId, type, purId)}
               onSelectSupplier={(sId) => {

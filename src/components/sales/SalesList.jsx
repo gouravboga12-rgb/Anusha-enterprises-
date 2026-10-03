@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { PlusCircle, Search, ShoppingCart, Receipt, BookOpen, FileText, Edit2, Calendar, X } from 'lucide-react';
+import { PlusCircle, Search, ShoppingCart, Receipt, BookOpen, FileText, Edit2, Calendar, X, Trash2, AlertCircle } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { Modal } from '../common/Modal';
 
 const toYYYYMMDD = (dateStr) => {
   if (!dateStr) return null;
@@ -25,6 +26,7 @@ const monthStartStr = () => {
 export const SalesList = ({
   sales,
   dataService,
+  currentUser,
   onOpenNewSale,
   onOpenPayment,
   onSelectCustomer,
@@ -36,6 +38,23 @@ export const SalesList = ({
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const confirmDeleteSale = async () => {
+    if (!deleteTarget) return;
+    try {
+      setIsDeleting(true);
+      setDeleteError('');
+      await dataService.deleteSale(deleteTarget.id, currentUser);
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete sales invoice');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const filteredSales = sales.filter((sale) => {
     const cust = dataService.getCustomerById(sale.customer_id);
@@ -323,6 +342,16 @@ export const SalesList = ({
                           >
                             <BookOpen size={13} /> Ledger
                           </button>
+                          {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '4px 8px', fontSize: '11px', color: '#e11d48', borderColor: '#fecdd3', background: '#fff1f2', fontWeight: 600 }}
+                              onClick={() => { setDeleteError(''); setDeleteTarget(sale); }}
+                              title="Delete this sales invoice permanently"
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -468,12 +497,113 @@ export const SalesList = ({
                   >
                     <BookOpen size={13} /> Ledger
                   </button>
+                  {(!dataService?.canDelete || dataService.canDelete(currentUser)) && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '6px 10px', fontSize: '12px', color: '#e11d48', borderColor: '#fecdd3', background: '#fff1f2', fontWeight: 700 }}
+                      onClick={() => { setDeleteError(''); setDeleteTarget(sale); }}
+                      title="Delete this sales invoice permanently"
+                    >
+                      <Trash2 size={13} /> Delete
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* Confirmation Modal for Permanent Sale Deletion */}
+      {deleteTarget && (
+        <Modal
+          isOpen={Boolean(deleteTarget)}
+          onClose={() => { if (!isDeleting) setDeleteTarget(null); }}
+          title="Confirm Permanent Deletion"
+          maxWidth="520px"
+        >
+          <div style={{ padding: '4px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '16px' }}>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: '#fee2e2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#e11d48',
+                flexShrink: 0
+              }}>
+                <Trash2 size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>
+                  Delete Invoice #{deleteTarget.invoice_no}?
+                </h3>
+                <p style={{ fontSize: '13px', color: '#475569', margin: 0, lineHeight: 1.5 }}>
+                  Customer: <strong>{dataService.getCustomerById(deleteTarget.customer_id)?.name || 'Customer'}</strong> • Total: <strong>{formatCurrency(deleteTarget.total_amount)}</strong>
+                </p>
+              </div>
+            </div>
+
+            {deleteError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', fontSize: '12.5px' }}>
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{
+              background: '#fff1f2',
+              border: '1px solid #fecdd3',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              marginBottom: '18px',
+              fontSize: '12.5px',
+              color: '#9f1239',
+              lineHeight: 1.5
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={15} /> This action is permanent and cannot be undone:
+              </div>
+              <ul style={{ margin: '4px 0 0 18px', padding: 0 }}>
+                <li>Stock for all items in this bill will be returned to the godown.</li>
+                <li>All linked payment vouchers for this invoice will be deleted.</li>
+                <li>Customer ledger, day book, and cloud database records will be permanently updated.</li>
+              </ul>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                style={{ fontWeight: 600 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDeleteSale}
+                disabled={isDeleting}
+                style={{
+                  background: '#e11d48',
+                  borderColor: '#be123c',
+                  color: '#fff',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Trash2 size={15} /> {isDeleting ? 'Deleting...' : 'OK, Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

@@ -178,7 +178,14 @@ export const EditPurchaseModal = ({
       title={`Edit Supplier Purchase — ${purchase.purchase_no}`}
       maxWidth="750px"
     >
-      <form onSubmit={handleSubmit}>
+      <form
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+            e.preventDefault();
+          }
+        }}
+      >
         {error && (
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
             {error}
