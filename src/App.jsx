@@ -34,6 +34,7 @@ import { BottomNav } from './components/common/BottomNav';
 import { Footer } from './components/common/Footer';
 import { LoginPage } from './components/auth/LoginPage';
 import { InvoiceModal } from './components/common/InvoiceModal';
+import { ToastNotification } from './components/common/ToastNotification';
 import { Boxes, Warehouse } from 'lucide-react';
 
 import { dataService } from './api/dataService';
@@ -223,6 +224,73 @@ export const App = () => {
   const openEditPurchase = (pur) => {
     setEditingPurchase(pur);
     setIsEditPurchaseOpen(true);
+  };
+
+  // Immediate confirmation alert/toast for sales & purchases
+  const [toastNotification, setToastNotification] = useState(null);
+
+  const handleSaleCreated = (sale) => {
+    if (!sale) return;
+    const customer = dataService?.getCustomerById?.(sale.customer_id);
+    const customerName = customer?.name || 'Customer';
+    const items = sale.items || [];
+    const totalQty = items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+
+    let quantitySummary = `${totalQty} units`;
+    if (items.length === 1) {
+      const it = items[0];
+      quantitySummary = `${it.quantity} ${it.unit || 'units'} (${it.product_name || 'Product'})`;
+    } else if (items.length === 2) {
+      quantitySummary = items.map((it) => `${it.quantity} ${it.unit || 'units'}`).join(', ');
+    } else if (items.length > 2) {
+      quantitySummary = `${totalQty} units across ${items.length} products`;
+    }
+
+    setToastNotification({
+      id: Date.now(),
+      type: 'sale',
+      title: `Successfully sold to ${customerName}`,
+      partyName: customerName,
+      partyType: 'Customer',
+      amount: sale.total_amount,
+      quantityText: quantitySummary,
+      refNumber: sale.invoice_no ? `Invoice #${sale.invoice_no}` : undefined,
+      doc: sale,
+      actionLabel: 'View Invoice',
+      onAction: () => openInvoice(sale, 'sale')
+    });
+  };
+
+  const handlePurchaseCreated = (pur) => {
+    if (!pur) return;
+    const supplier = dataService?.getSupplierById?.(pur.supplier_id);
+    const supplierName = supplier?.name || 'Supplier';
+    const items = pur.items || [];
+    const totalQty = items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+
+    let quantitySummary = `${totalQty} units`;
+    if (items.length === 1) {
+      const it = items[0];
+      quantitySummary = `${it.quantity} ${it.unit || 'units'} (${it.product_name || 'Product'})`;
+    } else if (items.length === 2) {
+      quantitySummary = items.map((it) => `${it.quantity} ${it.unit || 'units'}`).join(', ');
+    } else if (items.length > 2) {
+      quantitySummary = `${totalQty} units across ${items.length} products`;
+    }
+
+    setToastNotification({
+      id: Date.now(),
+      type: 'purchase',
+      title: `Successfully purchased from ${supplierName}`,
+      partyName: supplierName,
+      partyType: 'Supplier',
+      amount: pur.total_amount,
+      quantityText: quantitySummary,
+      refNumber: (pur.purchase_no || pur.id) ? `Bill #${pur.purchase_no || pur.id}` : undefined,
+      doc: pur,
+      actionLabel: null,
+      onAction: null
+    });
   };
 
   if (!currentUser) {
@@ -527,6 +595,7 @@ export const App = () => {
           initialCustomerId={saleInitialCustId}
           onOpenPayment={(cId, type) => openPayment(cId, type)}
           onViewInvoice={(sale) => openInvoice(sale, 'sale')}
+          onSaleCreated={handleSaleCreated}
         />
       )}
 
@@ -538,7 +607,7 @@ export const App = () => {
           currentUser={currentUser}
           initialSupplierId={purInitialSuppId}
           onOpenPayment={(sId, type) => openPayment(sId, type)}
-          
+          onPurchaseCreated={handlePurchaseCreated}
         />
       )}
 
@@ -700,6 +769,12 @@ export const App = () => {
             openEditPurchase(doc);
           }
         }}
+      />
+
+      {/* Toast Notification Banner */}
+      <ToastNotification
+        notification={toastNotification}
+        onClose={() => setToastNotification(null)}
       />
 
       {/* Touch-Friendly Mobile Bottom Navigation Bar */}
