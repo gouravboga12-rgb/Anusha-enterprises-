@@ -10,7 +10,9 @@ import {
   initialSales,
   initialPurchases,
   initialPayments,
-  initialAdjustments
+  initialAdjustments,
+  initialEmployees,
+  initialSalarySettlements
 } from '../mock/initialData.js';
 import { generateId, getTodayDateString, getCurrentTimeString, formatCurrency, roundCurrency } from '../utils/formatters.js';
 
@@ -173,6 +175,8 @@ class DataService {
       this.activityLog = [];
       this.auditTrail = [];
       this.walletTransactions = [];
+      this.employees = [];
+      this.employeeSalaries = [];
       this.isLoading = true;
     } else {
       this.products = JSON.parse(JSON.stringify(initialProducts));
@@ -190,6 +194,8 @@ class DataService {
       this.activityLog = [];
       this.auditTrail = [];
       this.walletTransactions = [];
+      this.employees = JSON.parse(JSON.stringify(initialEmployees));
+      this.employeeSalaries = JSON.parse(JSON.stringify(initialSalarySettlements));
       this.isLoading = false;
     }
 
@@ -215,6 +221,8 @@ class DataService {
         activityLog: this.activityLog,
         auditTrail: this.auditTrail,
         walletTransactions: this.walletTransactions,
+        employees: this.employees,
+        employeeSalaries: this.employeeSalaries,
         clearedActivityCutoff: this.clearedActivityCutoff,
         clearedActivityRanges: this.clearedActivityRanges,
         cachedAt: Date.now()
@@ -247,6 +255,12 @@ class DataService {
         this.activityLog = data.activityLog || [];
         this.auditTrail = data.auditTrail || [];
         this.walletTransactions = data.walletTransactions || [];
+        this.employees = (Array.isArray(data.employees) && data.employees.length > 0)
+          ? data.employees
+          : JSON.parse(JSON.stringify(initialEmployees));
+        this.employeeSalaries = (Array.isArray(data.employeeSalaries) && data.employeeSalaries.length > 0)
+          ? data.employeeSalaries
+          : JSON.parse(JSON.stringify(initialSalarySettlements));
         this.clearedActivityCutoff = Number(data.clearedActivityCutoff) || 0;
         this.clearedActivityRanges = Array.isArray(data.clearedActivityRanges) ? data.clearedActivityRanges : [];
         this._consolidateAndDeduplicateGodowns();
@@ -628,7 +642,7 @@ class DataService {
         prodsRes, custsRes, suppsRes, salesRes, purRes,
         cpRes, spRes, adjsRes, godownsRes, godownStockRes,
         transfersRes, suppProdsRes, usersRes, activityRes,
-        auditRes, walletRes
+        auditRes, walletRes, employeesRes, salariesRes
       ] = await Promise.all([
         supabase.from('products').select('*').neq('is_active', false).order('created_at', { ascending: false }),
         supabase.from('customers').select('*').order('created_at', { ascending: false }),
@@ -645,7 +659,9 @@ class DataService {
         supabase.from('crm_users').select('*').order('created_at', { ascending: false }),
         supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(500),
         supabase.from('audit_trail').select('*').order('changed_at', { ascending: false }).limit(500),
-        supabase.from('wallet_transactions').select('*').order('created_at', { ascending: false })
+        supabase.from('wallet_transactions').select('*').order('created_at', { ascending: false }),
+        supabase.from('employees').select('*').order('created_at', { ascending: false }),
+        supabase.from('employee_salary_settlements').select('*').order('created_at', { ascending: false })
       ]);
 
       const prods = prodsRes?.data || [];
@@ -787,6 +803,23 @@ class DataService {
       this.activityLog = activityData;
       this.auditTrail = auditData;
       this.walletTransactions = walletData.map((w) => ({ ...w, amount: Number(w.amount) || 0 }));
+
+      if (employeesRes?.data && Array.isArray(employeesRes.data) && employeesRes.data.length > 0) {
+        this.employees = employeesRes.data.map((e) => ({
+          ...e,
+          base_salary: Number(e.base_salary) || 0
+        }));
+      }
+      if (salariesRes?.data && Array.isArray(salariesRes.data) && salariesRes.data.length > 0) {
+        this.employeeSalaries = salariesRes.data.map((s) => ({
+          ...s,
+          base_salary: Number(s.base_salary) || 0,
+          advance_amount: Number(s.advance_amount) || 0,
+          paid_amount: Number(s.paid_amount) || 0,
+          net_payable: Number(s.net_payable) || 0,
+          pending_balance: Number(s.pending_balance) || 0
+        }));
+      }
 
       // RECONSTRUCT any purchases recorded in activityLog that might be missing (e.g. PUR-555)
       const existingPurRefs = new Set(this.purchases.map((p) => p.purchase_no));
@@ -3714,6 +3747,278 @@ class DataService {
   }
 
   // ==============================================================================
+  // EMPLOYEE PAYROLL & SALARIES (ISOLATED FULL ACCESS MODULE)
+  // ==============================================================================
+  getEmployees(status = 'all') {
+    const list = this.employees || [];
+    if (status === 'active') return list.filter((e) => e.status !== 'inactive');
+    if (status === 'inactive') return list.filter((e) => e.status === 'inactive');
+    return [...list];
+  }
+
+  getEmployeeById(id) {
+    if (!id) return null;
+    return (this.employees || []).find((e) => e.id === id) || null;
+  }
+
+  saveEmployee(empData, currentUser) {
+    const isNew = !empData.id;
+    const empId = empData.id || 'emp-' + Date.now();
+    const cleanSalary = Number(empData.base_salary) >= 0 ? Number(empData.base_salary) : 0;
+
+    const record = {
+      id: empId,
+      name: (empData.name || '').trim(),
+      phone: (empData.phone || '').trim(),
+      designation: (empData.designation || '').trim() || 'Staff Member',
+      base_salary: cleanSalary,
+      payment_mode_preference: empData.payment_mode_preference || 'Cash',
+      bank_details: (empData.bank_details || '').trim(),
+      joining_date: empData.joining_date || getTodayDateString(),
+      status: empData.status || 'active',
+      notes: (empData.notes || '').trim(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (isNew) {
+      record.created_at = new Date().toISOString();
+      this.employees = [record, ...(this.employees || [])];
+      this.logActivity(currentUser, 'CREATE', 'Payroll', empId, record.name,
+        `Added employee: ${record.name} (${record.designation}, Base: ₹${formatCurrency(record.base_salary)})`
+      );
+    } else {
+      const existing = (this.employees || []).find((e) => e.id === empId);
+      const merged = { ...existing, ...record };
+      this.employees = (this.employees || []).map((e) => (e.id === empId ? merged : e));
+      this.logActivity(currentUser, 'UPDATE', 'Payroll', empId, record.name,
+        `Updated employee details: ${record.name} (Base: ₹${formatCurrency(record.base_salary)})`
+      );
+    }
+
+    this.saveCache();
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      if (isNew) {
+        supabase.from('employees').insert([record]).then().catch(console.warn);
+      } else {
+        supabase.from('employees').update(record).eq('id', empId).then().catch(console.warn);
+      }
+    }
+
+    return record;
+  }
+
+  deleteEmployee(id, currentUser) {
+    const emp = this.getEmployeeById(id);
+    if (!emp) return false;
+
+    // Check if there are settlements
+    const hasSettlements = (this.employeeSalaries || []).some((s) => s.employee_id === id);
+    if (hasSettlements) {
+      // Soft deactivate
+      return this.saveEmployee({ ...emp, status: 'inactive' }, currentUser);
+    }
+
+    this.employees = (this.employees || []).filter((e) => e.id !== id);
+    this.logActivity(currentUser, 'DELETE', 'Payroll', id, emp.name, `Deleted employee profile: ${emp.name}`);
+    this.saveCache();
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      supabase.from('employees').delete().eq('id', id).then().catch(console.warn);
+    }
+    return true;
+  }
+
+  getSalarySettlements(filters = {}) {
+    let list = this.employeeSalaries || [];
+    if (filters.month_year) {
+      list = list.filter((s) => s.month_year === filters.month_year);
+    }
+    if (filters.employee_id) {
+      list = list.filter((s) => s.employee_id === filters.employee_id);
+    }
+    if (filters.status && filters.status !== 'all') {
+      list = list.filter((s) => s.status === filters.status);
+    }
+    return [...list].sort((a, b) => (b.payment_date || b.created_at || '').localeCompare(a.payment_date || a.created_at || ''));
+  }
+
+  getSalarySettlementById(id) {
+    if (!id) return null;
+    return (this.employeeSalaries || []).find((s) => s.id === id) || null;
+  }
+
+  saveSalarySettlement(data, currentUser) {
+    const isNew = !data.id;
+    const settlementId = data.id || 'sal-' + Date.now();
+    const employee = this.getEmployeeById(data.employee_id);
+    const empName = data.employee_name || employee?.name || 'Employee';
+
+    const baseSalary = Number(data.base_salary) >= 0 ? Number(data.base_salary) : (employee?.base_salary || 0);
+    const advanceAmount = Number(data.advance_amount) || 0;
+    const paidAmount = Number(data.paid_amount) || 0;
+    const netPayable = Math.max(0, baseSalary - advanceAmount);
+    const pendingBalance = Math.max(0, netPayable - paidAmount);
+
+    let status = 'Pending';
+    if (pendingBalance === 0 && (paidAmount > 0 || (advanceAmount >= baseSalary && advanceAmount > 0))) {
+      status = 'Paid';
+    } else if (paidAmount > 0 || advanceAmount > 0) {
+      status = 'Partially Paid';
+    }
+
+    const record = {
+      id: settlementId,
+      employee_id: data.employee_id,
+      employee_name: empName,
+      month_year: data.month_year, // e.g. "2026-10"
+      base_salary: baseSalary,
+      advance_amount: advanceAmount,
+      advance_date: data.advance_date || null,
+      advance_notes: (data.advance_notes || '').trim(),
+      paid_amount: paidAmount,
+      net_payable: netPayable,
+      pending_balance: pendingBalance,
+      payment_date: data.payment_date || getTodayDateString(),
+      payment_mode: data.payment_mode || 'Cash',
+      reference_no: (data.reference_no || '').trim(),
+      status: status,
+      notes: (data.notes || '').trim(),
+      recorded_by: currentUser?.name || 'Admin',
+      updated_at: new Date().toISOString()
+    };
+
+    if (isNew) {
+      record.created_at = new Date().toISOString();
+      this.employeeSalaries = [record, ...(this.employeeSalaries || [])];
+      this.logActivity(
+        currentUser,
+        'SALARY_SETTLE',
+        'Payroll',
+        settlementId,
+        `${empName} (${data.month_year})`,
+        `Salary settled for ${empName} for ${data.month_year}: Base ₹${baseSalary}, Advance ₹${advanceAmount}, Paid ₹${paidAmount} (${status})`
+      );
+    } else {
+      const existing = (this.employeeSalaries || []).find((s) => s.id === settlementId);
+      const merged = { ...existing, ...record };
+      this.employeeSalaries = (this.employeeSalaries || []).map((s) => (s.id === settlementId ? merged : s));
+      this.logActivity(
+        currentUser,
+        'SALARY_UPDATE',
+        'Payroll',
+        settlementId,
+        `${empName} (${data.month_year})`,
+        `Updated salary record for ${empName} for ${data.month_year}: Paid ₹${paidAmount}, Balance ₹${pendingBalance}`
+      );
+    }
+
+    this.saveCache();
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      if (isNew) {
+        supabase.from('employee_salary_settlements').insert([record]).then().catch(console.warn);
+      } else {
+        supabase.from('employee_salary_settlements').update(record).eq('id', settlementId).then().catch(console.warn);
+      }
+    }
+
+    return record;
+  }
+
+  deleteSalarySettlement(id, currentUser) {
+    const existing = this.getSalarySettlementById(id);
+    if (!existing) return false;
+
+    this.employeeSalaries = (this.employeeSalaries || []).filter((s) => s.id !== id);
+    this.logActivity(
+      currentUser,
+      'SALARY_DELETE',
+      'Payroll',
+      id,
+      `${existing.employee_name} (${existing.month_year})`,
+      `Deleted salary record for ${existing.employee_name} for ${existing.month_year}`
+    );
+    this.saveCache();
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      supabase.from('employee_salary_settlements').delete().eq('id', id).then().catch(console.warn);
+    }
+    return true;
+  }
+
+  getEmployeeSalaryHistory(employeeId) {
+    const employee = this.getEmployeeById(employeeId);
+    const settlements = (this.employeeSalaries || [])
+      .filter((s) => s.employee_id === employeeId)
+      .sort((a, b) => (b.month_year || '').localeCompare(a.month_year || ''));
+
+    const totalBaseSalary = settlements.reduce((sum, s) => sum + (Number(s.base_salary) || 0), 0);
+    const totalAdvance = settlements.reduce((sum, s) => sum + (Number(s.advance_amount) || 0), 0);
+    const totalPaid = settlements.reduce((sum, s) => sum + (Number(s.paid_amount) || 0), 0);
+    const totalPending = settlements.reduce((sum, s) => sum + (Number(s.pending_balance) || 0), 0);
+
+    return {
+      employee,
+      history: settlements,
+      totalMonths: settlements.length,
+      totalBaseSalary,
+      totalAdvance,
+      totalPaid,
+      totalPending
+    };
+  }
+
+  getMonthlySalarySummary(monthYear) {
+    const activeEmployees = (this.employees || []).filter((e) => e.status !== 'inactive');
+    const settlements = (this.employeeSalaries || []).filter((s) => s.month_year === monthYear);
+    const settlementMap = new Map();
+    settlements.forEach((s) => settlementMap.set(s.employee_id, s));
+
+    let totalBaseSalary = 0;
+    let totalAdvance = 0;
+    let totalPaid = 0;
+    let totalPending = 0;
+    let paidCount = 0;
+    let pendingCount = 0;
+
+    activeEmployees.forEach((emp) => {
+      const rec = settlementMap.get(emp.id);
+      const base = rec ? Number(rec.base_salary) : Number(emp.base_salary) || 0;
+      totalBaseSalary += base;
+
+      if (rec) {
+        totalAdvance += Number(rec.advance_amount) || 0;
+        totalPaid += Number(rec.paid_amount) || 0;
+        totalPending += Number(rec.pending_balance) || 0;
+        if (rec.status === 'Paid') {
+          paidCount++;
+        } else {
+          pendingCount++;
+        }
+      } else {
+        totalPending += base;
+        pendingCount++;
+      }
+    });
+
+    return {
+      monthYear,
+      totalEmployees: activeEmployees.length,
+      totalBaseSalary,
+      totalAdvance,
+      totalPaid,
+      totalPending,
+      paidCount,
+      pendingCount
+    };
+  }
+
+  // ==============================================================================
   // LEDGER (ENHANCED WITH ITEM DETAIL)
   // ==============================================================================
   getCustomerLedger(customerId) {
@@ -4106,6 +4411,8 @@ class DataService {
     this.godowns = [];
     this.godownStock = [];
     this.stockTransfers = [];
+    this.employees = JSON.parse(JSON.stringify(initialEmployees));
+    this.employeeSalaries = JSON.parse(JSON.stringify(initialSalarySettlements));
     this._ensureDefaultGodownDemo();
     this.notify();
   }

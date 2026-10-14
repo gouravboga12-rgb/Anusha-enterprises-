@@ -30,6 +30,7 @@ import { GodownList } from './components/godowns/GodownList';
 import { WalletPage } from './components/wallet/WalletPage';
 import { ActivityLogPage } from './components/activitylog/ActivityLogPage';
 import { UserManagement } from './components/users/UserManagement';
+import { PayrollPage } from './components/payroll/PayrollPage';
 import { BottomNav } from './components/common/BottomNav';
 import { Footer } from './components/common/Footer';
 import { LoginPage } from './components/auth/LoginPage';
@@ -50,15 +51,27 @@ export const App = () => {
   });
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
+  const isOwner = !currentUser || 
+    currentUser.role === 'owner' || 
+    currentUser.role === 'Owner / Administrator' || 
+    currentUser.role === 'full_access' || 
+    currentUser.email === 'shivat9640@gmail.com';
+
   const [activeTab, setActiveTab] = useState(() => {
     try {
-      return localStorage.getItem('anusha_crm_active_tab') || 'dashboard';
+      const saved = localStorage.getItem('anusha_crm_active_tab') || 'dashboard';
+      if (saved === 'payroll' && !isOwner) return 'dashboard';
+      return saved;
     } catch {
       return 'dashboard';
     }
   });
 
   const handleSelectTab = (tab) => {
+    if (tab === 'payroll' && !isOwner) {
+      alert('Access Restricted: The Employee Salaries & Payroll page is accessible to Full Access accounts only.');
+      return;
+    }
     setActiveTab(tab);
     try {
       localStorage.setItem('anusha_crm_active_tab', tab);
@@ -579,6 +592,26 @@ export const App = () => {
 
           {activeTab === 'users' && (
             <UserManagement dataService={dataService} currentUser={currentUser} />
+          )}
+
+          {activeTab === 'payroll' && (
+            isOwner ? (
+              <PayrollPage dataService={dataService} currentUser={currentUser} />
+            ) : (
+              <div className="card" style={{ padding: '36px', textAlign: 'center', margin: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#dc2626' }}>Access Restricted</h3>
+                <p style={{ color: '#64748b', fontSize: '13px', marginTop: '8px' }}>
+                  The Employee Salaries & Payroll page is strictly restricted to Full Access accounts only.
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleSelectTab('dashboard')}
+                  style={{ marginTop: '16px' }}
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            )
           )}
         </main>
 

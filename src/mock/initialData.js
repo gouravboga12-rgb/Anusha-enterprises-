@@ -371,3 +371,66 @@ export const initialAdjustments = [
     recorded_by: 'Admin'
   }
 ];
+
+export const initialEmployees = [
+  {
+    id: 'emp-1',
+    name: 'Ramesh Goud',
+    phone: '9848012345',
+    designation: 'Delivery Van Driver',
+    base_salary: 20000,
+    payment_mode_preference: 'Cash',
+    bank_details: 'SBI A/C: 38291048291, IFSC: SBIN0001234',
+    joining_date: '2025-01-10',
+    status: 'active',
+    notes: 'Handles explosive delivery van AP-25-T-4590'
+  },
+  {
+    id: 'emp-2',
+    name: 'Suresh Kumar',
+    phone: '9849123456',
+    designation: 'Godown In-Charge & Blaster Assistant',
+    base_salary: 22000,
+    payment_mode_preference: 'PhonePe / UPI',
+    bank_details: 'UPI: 9849123456@ybl',
+    joining_date: '2024-08-15',
+    status: 'active',
+    notes: 'Main Godown Nandipet operations'
+  },
+  {
+    id: 'emp-3',
+    name: 'Mahesh Reddy',
+    phone: '9440234567',
+    designation: 'Billing & Accounts Assistant',
+    base_salary: 18000,
+    payment_mode_preference: 'Bank Transfer',
+    bank_details: 'HDFC A/C: 501002349182, IFSC: HDFC0000123',
+    joining_date: '2025-03-01',
+    status: 'active',
+    notes: 'Invoices, E-Way bills and records'
+  }
+];
+
+export const initialSalarySettlements = [
+  {
+    id: 'sal-1',
+    employee_id: 'emp-1',
+    employee_name: 'Ramesh Goud',
+    month_year: '2026-09',
+    base_salary: 20000,
+    advance_amount: 5000,
+    advance_date: '2026-09-08',
+    advance_notes: 'Festival advance for Ganesh Chaturthi',
+    paid_amount: 15000,
+    net_payable: 15000,
+    pending_balance: 0,
+    payment_date: '2026-09-30',
+    payment_mode: 'Cash',
+    reference_no: 'CASH-SEP-26',
+    status: 'Paid',
+    notes: 'Salary for September 2026 fully cleared. ₹5,000 advance deducted.',
+    recorded_by: 'Admin',
+    created_at: '2026-09-30T18:00:00.000Z'
+  }
+];
+

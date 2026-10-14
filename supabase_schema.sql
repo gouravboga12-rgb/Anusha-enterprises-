@@ -510,3 +510,55 @@ ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS subtotal DECIMAL(12,2
 ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS cgst_amount DECIMAL(12,2);
 ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS sgst_amount DECIMAL(12,2);
 ALTER TABLE public.customer_sales ADD COLUMN IF NOT EXISTS gst_rate DECIMAL(5,2) DEFAULT 18.00;
+
+-- ==============================================================================
+-- 19. EMPLOYEE PAYROLL & SALARIES (ISOLATED FULL ACCESS MODULE)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.employees (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    designation VARCHAR(100) DEFAULT 'Staff Member',
+    base_salary DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    payment_mode_preference VARCHAR(50) DEFAULT 'Cash',
+    bank_details TEXT,
+    joining_date DATE DEFAULT CURRENT_DATE,
+    status VARCHAR(20) DEFAULT 'active',
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.employee_salary_settlements (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::TEXT,
+    employee_id TEXT NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
+    employee_name VARCHAR(255) NOT NULL,
+    month_year VARCHAR(10) NOT NULL, -- e.g. '2026-10'
+    base_salary DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    advance_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    advance_date DATE,
+    advance_notes TEXT,
+    paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    net_payable DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    pending_balance DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    payment_mode VARCHAR(50) DEFAULT 'Cash',
+    reference_no VARCHAR(100),
+    status VARCHAR(30) DEFAULT 'Pending',
+    notes TEXT,
+    recorded_by VARCHAR(100) DEFAULT 'Admin',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_employee_salaries_month ON public.employee_salary_settlements(month_year);
+CREATE INDEX IF NOT EXISTS idx_employee_salaries_emp ON public.employee_salary_settlements(employee_id);
+
+-- Enable RLS
+ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employee_salary_settlements ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public all on employees" ON public.employees FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all on employee_salary_settlements" ON public.employee_salary_settlements FOR ALL USING (true) WITH CHECK (true);
+

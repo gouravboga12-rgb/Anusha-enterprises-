@@ -17,7 +17,8 @@ import {
   LogOut,
   Wallet,
   Activity,
-  ShieldCheck
+  ShieldCheck,
+  Banknote
 } from 'lucide-react';
 import { dataService } from '../../api/dataService';
 
@@ -47,6 +48,7 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
   ];
 
   const adminItems = isOwner ? [
+    { id: 'payroll', label: 'Employee Salaries', icon: Banknote },
     { id: 'users', label: 'Staff & Roles', icon: ShieldCheck }
   ] : [];
 
