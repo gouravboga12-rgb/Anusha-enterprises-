@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, IndianRupee, Calendar, CreditCard, FileText, CheckCircle2, AlertCircle, ArrowDownRight, Clock } from 'lucide-react';
+import { X, IndianRupee, Calendar, CreditCard, FileText, CheckCircle2, AlertCircle, ArrowDownRight, Clock, Trash2 } from 'lucide-react';
 import { formatCurrency, getTodayDateString, getCurrentTimeString } from '../../utils/formatters';
 
 export const SalarySettlementModal = ({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   employee,
   monthYear, // e.g. "2026-10"
   existingSettlement
@@ -385,24 +386,56 @@ export const SalarySettlementModal = ({
             </div>
           </div>
 
-          <div className="modal-footer" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', padding: '14px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <CheckCircle2 size={16} />
-              {isSubmitting ? 'Saving...' : 'Save & Record Salary'}
-            </button>
+          <div className="modal-footer" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '14px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+            <div>
+              {existingSettlement?.id && onDelete && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm(`Are you sure you want to delete and reset this month's salary record for ${employee?.name}?`)) {
+                      await onDelete(existingSettlement.id);
+                      onClose();
+                    }
+                  }}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #fecaca',
+                    borderRadius: '6px',
+                    color: '#dc2626',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Trash2 size={13} />
+                  Reset / Delete Record
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onClose}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmitting}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <CheckCircle2 size={16} />
+                {isSubmitting ? 'Saving...' : 'Save & Record Salary'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

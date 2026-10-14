@@ -3813,19 +3813,19 @@ class DataService {
     const emp = this.getEmployeeById(id);
     if (!emp) return false;
 
-    // Check if there are settlements
-    const hasSettlements = (this.employeeSalaries || []).some((s) => s.employee_id === id);
-    if (hasSettlements) {
-      // Soft deactivate
-      return this.saveEmployee({ ...emp, status: 'inactive' }, currentUser);
-    }
+    // Cascade delete any associated settlements for this employee
+    this.employeeSalaries = (this.employeeSalaries || []).filter((s) => s.employee_id !== id);
 
+    // Remove employee record
     this.employees = (this.employees || []).filter((e) => e.id !== id);
+
     this.logActivity(currentUser, 'DELETE', 'Payroll', id, emp.name, `Deleted employee profile: ${emp.name}`);
     this.saveCache();
     this.notify();
 
     if (isSupabaseConfigured) {
+      // First delete associated settlements in Supabase, then delete employee
+      supabase.from('employee_salary_settlements').delete().eq('employee_id', id).then().catch(console.warn);
       supabase.from('employees').delete().eq('id', id).then().catch(console.warn);
     }
     return true;

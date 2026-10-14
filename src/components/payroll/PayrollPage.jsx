@@ -75,7 +75,7 @@ export const PayrollPage = ({ dataService, currentUser }) => {
   };
 
   // Fetch employees and settlements for selected month
-  const employees = dataService?.getEmployees ? dataService.getEmployees('all') : [];
+  const employees = dataService?.getEmployees ? dataService.getEmployees('active') : [];
   const settlements = dataService?.getSalarySettlements ? dataService.getSalarySettlements({ month_year: selectedMonthYear }) : [];
 
   // Map settlements by employee_id for O(1) lookup
@@ -223,12 +223,13 @@ export const PayrollPage = ({ dataService, currentUser }) => {
     setIsAdvanceModalOpen(true);
   };
 
-  const handleDeleteEmployee = (emp) => {
-    if (window.confirm(`Are you sure you want to delete or deactivate staff profile for "${emp.name}"?`)) {
+  const handleDeleteEmployee = async (emp) => {
+    if (window.confirm(`Are you sure you want to permanently delete staff member "${emp.name}"? This will delete their profile and all associated salary records.`)) {
       try {
-        dataService.deleteEmployee(emp.id, currentUser);
+        await dataService.deleteEmployee(emp.id, currentUser);
+        setTick((t) => t + 1);
       } catch (err) {
-        alert(err.message || 'Failed to delete employee profile.');
+        alert(err?.message || 'Failed to delete employee profile.');
       }
     }
   };
@@ -707,6 +708,15 @@ export const PayrollPage = ({ dataService, currentUser }) => {
                   >
                     <Edit2 size={14} />
                   </button>
+
+                  <button
+                    onClick={() => handleDeleteEmployee(emp)}
+                    className="btn btn-secondary"
+                    style={{ padding: '8px 10px', fontSize: '12px', color: '#ef4444' }}
+                    title="Delete Staff Member"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             );
@@ -744,6 +754,9 @@ export const PayrollPage = ({ dataService, currentUser }) => {
           existingSettlement={settlementsMap.get(settlementTargetEmployee.id) || null}
           onSave={async (settlementData) => {
             await dataService.saveSalarySettlement(settlementData, currentUser);
+          }}
+          onDelete={async (settlementId) => {
+            await dataService.deleteSalarySettlement(settlementId, currentUser);
           }}
         />
       )}
