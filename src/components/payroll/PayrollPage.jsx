@@ -8,6 +8,8 @@ import { formatCurrency, formatDate, getTodayDateString } from '../../utils/form
 import { EmployeeFormModal } from './EmployeeFormModal';
 import { SalarySettlementModal } from './SalarySettlementModal';
 import { EmployeeStatementModal } from './EmployeeStatementModal';
+import { PayDueModal } from './PayDueModal';
+import { AdvanceModal } from './AdvanceModal';
 import './payroll.css';
 
 export const PayrollPage = ({ dataService, currentUser }) => {
@@ -31,6 +33,12 @@ export const PayrollPage = ({ dataService, currentUser }) => {
 
   const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
   const [statementTargetEmployee, setStatementTargetEmployee] = useState(null);
+
+  const [isPayDueModalOpen, setIsPayDueModalOpen] = useState(false);
+  const [payDueTarget, setPayDueTarget] = useState(null);
+
+  const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+  const [advanceTargetEmployee, setAdvanceTargetEmployee] = useState(null);
 
   // Subscribe to live data changes
   useEffect(() => {
@@ -193,6 +201,26 @@ export const PayrollPage = ({ dataService, currentUser }) => {
   const handleOpenStatement = (emp) => {
     setStatementTargetEmployee(emp);
     setIsStatementModalOpen(true);
+  };
+
+  const handleOpenPayDue = (emp, settlement) => {
+    setPayDueTarget({
+      employee: emp,
+      settlement: settlement || {
+        employee_id: emp.id,
+        base_salary: emp.base_salary,
+        pending_balance: emp.base_salary,
+        net_payable: emp.base_salary,
+        paid_amount: 0,
+        advance_amount: 0
+      }
+    });
+    setIsPayDueModalOpen(true);
+  };
+
+  const handleOpenAdvance = (emp) => {
+    setAdvanceTargetEmployee(emp);
+    setIsAdvanceModalOpen(true);
   };
 
   const handleDeleteEmployee = (emp) => {
@@ -466,11 +494,52 @@ export const PayrollPage = ({ dataService, currentUser }) => {
 
                     <td style={{ textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        {r.pendingBalance > 0 && (
+                          <button
+                            onClick={() => handleOpenPayDue(emp, r.settlement)}
+                            className="btn btn-primary"
+                            style={{
+                              padding: '5px 10px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              background: '#059669',
+                              borderColor: '#059669',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="Pay remaining due balance"
+                          >
+                            <IndianRupee size={12} />
+                            Pay Due ({formatCurrency(r.pendingBalance)})
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleOpenAdvance(emp)}
+                          className="btn btn-secondary"
+                          style={{
+                            padding: '5px 9px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: '#d97706',
+                            borderColor: '#fde68a',
+                            background: '#fffbeb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Give Advance (For this month or next month)"
+                        >
+                          <PlusCircle size={12} />
+                          + Advance
+                        </button>
+
                         <button
                           onClick={() => handleOpenSettlement(emp)}
                           className={isPaid ? 'btn btn-secondary' : 'btn btn-primary'}
                           style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700 }}
-                          title={isPaid ? 'Edit Settlement' : 'Settle Salary'}
+                          title={isPaid ? 'Edit Salary / Settlement' : 'Settle Salary'}
                         >
                           {isPaid ? 'Edit Salary' : 'Settle Salary'}
                         </button>
@@ -479,10 +548,10 @@ export const PayrollPage = ({ dataService, currentUser }) => {
                           onClick={() => handleOpenStatement(emp)}
                           className="btn btn-secondary"
                           style={{ padding: '5px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                          title="View Statement & Download PDF Slip"
+                          title="View Ledger Statement & Download PDF Slip"
                         >
                           <FileText size={13} />
-                          Slip
+                          Ledger
                         </button>
 
                         <button
@@ -569,11 +638,54 @@ export const PayrollPage = ({ dataService, currentUser }) => {
                   </div>
                 </div>
 
-                <div className="payroll-actions-row">
+                <div className="payroll-actions-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {r.pendingBalance > 0 && (
+                    <button
+                      onClick={() => handleOpenPayDue(emp, r.settlement)}
+                      className="btn btn-primary"
+                      style={{
+                        flex: '1 1 calc(50% - 4px)',
+                        padding: '8px 10px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        background: '#059669',
+                        borderColor: '#059669',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <IndianRupee size={13} />
+                      Pay Due ({formatCurrency(r.pendingBalance)})
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => handleOpenAdvance(emp)}
+                    className="btn btn-secondary"
+                    style={{
+                      flex: '1 1 calc(50% - 4px)',
+                      padding: '8px 10px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#d97706',
+                      borderColor: '#fde68a',
+                      background: '#fffbeb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <PlusCircle size={13} />
+                    + Advance
+                  </button>
+
                   <button
                     onClick={() => handleOpenSettlement(emp)}
                     className={isPaid ? 'btn btn-secondary' : 'btn btn-primary'}
-                    style={{ flex: 1, padding: '8px 12px', fontSize: '12px', fontWeight: 700 }}
+                    style={{ flex: '1 1 calc(50% - 4px)', padding: '8px 10px', fontSize: '12px', fontWeight: 700 }}
                   >
                     {isPaid ? 'Edit Salary' : 'Settle Salary'}
                   </button>
@@ -581,10 +693,10 @@ export const PayrollPage = ({ dataService, currentUser }) => {
                   <button
                     onClick={() => handleOpenStatement(emp)}
                     className="btn btn-secondary"
-                    style={{ padding: '8px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{ flex: '1 1 calc(30% - 4px)', padding: '8px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                   >
                     <FileText size={14} />
-                    Slip
+                    Ledger
                   </button>
 
                   <button
@@ -647,6 +759,49 @@ export const PayrollPage = ({ dataService, currentUser }) => {
           employee={statementTargetEmployee}
           dataService={dataService}
           currentMonthYear={selectedMonthYear}
+        />
+      )}
+
+      {/* Pay Due Modal */}
+      {isPayDueModalOpen && payDueTarget && (
+        <PayDueModal
+          isOpen={isPayDueModalOpen}
+          onClose={() => {
+            setIsPayDueModalOpen(false);
+            setPayDueTarget(null);
+          }}
+          employee={payDueTarget.employee}
+          settlement={payDueTarget.settlement}
+          monthYear={selectedMonthYear}
+          onSave={async (paymentData) => {
+            await dataService.recordDuePayment(
+              payDueTarget.employee.id,
+              selectedMonthYear,
+              paymentData,
+              currentUser
+            );
+          }}
+        />
+      )}
+
+      {/* Advance Modal */}
+      {isAdvanceModalOpen && advanceTargetEmployee && (
+        <AdvanceModal
+          isOpen={isAdvanceModalOpen}
+          onClose={() => {
+            setIsAdvanceModalOpen(false);
+            setAdvanceTargetEmployee(null);
+          }}
+          employee={advanceTargetEmployee}
+          currentMonthYear={selectedMonthYear}
+          onSave={async (advanceData, targetMonth) => {
+            await dataService.recordAdvance(
+              advanceTargetEmployee.id,
+              targetMonth,
+              advanceData,
+              currentUser
+            );
+          }}
         />
       )}
     </div>

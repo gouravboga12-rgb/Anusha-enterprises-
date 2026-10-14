@@ -3878,7 +3878,9 @@ class DataService {
       advance_amount: advanceAmount,
       advance_date: data.advance_date || null,
       advance_notes: (data.advance_notes || '').trim(),
+      advance_history: data.advance_history || (this.employeeSalaries || []).find(s => s.id === settlementId)?.advance_history || [],
       paid_amount: paidAmount,
+      payment_history: data.payment_history || (this.employeeSalaries || []).find(s => s.id === settlementId)?.payment_history || [],
       net_payable: netPayable,
       pending_balance: pendingBalance,
       payment_date: data.payment_date || getTodayDateString(),
@@ -3949,6 +3951,142 @@ class DataService {
       supabase.from('employee_salary_settlements').delete().eq('id', id).then().catch(console.warn);
     }
     return true;
+  }
+
+  // Dedicated helper to record an advance (for current or next month) anytime
+  recordAdvance(employeeId, monthYear, advanceData, currentUser) {
+    const employee = this.getEmployeeById(employeeId);
+    if (!employee) throw new Error('Employee not found');
+
+    const amount = Number(advanceData.amount) || 0;
+    if (amount <= 0) throw new Error('Advance amount must be greater than 0');
+
+    // Find existing settlement for this month
+    const existing = (this.employeeSalaries || []).find(
+      (s) => s.employee_id === employeeId && s.month_year === monthYear
+    );
+
+    const baseSalary = existing ? Number(existing.base_salary) : Number(employee.base_salary) || 0;
+    const previousAdvance = existing ? Number(existing.advance_amount) || 0 : 0;
+    const newTotalAdvance = previousAdvance + amount;
+    const previousPaid = existing ? Number(existing.paid_amount) || 0 : 0;
+    const netPayable = Math.max(0, baseSalary - newTotalAdvance);
+    const pendingBalance = Math.max(0, netPayable - previousPaid);
+
+    // Maintain advance history list
+    const newAdvanceItem = {
+      id: 'adv-' + Date.now(),
+      amount: amount,
+      date: advanceData.date || getTodayDateString(),
+      notes: (advanceData.notes || '').trim(),
+      payment_mode: advanceData.payment_mode || 'Cash'
+    };
+
+    let advanceHistory = existing?.advance_history && Array.isArray(existing.advance_history)
+      ? [...existing.advance_history]
+      : [];
+
+    if (previousAdvance > 0 && advanceHistory.length === 0) {
+      advanceHistory.push({
+        id: 'adv-prev',
+        amount: previousAdvance,
+        date: existing.advance_date || existing.created_at?.slice(0, 10) || getTodayDateString(),
+        notes: existing.advance_notes || 'Initial advance',
+        payment_mode: 'Cash'
+      });
+    }
+    advanceHistory.push(newAdvanceItem);
+
+    const updatedData = {
+      ...(existing ? { id: existing.id } : {}),
+      employee_id: employeeId,
+      employee_name: employee.name,
+      month_year: monthYear,
+      base_salary: baseSalary,
+      advance_amount: newTotalAdvance,
+      advance_date: advanceData.date || getTodayDateString(),
+      advance_notes: advanceData.notes ? `${existing?.advance_notes ? existing.advance_notes + ' | ' : ''}${advanceData.notes}` : existing?.advance_notes || '',
+      advance_history: advanceHistory,
+      paid_amount: previousPaid,
+      net_payable: netPayable,
+      pending_balance: pendingBalance,
+      payment_date: existing?.payment_date || getTodayDateString(),
+      payment_mode: existing?.payment_mode || employee.payment_mode_preference || 'Cash',
+      reference_no: existing?.reference_no || '',
+      notes: existing?.notes || ''
+    };
+
+    return this.saveSalarySettlement(updatedData, currentUser);
+  }
+
+  // Dedicated helper to pay remaining due balance
+  recordDuePayment(employeeId, monthYear, paymentData, currentUser) {
+    const employee = this.getEmployeeById(employeeId);
+    if (!employee) throw new Error('Employee not found');
+
+    const payingAmount = Number(paymentData.amount) || 0;
+    if (payingAmount <= 0) throw new Error('Payment amount must be greater than 0');
+
+    const existing = (this.employeeSalaries || []).find(
+      (s) => s.employee_id === employeeId && s.month_year === monthYear
+    );
+
+    if (!existing) {
+      throw new Error('No existing settlement record found for this month');
+    }
+
+    const previousPaid = Number(existing.paid_amount) || 0;
+    const newPaidAmount = previousPaid + payingAmount;
+    const netPayable = Number(existing.net_payable) || 0;
+    const pendingBalance = Math.max(0, netPayable - newPaidAmount);
+
+    // Maintain payment history list
+    const newPaymentItem = {
+      id: 'pay-' + Date.now(),
+      amount: payingAmount,
+      date: paymentData.date || getTodayDateString(),
+      payment_mode: paymentData.payment_mode || 'Cash',
+      reference_no: (paymentData.reference_no || '').trim(),
+      notes: (paymentData.notes || '').trim()
+    };
+
+    let paymentHistory = existing.payment_history && Array.isArray(existing.payment_history)
+      ? [...existing.payment_history]
+      : [];
+
+    if (previousPaid > 0 && paymentHistory.length === 0) {
+      paymentHistory.push({
+        id: 'pay-initial',
+        amount: previousPaid,
+        date: existing.payment_date || existing.created_at?.slice(0, 10) || getTodayDateString(),
+        payment_mode: existing.payment_mode || 'Cash',
+        reference_no: existing.reference_no || '',
+        notes: 'Initial salary disbursement'
+      });
+    }
+    paymentHistory.push(newPaymentItem);
+
+    const updatedData = {
+      id: existing.id,
+      employee_id: employeeId,
+      employee_name: employee.name,
+      month_year: monthYear,
+      base_salary: existing.base_salary,
+      advance_amount: existing.advance_amount,
+      advance_date: existing.advance_date,
+      advance_notes: existing.advance_notes,
+      advance_history: existing.advance_history || [],
+      paid_amount: newPaidAmount,
+      payment_history: paymentHistory,
+      net_payable: netPayable,
+      pending_balance: pendingBalance,
+      payment_date: paymentData.date || getTodayDateString(),
+      payment_mode: paymentData.payment_mode || existing.payment_mode || 'Cash',
+      reference_no: paymentData.reference_no || existing.reference_no || '',
+      notes: paymentData.notes ? `${existing.notes ? existing.notes + ' | ' : ''}Paid due: ${paymentData.notes}` : existing.notes
+    };
+
+    return this.saveSalarySettlement(updatedData, currentUser);
   }
 
   getEmployeeSalaryHistory(employeeId) {

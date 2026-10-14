@@ -562,3 +562,6 @@ ALTER TABLE public.employee_salary_settlements ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public all on employees" ON public.employees FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all on employee_salary_settlements" ON public.employee_salary_settlements FOR ALL USING (true) WITH CHECK (true);
 
+ALTER TABLE public.employee_salary_settlements ADD COLUMN IF NOT EXISTS advance_history JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.employee_salary_settlements ADD COLUMN IF NOT EXISTS payment_history JSONB DEFAULT '[]'::jsonb;
+
