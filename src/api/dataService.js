@@ -809,7 +809,13 @@ class DataService {
           ...e,
           base_salary: Number(e.base_salary) || 0
         }));
+      } else if (!this.employees || this.employees.length === 0) {
+        this.employees = JSON.parse(JSON.stringify(initialEmployees));
+        if (isSupabaseConfigured) {
+          supabase.from('employees').upsert(this.employees, { onConflict: 'id' }).then().catch(console.warn);
+        }
       }
+
       if (salariesRes?.data && Array.isArray(salariesRes.data) && salariesRes.data.length > 0) {
         this.employeeSalaries = salariesRes.data.map((s) => ({
           ...s,
@@ -819,6 +825,11 @@ class DataService {
           net_payable: Number(s.net_payable) || 0,
           pending_balance: Number(s.pending_balance) || 0
         }));
+      } else if (!this.employeeSalaries || this.employeeSalaries.length === 0) {
+        this.employeeSalaries = JSON.parse(JSON.stringify(initialSalarySettlements));
+        if (isSupabaseConfigured) {
+          supabase.from('employee_salary_settlements').upsert(this.employeeSalaries, { onConflict: 'id' }).then().catch(console.warn);
+        }
       }
 
       // RECONSTRUCT any purchases recorded in activityLog that might be missing (e.g. PUR-555)
@@ -3749,6 +3760,27 @@ class DataService {
   // ==============================================================================
   // EMPLOYEE PAYROLL & SALARIES (ISOLATED FULL ACCESS MODULE)
   // ==============================================================================
+  async seedDemoPayrollData(force = false) {
+    if (!force && this.employees && this.employees.length >= 5) {
+      return false;
+    }
+
+    this.employees = JSON.parse(JSON.stringify(initialEmployees));
+    this.employeeSalaries = JSON.parse(JSON.stringify(initialSalarySettlements));
+    this.saveCache();
+    this.notify();
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('employees').upsert(this.employees, { onConflict: 'id' });
+        await supabase.from('employee_salary_settlements').upsert(this.employeeSalaries, { onConflict: 'id' });
+      } catch (err) {
+        console.warn('Supabase demo payroll seed warning:', err);
+      }
+    }
+    return true;
+  }
+
   getEmployees(status = 'all') {
     const list = this.employees || [];
     if (status === 'active') return list.filter((e) => e.status !== 'inactive');

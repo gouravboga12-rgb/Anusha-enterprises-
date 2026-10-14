@@ -374,63 +374,1474 @@ export const initialAdjustments = [
 
 export const initialEmployees = [
   {
-    id: 'emp-1',
-    name: 'Ramesh Goud',
-    phone: '9848012345',
-    designation: 'Delivery Van Driver',
-    base_salary: 20000,
-    payment_mode_preference: 'Cash',
-    bank_details: 'SBI A/C: 38291048291, IFSC: SBIN0001234',
-    joining_date: '2025-01-10',
-    status: 'active',
-    notes: 'Handles explosive delivery van AP-25-T-4590'
+    "id": "emp-1",
+    "name": "Ramesh Goud",
+    "phone": "9848012345",
+    "designation": "Delivery Van Driver",
+    "base_salary": 20000,
+    "payment_mode_preference": "Cash",
+    "bank_details": "SBI A/C: 38291048291, IFSC: SBIN0001234",
+    "joining_date": "2025-01-10",
+    "status": "active",
+    "notes": "Handles explosive delivery van AP-25-T-4590"
   },
   {
-    id: 'emp-2',
-    name: 'Suresh Kumar',
-    phone: '9849123456',
-    designation: 'Godown In-Charge & Blaster Assistant',
-    base_salary: 22000,
-    payment_mode_preference: 'PhonePe / UPI',
-    bank_details: 'UPI: 9849123456@ybl',
-    joining_date: '2024-08-15',
-    status: 'active',
-    notes: 'Main Godown Nandipet operations'
+    "id": "emp-2",
+    "name": "Suresh Kumar",
+    "phone": "9849123456",
+    "designation": "Godown In-Charge & Blaster Assistant",
+    "base_salary": 25000,
+    "payment_mode_preference": "PhonePe / UPI",
+    "bank_details": "UPI: 9849123456@ybl (SBI Bank)",
+    "joining_date": "2024-08-15",
+    "status": "active",
+    "notes": "Main Godown Nandipet operations & explosives loading"
   },
   {
-    id: 'emp-3',
-    name: 'Mahesh Reddy',
-    phone: '9440234567',
-    designation: 'Billing & Accounts Assistant',
-    base_salary: 18000,
-    payment_mode_preference: 'Bank Transfer',
-    bank_details: 'HDFC A/C: 501002349182, IFSC: HDFC0000123',
-    joining_date: '2025-03-01',
-    status: 'active',
-    notes: 'Invoices, E-Way bills and records'
+    "id": "emp-3",
+    "name": "Anil Reddy",
+    "phone": "9440234567",
+    "designation": "Senior Marketing & Sales Executive",
+    "base_salary": 30000,
+    "payment_mode_preference": "Bank Transfer (NEFT/IMPS)",
+    "bank_details": "HDFC A/C: 501002349182, IFSC: HDFC0000123",
+    "joining_date": "2024-02-01",
+    "status": "active",
+    "notes": "Quarry and stone crusher client relationship management"
+  },
+  {
+    "id": "emp-4",
+    "name": "Praveen Sharma",
+    "phone": "9701834211",
+    "designation": "Accountant & Billing Staff",
+    "base_salary": 22000,
+    "payment_mode_preference": "Bank Transfer",
+    "bank_details": "ICICI A/C: 002301582910, IFSC: ICIC0000023",
+    "joining_date": "2025-03-01",
+    "status": "active",
+    "notes": "Handles PESO records, daily sales billing, and GST compliance"
+  },
+  {
+    "id": "emp-5",
+    "name": "Mahesh Nayak",
+    "phone": "9988776655",
+    "designation": "Security Guard & Helper",
+    "base_salary": 15000,
+    "payment_mode_preference": "Cash",
+    "bank_details": "Paid via Cash against signature voucher",
+    "joining_date": "2025-02-15",
+    "status": "active",
+    "notes": "Night security shift and day packaging support"
   }
 ];
 
 export const initialSalarySettlements = [
   {
-    id: 'sal-1',
-    employee_id: 'emp-1',
-    employee_name: 'Ramesh Goud',
-    month_year: '2026-09',
-    base_salary: 20000,
-    advance_amount: 5000,
-    advance_date: '2026-09-08',
-    advance_notes: 'Festival advance for Ganesh Chaturthi',
-    paid_amount: 15000,
-    net_payable: 15000,
-    pending_balance: 0,
-    payment_date: '2026-09-30',
-    payment_mode: 'Cash',
-    reference_no: 'CASH-SEP-26',
-    status: 'Paid',
-    notes: 'Salary for September 2026 fully cleared. ₹5,000 advance deducted.',
-    recorded_by: 'Admin',
-    created_at: '2026-09-30T18:00:00.000Z'
+    "id": "sal-101",
+    "employee_id": "emp-1",
+    "employee_name": "Ramesh Goud",
+    "month_year": "2026-03",
+    "base_salary": 20000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 20000,
+    "payment_date": "2026-03-31",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-101",
+    "payment_history": [
+      {
+        "id": "pay-101",
+        "amount": 20000,
+        "date": "2026-03-31",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-101",
+        "notes": "Monthly salary cleared in full"
+      }
+    ],
+    "net_payable": 20000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Monthly salary cleared in full",
+    "recorded_by": "Admin",
+    "created_at": "2026-03-31T18:00:00.000Z",
+    "updated_at": "2026-03-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-102",
+    "employee_id": "emp-1",
+    "employee_name": "Ramesh Goud",
+    "month_year": "2026-04",
+    "base_salary": 20000,
+    "advance_amount": 3000,
+    "advance_date": "2026-04-12",
+    "advance_notes": "Vehicle maintenance advance",
+    "advance_history": [
+      {
+        "id": "adv-102",
+        "amount": 3000,
+        "date": "2026-04-12",
+        "notes": "Vehicle maintenance advance",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 17000,
+    "payment_date": "2026-04-30",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-102",
+    "payment_history": [
+      {
+        "id": "pay-102",
+        "amount": 17000,
+        "date": "2026-04-30",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-102",
+        "notes": "Advance deducted, balance paid in cash"
+      }
+    ],
+    "net_payable": 17000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Advance deducted, balance paid in cash",
+    "recorded_by": "Admin",
+    "created_at": "2026-04-30T18:00:00.000Z",
+    "updated_at": "2026-04-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-103",
+    "employee_id": "emp-1",
+    "employee_name": "Ramesh Goud",
+    "month_year": "2026-05",
+    "base_salary": 20000,
+    "advance_amount": 5000,
+    "advance_date": "2026-05-10",
+    "advance_notes": "Personal emergency loan",
+    "advance_history": [
+      {
+        "id": "adv-103",
+        "amount": 5000,
+        "date": "2026-05-10",
+        "notes": "Personal emergency loan",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 15000,
+    "payment_date": "2026-05-31",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-103",
+    "payment_history": [
+      {
+        "id": "pay-103",
+        "amount": 15000,
+        "date": "2026-05-31",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-103",
+        "notes": "Salary settled after advance deduction"
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Salary settled after advance deduction",
+    "recorded_by": "Admin",
+    "created_at": "2026-05-31T18:00:00.000Z",
+    "updated_at": "2026-05-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-104",
+    "employee_id": "emp-1",
+    "employee_name": "Ramesh Goud",
+    "month_year": "2026-06",
+    "base_salary": 20000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 20000,
+    "payment_date": "2026-06-30",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-104",
+    "payment_history": [
+      {
+        "id": "pay-104",
+        "amount": 20000,
+        "date": "2026-06-30",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-104",
+        "notes": "Monthly salary cleared"
+      }
+    ],
+    "net_payable": 20000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Monthly salary cleared",
+    "recorded_by": "Admin",
+    "created_at": "2026-06-30T18:00:00.000Z",
+    "updated_at": "2026-06-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-105",
+    "employee_id": "emp-1",
+    "employee_name": "Ramesh Goud",
+    "month_year": "2026-07",
+    "base_salary": 20000,
+    "advance_amount": 4000,
+    "advance_date": "2026-07-15",
+    "advance_notes": "Family medical expense advance",
+    "advance_history": [
+      {
+        "id": "adv-105",
+        "amount": 4000,
+        "date": "2026-07-15",
+        "notes": "Family medical expense advance",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 16000,
+    "payment_date": "2026-07-31",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-105",
+    "payment_history": [
+      {
+        "id": "pay-105",
+        "amount": 16000,
+        "date": "2026-07-31",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-105",
+        "notes": "Advance deducted"
+      }
+    ],
+    "net_payable": 16000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Advance deducted",
+    "recorded_by": "Admin",
+    "created_at": "2026-07-31T18:00:00.000Z",
+    "updated_at": "2026-07-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-106",
+    "employee_id": "emp-1",
+    "employee_name": "Ramesh Goud",
+    "month_year": "2026-08",
+    "base_salary": 20000,
+    "advance_amount": 5000,
+    "advance_date": "2026-08-18",
+    "advance_notes": "School fees advance",
+    "advance_history": [
+      {
+        "id": "adv-106",
+        "amount": 5000,
+        "date": "2026-08-18",
+        "notes": "School fees advance",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 15000,
+    "payment_date": "2026-08-31",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-106",
+    "payment_history": [
+      {
+        "id": "pay-106",
+        "amount": 15000,
+        "date": "2026-08-31",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-106",
+        "notes": "Salary disbursed"
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Salary disbursed",
+    "recorded_by": "Admin",
+    "created_at": "2026-08-31T18:00:00.000Z",
+    "updated_at": "2026-08-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-107",
+    "employee_id": "emp-1",
+    "employee_name": "Ramesh Goud",
+    "month_year": "2026-09",
+    "base_salary": 20000,
+    "advance_amount": 5000,
+    "advance_date": "2026-09-08",
+    "advance_notes": "Ganesh Chaturthi festival advance",
+    "advance_history": [
+      {
+        "id": "adv-107",
+        "amount": 5000,
+        "date": "2026-09-08",
+        "notes": "Ganesh Chaturthi festival advance",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 15000,
+    "payment_date": "2026-09-30",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-107",
+    "payment_history": [
+      {
+        "id": "pay-107",
+        "amount": 15000,
+        "date": "2026-09-30",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-107",
+        "notes": "Festival advance adjusted"
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Festival advance adjusted",
+    "recorded_by": "Admin",
+    "created_at": "2026-09-30T18:00:00.000Z",
+    "updated_at": "2026-09-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-108",
+    "employee_id": "emp-1",
+    "employee_name": "Ramesh Goud",
+    "month_year": "2026-10",
+    "base_salary": 20000,
+    "advance_amount": 5000,
+    "advance_date": "2026-10-05",
+    "advance_notes": "Diwali advance taken",
+    "advance_history": [
+      {
+        "id": "adv-108",
+        "amount": 5000,
+        "date": "2026-10-05",
+        "notes": "Diwali advance taken",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 10000,
+    "payment_date": "2026-10-10",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-108",
+    "payment_history": [
+      {
+        "id": "pay-108",
+        "amount": 10000,
+        "date": "2026-10-10",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-108",
+        "notes": "Partial payment made, ₹5,000 pending due"
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 5000,
+    "status": "Partially Paid",
+    "notes": "Partial payment made, ₹5,000 pending due",
+    "recorded_by": "Admin",
+    "created_at": "2026-10-10T18:00:00.000Z",
+    "updated_at": "2026-10-10T18:00:00.000Z"
+  },
+  {
+    "id": "sal-109",
+    "employee_id": "emp-2",
+    "employee_name": "Suresh Kumar",
+    "month_year": "2026-03",
+    "base_salary": 25000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 25000,
+    "payment_date": "2026-03-31",
+    "payment_mode": "PhonePe / UPI",
+    "reference_no": "UPI-REF-109",
+    "payment_history": [
+      {
+        "id": "pay-109",
+        "amount": 25000,
+        "date": "2026-03-31",
+        "payment_mode": "PhonePe / UPI",
+        "reference_no": "UPI-REF-109",
+        "notes": "Transferred via UPI to 9849123456@ybl"
+      }
+    ],
+    "net_payable": 25000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Transferred via UPI to 9849123456@ybl",
+    "recorded_by": "Admin",
+    "created_at": "2026-03-31T18:00:00.000Z",
+    "updated_at": "2026-03-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-110",
+    "employee_id": "emp-2",
+    "employee_name": "Suresh Kumar",
+    "month_year": "2026-04",
+    "base_salary": 25000,
+    "advance_amount": 5000,
+    "advance_date": "2026-04-10",
+    "advance_notes": "Home repair advance",
+    "advance_history": [
+      {
+        "id": "adv-110",
+        "amount": 5000,
+        "date": "2026-04-10",
+        "notes": "Home repair advance",
+        "payment_mode": "PhonePe / UPI"
+      }
+    ],
+    "paid_amount": 20000,
+    "payment_date": "2026-04-30",
+    "payment_mode": "PhonePe / UPI",
+    "reference_no": "UPI-REF-110",
+    "payment_history": [
+      {
+        "id": "pay-110",
+        "amount": 20000,
+        "date": "2026-04-30",
+        "payment_mode": "PhonePe / UPI",
+        "reference_no": "UPI-REF-110",
+        "notes": "UPI Ref: 610293847291"
+      }
+    ],
+    "net_payable": 20000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "UPI Ref: 610293847291",
+    "recorded_by": "Admin",
+    "created_at": "2026-04-30T18:00:00.000Z",
+    "updated_at": "2026-04-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-111",
+    "employee_id": "emp-2",
+    "employee_name": "Suresh Kumar",
+    "month_year": "2026-05",
+    "base_salary": 25000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 25000,
+    "payment_date": "2026-05-31",
+    "payment_mode": "PhonePe / UPI",
+    "reference_no": "UPI-REF-111",
+    "payment_history": [
+      {
+        "id": "pay-111",
+        "amount": 25000,
+        "date": "2026-05-31",
+        "payment_mode": "PhonePe / UPI",
+        "reference_no": "UPI-REF-111",
+        "notes": "Cleared via PhonePe"
+      }
+    ],
+    "net_payable": 25000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cleared via PhonePe",
+    "recorded_by": "Admin",
+    "created_at": "2026-05-31T18:00:00.000Z",
+    "updated_at": "2026-05-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-112",
+    "employee_id": "emp-2",
+    "employee_name": "Suresh Kumar",
+    "month_year": "2026-06",
+    "base_salary": 25000,
+    "advance_amount": 10000,
+    "advance_date": "2026-06-08",
+    "advance_notes": "Advance against agricultural equipment",
+    "advance_history": [
+      {
+        "id": "adv-112",
+        "amount": 10000,
+        "date": "2026-06-08",
+        "notes": "Advance against agricultural equipment",
+        "payment_mode": "PhonePe / UPI"
+      }
+    ],
+    "paid_amount": 15000,
+    "payment_date": "2026-06-30",
+    "payment_mode": "PhonePe / UPI",
+    "reference_no": "UPI-REF-112",
+    "payment_history": [
+      {
+        "id": "pay-112",
+        "amount": 15000,
+        "date": "2026-06-30",
+        "payment_mode": "PhonePe / UPI",
+        "reference_no": "UPI-REF-112",
+        "notes": "Cleared"
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cleared",
+    "recorded_by": "Admin",
+    "created_at": "2026-06-30T18:00:00.000Z",
+    "updated_at": "2026-06-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-113",
+    "employee_id": "emp-2",
+    "employee_name": "Suresh Kumar",
+    "month_year": "2026-07",
+    "base_salary": 25000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 25000,
+    "payment_date": "2026-07-31",
+    "payment_mode": "PhonePe / UPI",
+    "reference_no": "UPI-REF-113",
+    "payment_history": [
+      {
+        "id": "pay-113",
+        "amount": 25000,
+        "date": "2026-07-31",
+        "payment_mode": "PhonePe / UPI",
+        "reference_no": "UPI-REF-113",
+        "notes": "Salary credited on time"
+      }
+    ],
+    "net_payable": 25000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Salary credited on time",
+    "recorded_by": "Admin",
+    "created_at": "2026-07-31T18:00:00.000Z",
+    "updated_at": "2026-07-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-114",
+    "employee_id": "emp-2",
+    "employee_name": "Suresh Kumar",
+    "month_year": "2026-08",
+    "base_salary": 25000,
+    "advance_amount": 5000,
+    "advance_date": "2026-08-12",
+    "advance_notes": "Interim loan advance",
+    "advance_history": [
+      {
+        "id": "adv-114",
+        "amount": 5000,
+        "date": "2026-08-12",
+        "notes": "Interim loan advance",
+        "payment_mode": "PhonePe / UPI"
+      }
+    ],
+    "paid_amount": 20000,
+    "payment_date": "2026-08-31",
+    "payment_mode": "PhonePe / UPI",
+    "reference_no": "UPI-REF-114",
+    "payment_history": [
+      {
+        "id": "pay-114",
+        "amount": 20000,
+        "date": "2026-08-31",
+        "payment_mode": "PhonePe / UPI",
+        "reference_no": "UPI-REF-114",
+        "notes": "Disbursed via UPI"
+      }
+    ],
+    "net_payable": 20000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Disbursed via UPI",
+    "recorded_by": "Admin",
+    "created_at": "2026-08-31T18:00:00.000Z",
+    "updated_at": "2026-08-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-115",
+    "employee_id": "emp-2",
+    "employee_name": "Suresh Kumar",
+    "month_year": "2026-09",
+    "base_salary": 25000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 25000,
+    "payment_date": "2026-09-30",
+    "payment_mode": "PhonePe / UPI",
+    "reference_no": "UPI-REF-115",
+    "payment_history": [
+      {
+        "id": "pay-115",
+        "amount": 25000,
+        "date": "2026-09-30",
+        "payment_mode": "PhonePe / UPI",
+        "reference_no": "UPI-REF-115",
+        "notes": "September salary cleared"
+      }
+    ],
+    "net_payable": 25000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "September salary cleared",
+    "recorded_by": "Admin",
+    "created_at": "2026-09-30T18:00:00.000Z",
+    "updated_at": "2026-09-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-116",
+    "employee_id": "emp-2",
+    "employee_name": "Suresh Kumar",
+    "month_year": "2026-10",
+    "base_salary": 25000,
+    "advance_amount": 5000,
+    "advance_date": "2026-10-02",
+    "advance_notes": "Advance taken early for October",
+    "advance_history": [
+      {
+        "id": "adv-116",
+        "amount": 5000,
+        "date": "2026-10-02",
+        "notes": "Advance taken early for October",
+        "payment_mode": "PhonePe / UPI"
+      }
+    ],
+    "paid_amount": 20000,
+    "payment_date": "2026-10-14",
+    "payment_mode": "PhonePe / UPI",
+    "reference_no": "UPI-REF-116",
+    "payment_history": [
+      {
+        "id": "pay-116",
+        "amount": 20000,
+        "date": "2026-10-14",
+        "payment_mode": "PhonePe / UPI",
+        "reference_no": "UPI-REF-116",
+        "notes": "Advance adjusted, balance fully settled"
+      }
+    ],
+    "net_payable": 20000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Advance adjusted, balance fully settled",
+    "recorded_by": "Admin",
+    "created_at": "2026-10-14T18:00:00.000Z",
+    "updated_at": "2026-10-14T18:00:00.000Z"
+  },
+  {
+    "id": "sal-117",
+    "employee_id": "emp-3",
+    "employee_name": "Anil Reddy",
+    "month_year": "2026-03",
+    "base_salary": 30000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 30000,
+    "payment_date": "2026-03-31",
+    "payment_mode": "Bank Transfer (NEFT/IMPS)",
+    "reference_no": "NEFT-117",
+    "payment_history": [
+      {
+        "id": "pay-117",
+        "amount": 30000,
+        "date": "2026-03-31",
+        "payment_mode": "Bank Transfer (NEFT/IMPS)",
+        "reference_no": "NEFT-117",
+        "notes": "HDFC NEFT #N102948291"
+      }
+    ],
+    "net_payable": 30000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "HDFC NEFT #N102948291",
+    "recorded_by": "Admin",
+    "created_at": "2026-03-31T18:00:00.000Z",
+    "updated_at": "2026-03-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-118",
+    "employee_id": "emp-3",
+    "employee_name": "Anil Reddy",
+    "month_year": "2026-04",
+    "base_salary": 30000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 30000,
+    "payment_date": "2026-04-30",
+    "payment_mode": "Bank Transfer (NEFT/IMPS)",
+    "reference_no": "NEFT-118",
+    "payment_history": [
+      {
+        "id": "pay-118",
+        "amount": 30000,
+        "date": "2026-04-30",
+        "payment_mode": "Bank Transfer (NEFT/IMPS)",
+        "reference_no": "NEFT-118",
+        "notes": "NEFT Transfer cleared"
+      }
+    ],
+    "net_payable": 30000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "NEFT Transfer cleared",
+    "recorded_by": "Admin",
+    "created_at": "2026-04-30T18:00:00.000Z",
+    "updated_at": "2026-04-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-119",
+    "employee_id": "emp-3",
+    "employee_name": "Anil Reddy",
+    "month_year": "2026-05",
+    "base_salary": 30000,
+    "advance_amount": 5000,
+    "advance_date": "2026-05-12",
+    "advance_notes": "Field client tour advance",
+    "advance_history": [
+      {
+        "id": "adv-119",
+        "amount": 5000,
+        "date": "2026-05-12",
+        "notes": "Field client tour advance",
+        "payment_mode": "Bank Transfer"
+      }
+    ],
+    "paid_amount": 25000,
+    "payment_date": "2026-05-31",
+    "payment_mode": "Bank Transfer (NEFT/IMPS)",
+    "reference_no": "NEFT-119",
+    "payment_history": [
+      {
+        "id": "pay-119",
+        "amount": 25000,
+        "date": "2026-05-31",
+        "payment_mode": "Bank Transfer (NEFT/IMPS)",
+        "reference_no": "NEFT-119",
+        "notes": "Advance deducted from salary"
+      }
+    ],
+    "net_payable": 25000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Advance deducted from salary",
+    "recorded_by": "Admin",
+    "created_at": "2026-05-31T18:00:00.000Z",
+    "updated_at": "2026-05-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-120",
+    "employee_id": "emp-3",
+    "employee_name": "Anil Reddy",
+    "month_year": "2026-06",
+    "base_salary": 30000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 30000,
+    "payment_date": "2026-06-30",
+    "payment_mode": "Bank Transfer (NEFT/IMPS)",
+    "reference_no": "NEFT-120",
+    "payment_history": [
+      {
+        "id": "pay-120",
+        "amount": 30000,
+        "date": "2026-06-30",
+        "payment_mode": "Bank Transfer (NEFT/IMPS)",
+        "reference_no": "NEFT-120",
+        "notes": "IMPS Ref: 492019382190"
+      }
+    ],
+    "net_payable": 30000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "IMPS Ref: 492019382190",
+    "recorded_by": "Admin",
+    "created_at": "2026-06-30T18:00:00.000Z",
+    "updated_at": "2026-06-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-121",
+    "employee_id": "emp-3",
+    "employee_name": "Anil Reddy",
+    "month_year": "2026-07",
+    "base_salary": 30000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 30000,
+    "payment_date": "2026-07-31",
+    "payment_mode": "Bank Transfer (NEFT/IMPS)",
+    "reference_no": "NEFT-121",
+    "payment_history": [
+      {
+        "id": "pay-121",
+        "amount": 30000,
+        "date": "2026-07-31",
+        "payment_mode": "Bank Transfer (NEFT/IMPS)",
+        "reference_no": "NEFT-121",
+        "notes": "Salary credited"
+      }
+    ],
+    "net_payable": 30000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Salary credited",
+    "recorded_by": "Admin",
+    "created_at": "2026-07-31T18:00:00.000Z",
+    "updated_at": "2026-07-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-122",
+    "employee_id": "emp-3",
+    "employee_name": "Anil Reddy",
+    "month_year": "2026-08",
+    "base_salary": 30000,
+    "advance_amount": 8000,
+    "advance_date": "2026-08-10",
+    "advance_notes": "Hospital medical emergency advance",
+    "advance_history": [
+      {
+        "id": "adv-122",
+        "amount": 8000,
+        "date": "2026-08-10",
+        "notes": "Hospital medical emergency advance",
+        "payment_mode": "Bank Transfer"
+      }
+    ],
+    "paid_amount": 22000,
+    "payment_date": "2026-08-31",
+    "payment_mode": "Bank Transfer (NEFT/IMPS)",
+    "reference_no": "NEFT-122",
+    "payment_history": [
+      {
+        "id": "pay-122",
+        "amount": 22000,
+        "date": "2026-08-31",
+        "payment_mode": "Bank Transfer (NEFT/IMPS)",
+        "reference_no": "NEFT-122",
+        "notes": "Cleared via NEFT"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cleared via NEFT",
+    "recorded_by": "Admin",
+    "created_at": "2026-08-31T18:00:00.000Z",
+    "updated_at": "2026-08-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-123",
+    "employee_id": "emp-3",
+    "employee_name": "Anil Reddy",
+    "month_year": "2026-09",
+    "base_salary": 30000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 30000,
+    "payment_date": "2026-09-30",
+    "payment_mode": "Bank Transfer (NEFT/IMPS)",
+    "reference_no": "NEFT-123",
+    "payment_history": [
+      {
+        "id": "pay-123",
+        "amount": 30000,
+        "date": "2026-09-30",
+        "payment_mode": "Bank Transfer (NEFT/IMPS)",
+        "reference_no": "NEFT-123",
+        "notes": "Cleared via NEFT"
+      }
+    ],
+    "net_payable": 30000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cleared via NEFT",
+    "recorded_by": "Admin",
+    "created_at": "2026-09-30T18:00:00.000Z",
+    "updated_at": "2026-09-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-124",
+    "employee_id": "emp-3",
+    "employee_name": "Anil Reddy",
+    "month_year": "2026-10",
+    "base_salary": 30000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 25000,
+    "payment_date": "2026-10-10",
+    "payment_mode": "Bank Transfer (NEFT/IMPS)",
+    "reference_no": "NEFT-124",
+    "payment_history": [
+      {
+        "id": "pay-124",
+        "amount": 25000,
+        "date": "2026-10-10",
+        "payment_mode": "Bank Transfer (NEFT/IMPS)",
+        "reference_no": "NEFT-124",
+        "notes": "₹25,000 paid via IMPS. Balance ₹5,000 due."
+      }
+    ],
+    "net_payable": 30000,
+    "pending_balance": 5000,
+    "status": "Partially Paid",
+    "notes": "₹25,000 paid via IMPS. Balance ₹5,000 due.",
+    "recorded_by": "Admin",
+    "created_at": "2026-10-10T18:00:00.000Z",
+    "updated_at": "2026-10-10T18:00:00.000Z"
+  },
+  {
+    "id": "sal-125",
+    "employee_id": "emp-4",
+    "employee_name": "Praveen Sharma",
+    "month_year": "2026-03",
+    "base_salary": 22000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 22000,
+    "payment_date": "2026-03-31",
+    "payment_mode": "Bank Transfer",
+    "reference_no": "NEFT-125",
+    "payment_history": [
+      {
+        "id": "pay-125",
+        "amount": 22000,
+        "date": "2026-03-31",
+        "payment_mode": "Bank Transfer",
+        "reference_no": "NEFT-125",
+        "notes": "ICICI Bank Transfer cleared"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "ICICI Bank Transfer cleared",
+    "recorded_by": "Admin",
+    "created_at": "2026-03-31T18:00:00.000Z",
+    "updated_at": "2026-03-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-126",
+    "employee_id": "emp-4",
+    "employee_name": "Praveen Sharma",
+    "month_year": "2026-04",
+    "base_salary": 22000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 22000,
+    "payment_date": "2026-04-30",
+    "payment_mode": "Bank Transfer",
+    "reference_no": "NEFT-126",
+    "payment_history": [
+      {
+        "id": "pay-126",
+        "amount": 22000,
+        "date": "2026-04-30",
+        "payment_mode": "Bank Transfer",
+        "reference_no": "NEFT-126",
+        "notes": "Direct bank deposit"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Direct bank deposit",
+    "recorded_by": "Admin",
+    "created_at": "2026-04-30T18:00:00.000Z",
+    "updated_at": "2026-04-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-127",
+    "employee_id": "emp-4",
+    "employee_name": "Praveen Sharma",
+    "month_year": "2026-05",
+    "base_salary": 22000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 22000,
+    "payment_date": "2026-05-31",
+    "payment_mode": "Bank Transfer",
+    "reference_no": "NEFT-127",
+    "payment_history": [
+      {
+        "id": "pay-127",
+        "amount": 22000,
+        "date": "2026-05-31",
+        "payment_mode": "Bank Transfer",
+        "reference_no": "NEFT-127",
+        "notes": "Direct bank deposit"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Direct bank deposit",
+    "recorded_by": "Admin",
+    "created_at": "2026-05-31T18:00:00.000Z",
+    "updated_at": "2026-05-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-128",
+    "employee_id": "emp-4",
+    "employee_name": "Praveen Sharma",
+    "month_year": "2026-06",
+    "base_salary": 22000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 22000,
+    "payment_date": "2026-06-30",
+    "payment_mode": "Bank Transfer",
+    "reference_no": "NEFT-128",
+    "payment_history": [
+      {
+        "id": "pay-128",
+        "amount": 22000,
+        "date": "2026-06-30",
+        "payment_mode": "Bank Transfer",
+        "reference_no": "NEFT-128",
+        "notes": "Direct bank deposit"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Direct bank deposit",
+    "recorded_by": "Admin",
+    "created_at": "2026-06-30T18:00:00.000Z",
+    "updated_at": "2026-06-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-129",
+    "employee_id": "emp-4",
+    "employee_name": "Praveen Sharma",
+    "month_year": "2026-07",
+    "base_salary": 22000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 22000,
+    "payment_date": "2026-07-31",
+    "payment_mode": "Bank Transfer",
+    "reference_no": "NEFT-129",
+    "payment_history": [
+      {
+        "id": "pay-129",
+        "amount": 22000,
+        "date": "2026-07-31",
+        "payment_mode": "Bank Transfer",
+        "reference_no": "NEFT-129",
+        "notes": "Direct bank deposit"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Direct bank deposit",
+    "recorded_by": "Admin",
+    "created_at": "2026-07-31T18:00:00.000Z",
+    "updated_at": "2026-07-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-130",
+    "employee_id": "emp-4",
+    "employee_name": "Praveen Sharma",
+    "month_year": "2026-08",
+    "base_salary": 22000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 22000,
+    "payment_date": "2026-08-31",
+    "payment_mode": "Bank Transfer",
+    "reference_no": "NEFT-130",
+    "payment_history": [
+      {
+        "id": "pay-130",
+        "amount": 22000,
+        "date": "2026-08-31",
+        "payment_mode": "Bank Transfer",
+        "reference_no": "NEFT-130",
+        "notes": "Direct bank deposit"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Direct bank deposit",
+    "recorded_by": "Admin",
+    "created_at": "2026-08-31T18:00:00.000Z",
+    "updated_at": "2026-08-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-131",
+    "employee_id": "emp-4",
+    "employee_name": "Praveen Sharma",
+    "month_year": "2026-09",
+    "base_salary": 22000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 22000,
+    "payment_date": "2026-09-30",
+    "payment_mode": "Bank Transfer",
+    "reference_no": "NEFT-131",
+    "payment_history": [
+      {
+        "id": "pay-131",
+        "amount": 22000,
+        "date": "2026-09-30",
+        "payment_mode": "Bank Transfer",
+        "reference_no": "NEFT-131",
+        "notes": "Direct bank deposit"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Direct bank deposit",
+    "recorded_by": "Admin",
+    "created_at": "2026-09-30T18:00:00.000Z",
+    "updated_at": "2026-09-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-132",
+    "employee_id": "emp-4",
+    "employee_name": "Praveen Sharma",
+    "month_year": "2026-10",
+    "base_salary": 22000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 22000,
+    "payment_date": "2026-10-10",
+    "payment_mode": "Bank Transfer",
+    "reference_no": "NEFT-132",
+    "payment_history": [
+      {
+        "id": "pay-132",
+        "amount": 22000,
+        "date": "2026-10-10",
+        "payment_mode": "Bank Transfer",
+        "reference_no": "NEFT-132",
+        "notes": "October salary cleared early"
+      }
+    ],
+    "net_payable": 22000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "October salary cleared early",
+    "recorded_by": "Admin",
+    "created_at": "2026-10-10T18:00:00.000Z",
+    "updated_at": "2026-10-10T18:00:00.000Z"
+  },
+  {
+    "id": "sal-133",
+    "employee_id": "emp-5",
+    "employee_name": "Mahesh Nayak",
+    "month_year": "2026-03",
+    "base_salary": 15000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 15000,
+    "payment_date": "2026-03-31",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-133",
+    "payment_history": [
+      {
+        "id": "pay-133",
+        "amount": 15000,
+        "date": "2026-03-31",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-133",
+        "notes": "Cash payment voucher signed"
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cash payment voucher signed",
+    "recorded_by": "Admin",
+    "created_at": "2026-03-31T18:00:00.000Z",
+    "updated_at": "2026-03-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-134",
+    "employee_id": "emp-5",
+    "employee_name": "Mahesh Nayak",
+    "month_year": "2026-04",
+    "base_salary": 15000,
+    "advance_amount": 2000,
+    "advance_date": "2026-04-14",
+    "advance_notes": "Ugadi festival advance",
+    "advance_history": [
+      {
+        "id": "adv-134",
+        "amount": 2000,
+        "date": "2026-04-14",
+        "notes": "Ugadi festival advance",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 13000,
+    "payment_date": "2026-04-30",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-134",
+    "payment_history": [
+      {
+        "id": "pay-134",
+        "amount": 13000,
+        "date": "2026-04-30",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-134",
+        "notes": "Cash settled"
+      }
+    ],
+    "net_payable": 13000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cash settled",
+    "recorded_by": "Admin",
+    "created_at": "2026-04-30T18:00:00.000Z",
+    "updated_at": "2026-04-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-135",
+    "employee_id": "emp-5",
+    "employee_name": "Mahesh Nayak",
+    "month_year": "2026-05",
+    "base_salary": 15000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 15000,
+    "payment_date": "2026-05-31",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-135",
+    "payment_history": [
+      {
+        "id": "pay-135",
+        "amount": 15000,
+        "date": "2026-05-31",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-135",
+        "notes": "Cash settled"
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cash settled",
+    "recorded_by": "Admin",
+    "created_at": "2026-05-31T18:00:00.000Z",
+    "updated_at": "2026-05-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-136",
+    "employee_id": "emp-5",
+    "employee_name": "Mahesh Nayak",
+    "month_year": "2026-06",
+    "base_salary": 15000,
+    "advance_amount": 3000,
+    "advance_date": "2026-06-10",
+    "advance_notes": "Personal advance",
+    "advance_history": [
+      {
+        "id": "adv-136",
+        "amount": 3000,
+        "date": "2026-06-10",
+        "notes": "Personal advance",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 12000,
+    "payment_date": "2026-06-30",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-136",
+    "payment_history": [
+      {
+        "id": "pay-136",
+        "amount": 12000,
+        "date": "2026-06-30",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-136",
+        "notes": "Cash settled"
+      }
+    ],
+    "net_payable": 12000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cash settled",
+    "recorded_by": "Admin",
+    "created_at": "2026-06-30T18:00:00.000Z",
+    "updated_at": "2026-06-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-137",
+    "employee_id": "emp-5",
+    "employee_name": "Mahesh Nayak",
+    "month_year": "2026-07",
+    "base_salary": 15000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 15000,
+    "payment_date": "2026-07-31",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-137",
+    "payment_history": [
+      {
+        "id": "pay-137",
+        "amount": 15000,
+        "date": "2026-07-31",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-137",
+        "notes": "Cash settled"
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cash settled",
+    "recorded_by": "Admin",
+    "created_at": "2026-07-31T18:00:00.000Z",
+    "updated_at": "2026-07-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-138",
+    "employee_id": "emp-5",
+    "employee_name": "Mahesh Nayak",
+    "month_year": "2026-08",
+    "base_salary": 15000,
+    "advance_amount": 3000,
+    "advance_date": "2026-08-15",
+    "advance_notes": "Rakhi festival advance",
+    "advance_history": [
+      {
+        "id": "adv-138",
+        "amount": 3000,
+        "date": "2026-08-15",
+        "notes": "Rakhi festival advance",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 12000,
+    "payment_date": "2026-08-31",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-138",
+    "payment_history": [
+      {
+        "id": "pay-138",
+        "amount": 12000,
+        "date": "2026-08-31",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-138",
+        "notes": "Cash settled"
+      }
+    ],
+    "net_payable": 12000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cash settled",
+    "recorded_by": "Admin",
+    "created_at": "2026-08-31T18:00:00.000Z",
+    "updated_at": "2026-08-31T18:00:00.000Z"
+  },
+  {
+    "id": "sal-139",
+    "employee_id": "emp-5",
+    "employee_name": "Mahesh Nayak",
+    "month_year": "2026-09",
+    "base_salary": 15000,
+    "advance_amount": 2000,
+    "advance_date": "2026-09-05",
+    "advance_notes": "Ganesh festival advance",
+    "advance_history": [
+      {
+        "id": "adv-139",
+        "amount": 2000,
+        "date": "2026-09-05",
+        "notes": "Ganesh festival advance",
+        "payment_mode": "Cash"
+      }
+    ],
+    "paid_amount": 13000,
+    "payment_date": "2026-09-30",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-139",
+    "payment_history": [
+      {
+        "id": "pay-139",
+        "amount": 13000,
+        "date": "2026-09-30",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-139",
+        "notes": "Cash settled"
+      }
+    ],
+    "net_payable": 13000,
+    "pending_balance": 0,
+    "status": "Paid",
+    "notes": "Cash settled",
+    "recorded_by": "Admin",
+    "created_at": "2026-09-30T18:00:00.000Z",
+    "updated_at": "2026-09-30T18:00:00.000Z"
+  },
+  {
+    "id": "sal-140",
+    "employee_id": "emp-5",
+    "employee_name": "Mahesh Nayak",
+    "month_year": "2026-10",
+    "base_salary": 15000,
+    "advance_amount": 0,
+    "advance_date": null,
+    "advance_notes": "",
+    "advance_history": [],
+    "paid_amount": 10000,
+    "payment_date": "2026-10-10",
+    "payment_mode": "Cash",
+    "reference_no": "VOUCHER-140",
+    "payment_history": [
+      {
+        "id": "pay-140",
+        "amount": 10000,
+        "date": "2026-10-10",
+        "payment_mode": "Cash",
+        "reference_no": "VOUCHER-140",
+        "notes": "₹10,000 paid in cash. ₹5,000 due balance."
+      }
+    ],
+    "net_payable": 15000,
+    "pending_balance": 5000,
+    "status": "Partially Paid",
+    "notes": "₹10,000 paid in cash. ₹5,000 due balance.",
+    "recorded_by": "Admin",
+    "created_at": "2026-10-10T18:00:00.000Z",
+    "updated_at": "2026-10-10T18:00:00.000Z"
   }
 ];
-
