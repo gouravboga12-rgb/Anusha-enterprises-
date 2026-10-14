@@ -90,8 +90,8 @@ export const EmployeeFormModal = ({ isOpen, onClose, onSave, employee }) => {
 
   return (
     <div className="modal-backdrop">
-      <div className="modal-content" style={{ maxWidth: '540px', width: '95%' }}>
-        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+      <div className="modal-content" style={{ maxWidth: '540px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-header" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
               {employee ? 'Edit Employee Details' : 'Add New Employee'}
@@ -108,8 +108,8 @@ export const EmployeeFormModal = ({ isOpen, onClose, onSave, employee }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body" style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div className="modal-body" style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
             {error && (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' }}>
                 {error}
@@ -262,7 +262,7 @@ export const EmployeeFormModal = ({ isOpen, onClose, onSave, employee }) => {
             </div>
           </div>
 
-          <div className="modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', padding: '16px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+          <div className="modal-footer" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', padding: '14px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
             <button
               type="button"
               className="btn btn-secondary"
