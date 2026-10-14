@@ -95,7 +95,7 @@ export const EmployeeStatementModal = ({
                 <span>•</span>
                 <span>{employee.phone}</span>
                 <span>•</span>
-                <span style={{ fontWeight: 600, color: '#0284c7' }}>Base: ₹{formatCurrency(employee.base_salary)}/mo</span>
+                <span style={{ fontWeight: 600, color: '#0284c7' }}>Base: {formatCurrency(employee.base_salary)}/mo</span>
               </div>
             </div>
           </div>
@@ -187,20 +187,20 @@ export const EmployeeStatementModal = ({
             </div>
             <div style={{ background: '#ffffff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
               <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Gross Base Salary</div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>₹{formatCurrency(historyData.totalBaseSalary)}</div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{formatCurrency(historyData.totalBaseSalary)}</div>
             </div>
             <div style={{ background: '#ffffff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
               <div style={{ fontSize: '11px', color: '#d97706', fontWeight: 600 }}>Total Advances Taken</div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#d97706', marginTop: '2px' }}>₹{formatCurrency(historyData.totalAdvance)}</div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#d97706', marginTop: '2px' }}>{formatCurrency(historyData.totalAdvance)}</div>
             </div>
             <div style={{ background: '#ecfdf5', padding: '12px', borderRadius: '8px', border: '1px solid #a7f3d0', textAlign: 'center' }}>
               <div style={{ fontSize: '11px', color: '#059669', fontWeight: 700 }}>Total Paid Till Date</div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>₹{formatCurrency(historyData.totalPaid)}</div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>{formatCurrency(historyData.totalPaid)}</div>
             </div>
             {historyData.totalPending > 0 && (
               <div style={{ background: '#fef2f2', padding: '12px', borderRadius: '8px', border: '1px solid #fecaca', textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: 700 }}>Pending Balance Due</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#dc2626', marginTop: '2px' }}>₹{formatCurrency(historyData.totalPending)}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#dc2626', marginTop: '2px' }}>{formatCurrency(historyData.totalPending)}</div>
               </div>
             )}
           </div>
@@ -282,7 +282,7 @@ export const EmployeeStatementModal = ({
                           <strong>Basic Monthly Salary</strong>
                           <div style={{ fontSize: '11px', color: '#64748b' }}>Gross fixed salary for {formatMonthLabel(selectedMonth)}</div>
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{formatCurrency(currentSettlement.base_salary)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(currentSettlement.base_salary)}</td>
                       </tr>
 
                       {Number(currentSettlement.advance_amount) > 0 && (
@@ -295,7 +295,7 @@ export const EmployeeStatementModal = ({
                             </div>
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 700, color: '#b45309' }}>
-                            - ₹{formatCurrency(currentSettlement.advance_amount)}
+                            - {formatCurrency(currentSettlement.advance_amount)}
                           </td>
                         </tr>
                       )}
@@ -306,7 +306,7 @@ export const EmployeeStatementModal = ({
                           <div style={{ fontSize: '11px', color: '#1e40af' }}>After advance deductions</div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 800, color: '#1e40af' }}>
-                          ₹{formatCurrency(currentSettlement.net_payable)}
+                          {formatCurrency(currentSettlement.net_payable)}
                         </td>
                       </tr>
 
@@ -319,7 +319,7 @@ export const EmployeeStatementModal = ({
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 800, color: '#047857' }}>
-                          ₹{formatCurrency(currentSettlement.paid_amount)}
+                          {formatCurrency(currentSettlement.paid_amount)}
                         </td>
                       </tr>
 
@@ -329,7 +329,7 @@ export const EmployeeStatementModal = ({
                             <strong style={{ color: '#b91c1c' }}>Remaining Balance Due</strong>
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 800, color: '#b91c1c' }}>
-                            ₹{formatCurrency(currentSettlement.pending_balance)}
+                            {formatCurrency(currentSettlement.pending_balance)}
                           </td>
                         </tr>
                       )}
@@ -398,12 +398,12 @@ export const EmployeeStatementModal = ({
                       {historyData.history.map((s) => (
                         <tr key={s.id}>
                           <td style={{ fontWeight: 700 }}>{formatMonthLabel(s.month_year)}</td>
-                          <td style={{ textAlign: 'right' }}>₹{formatCurrency(s.base_salary)}</td>
+                          <td style={{ textAlign: 'right' }}>{formatCurrency(s.base_salary)}</td>
                           <td style={{ textAlign: 'right', color: Number(s.advance_amount) > 0 ? '#d97706' : '#94a3b8' }}>
-                            {Number(s.advance_amount) > 0 ? `₹${formatCurrency(s.advance_amount)}` : '—'}
+                            {Number(s.advance_amount) > 0 ? formatCurrency(s.advance_amount) : '—'}
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
-                            ₹{formatCurrency(s.paid_amount)}
+                            {formatCurrency(s.paid_amount)}
                           </td>
                           <td style={{ textAlign: 'center', fontSize: '11px' }}>
                             <div>{formatDate(s.payment_date)}</div>
@@ -427,9 +427,9 @@ export const EmployeeStatementModal = ({
                     <tfoot>
                       <tr style={{ background: '#f8fafc', fontWeight: 800 }}>
                         <td>TOTALS</td>
-                        <td style={{ textAlign: 'right' }}>₹{formatCurrency(historyData.totalBaseSalary)}</td>
-                        <td style={{ textAlign: 'right', color: '#d97706' }}>₹{formatCurrency(historyData.totalAdvance)}</td>
-                        <td style={{ textAlign: 'right', color: '#16a34a' }}>₹{formatCurrency(historyData.totalPaid)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatCurrency(historyData.totalBaseSalary)}</td>
+                        <td style={{ textAlign: 'right', color: '#d97706' }}>{formatCurrency(historyData.totalAdvance)}</td>
+                        <td style={{ textAlign: 'right', color: '#16a34a' }}>{formatCurrency(historyData.totalPaid)}</td>
                         <td colSpan={2} style={{ textAlign: 'center', color: '#64748b' }}>
                           {historyData.totalMonths} months processed
                         </td>

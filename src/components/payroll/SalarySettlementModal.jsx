@@ -187,19 +187,19 @@ export const SalarySettlementModal = ({
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', textAlign: 'center' }}>
                 <div style={{ background: '#ffffff', padding: '8px 4px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontSize: '11px', color: '#64748b' }}>Base Salary</div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>₹{formatCurrency(numBaseSalary)}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{formatCurrency(numBaseSalary)}</div>
                 </div>
                 <div style={{ background: '#ffffff', padding: '8px 4px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontSize: '11px', color: '#d97706' }}>- Advance</div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#d97706', marginTop: '2px' }}>₹{formatCurrency(numAdvance)}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#d97706', marginTop: '2px' }}>{formatCurrency(numAdvance)}</div>
                 </div>
                 <div style={{ background: '#eff6ff', padding: '8px 4px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
                   <div style={{ fontSize: '11px', color: '#0284c7' }}>= Net Due</div>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0284c7', marginTop: '2px' }}>₹{formatCurrency(netPayable)}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0284c7', marginTop: '2px' }}>{formatCurrency(netPayable)}</div>
                 </div>
                 <div style={{ background: '#ecfdf5', padding: '8px 4px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
                   <div style={{ fontSize: '11px', color: '#059669' }}>Disbursed</div>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>₹{formatCurrency(numPaid)}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>{formatCurrency(numPaid)}</div>
                 </div>
               </div>
             </div>
@@ -222,7 +222,7 @@ export const SalarySettlementModal = ({
                 />
               </div>
               <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
-                Defaults to employee profile base salary (₹{formatCurrency(employee.base_salary)})
+                Defaults to employee profile base salary ({formatCurrency(employee.base_salary)})
               </span>
             </div>
 
@@ -303,7 +303,7 @@ export const SalarySettlementModal = ({
                     onClick={handleSetFullNet}
                     style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '11px', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
                   >
-                    Pay Full Net Due (₹{formatCurrency(netPayable)})
+                    Pay Full Net Due ({formatCurrency(netPayable)})
                   </button>
                 )}
               </div>

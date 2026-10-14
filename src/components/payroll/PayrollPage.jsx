@@ -268,7 +268,7 @@ export const PayrollPage = ({ dataService, currentUser }) => {
           </div>
           <div className="payroll-kpi-info">
             <div className="payroll-kpi-label">Total Monthly Payroll</div>
-            <div className="payroll-kpi-value">₹{formatCurrency(summaryKpis.totalBase)}</div>
+            <div className="payroll-kpi-value">{formatCurrency(summaryKpis.totalBase)}</div>
             <div className="payroll-kpi-subtext">Active Staff ({summaryKpis.totalActive} Members)</div>
           </div>
         </div>
@@ -279,7 +279,7 @@ export const PayrollPage = ({ dataService, currentUser }) => {
           </div>
           <div className="payroll-kpi-info">
             <div className="payroll-kpi-label">Advances Deducted</div>
-            <div className="payroll-kpi-value" style={{ color: '#d97706' }}>₹{formatCurrency(summaryKpis.totalAdv)}</div>
+            <div className="payroll-kpi-value" style={{ color: '#d97706' }}>{formatCurrency(summaryKpis.totalAdv)}</div>
             <div className="payroll-kpi-subtext">Adjusted this month</div>
           </div>
         </div>
@@ -290,7 +290,7 @@ export const PayrollPage = ({ dataService, currentUser }) => {
           </div>
           <div className="payroll-kpi-info">
             <div className="payroll-kpi-label">Total Salary Disbursed</div>
-            <div className="payroll-kpi-value" style={{ color: '#059669' }}>₹{formatCurrency(summaryKpis.totalPaid)}</div>
+            <div className="payroll-kpi-value" style={{ color: '#059669' }}>{formatCurrency(summaryKpis.totalPaid)}</div>
             <div className="payroll-kpi-subtext">{summaryKpis.paidCount} Fully Settled</div>
           </div>
         </div>
@@ -301,7 +301,7 @@ export const PayrollPage = ({ dataService, currentUser }) => {
           </div>
           <div className="payroll-kpi-info">
             <div className="payroll-kpi-label">Pending / Unpaid Balance</div>
-            <div className="payroll-kpi-value" style={{ color: '#dc2626' }}>₹{formatCurrency(summaryKpis.totalPending)}</div>
+            <div className="payroll-kpi-value" style={{ color: '#dc2626' }}>{formatCurrency(summaryKpis.totalPending)}</div>
             <div className="payroll-kpi-subtext">
               <strong style={{ color: '#dc2626' }}>{summaryKpis.pendingCount} Staff</strong> not yet paid
             </div>
@@ -416,14 +416,14 @@ export const PayrollPage = ({ dataService, currentUser }) => {
                     </td>
 
                     <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                      ₹{formatCurrency(r.baseSalary)}
+                      {formatCurrency(r.baseSalary)}
                     </td>
 
                     <td style={{ textAlign: 'right' }}>
                       {r.advanceAmount > 0 ? (
                         <div>
                           <span style={{ fontWeight: 700, color: '#d97706' }}>
-                            - ₹{formatCurrency(r.advanceAmount)}
+                            - {formatCurrency(r.advanceAmount)}
                           </span>
                           {r.advanceDate && (
                             <div style={{ fontSize: '10px', color: '#92400e' }}>
@@ -437,14 +437,14 @@ export const PayrollPage = ({ dataService, currentUser }) => {
                     </td>
 
                     <td style={{ textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>
-                      ₹{formatCurrency(r.netPayable)}
+                      {formatCurrency(r.netPayable)}
                     </td>
 
                     <td style={{ textAlign: 'right' }}>
                       {r.paidAmount > 0 ? (
                         <div>
                           <span style={{ fontWeight: 800, color: '#059669' }}>
-                            ₹{formatCurrency(r.paidAmount)}
+                            {formatCurrency(r.paidAmount)}
                           </span>
                           <div style={{ fontSize: '10px', color: '#64748b' }}>
                             {r.paymentMode} {r.paymentDate ? `(${formatDate(r.paymentDate)})` : ''}
@@ -548,24 +548,24 @@ export const PayrollPage = ({ dataService, currentUser }) => {
                 <div className="payroll-emp-breakdown-grid">
                   <div className="payroll-breakdown-item">
                     <span>Base Monthly Salary</span>
-                    <span>₹{formatCurrency(r.baseSalary)}</span>
+                    <span>{formatCurrency(r.baseSalary)}</span>
                   </div>
 
                   <div className="payroll-breakdown-item">
                     <span>Advance Taken</span>
                     <span style={{ color: r.advanceAmount > 0 ? '#d97706' : '#64748b' }}>
-                      {r.advanceAmount > 0 ? `- ₹${formatCurrency(r.advanceAmount)}` : '₹0'}
+                      {r.advanceAmount > 0 ? `- ${formatCurrency(r.advanceAmount)}` : '₹0'}
                     </span>
                   </div>
 
                   <div className="payroll-breakdown-item">
                     <span>Net Payable Due</span>
-                    <span style={{ color: '#0284c7' }}>₹{formatCurrency(r.netPayable)}</span>
+                    <span style={{ color: '#0284c7' }}>{formatCurrency(r.netPayable)}</span>
                   </div>
 
                   <div className="payroll-breakdown-item">
                     <span>Disbursed</span>
-                    <span style={{ color: '#059669' }}>₹{formatCurrency(r.paidAmount)}</span>
+                    <span style={{ color: '#059669' }}>{formatCurrency(r.paidAmount)}</span>
                   </div>
                 </div>
 
