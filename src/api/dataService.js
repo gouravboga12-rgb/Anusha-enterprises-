@@ -3841,7 +3841,7 @@ class DataService {
     return record;
   }
 
-  deleteEmployee(id, currentUser) {
+  async deleteEmployee(id, currentUser) {
     const emp = this.getEmployeeById(id);
     if (!emp) return false;
 
@@ -3856,9 +3856,13 @@ class DataService {
     this.notify();
 
     if (isSupabaseConfigured) {
-      // First delete associated settlements in Supabase, then delete employee
-      supabase.from('employee_salary_settlements').delete().eq('employee_id', id).then().catch(console.warn);
-      supabase.from('employees').delete().eq('id', id).then().catch(console.warn);
+      try {
+        // Cascade delete in Supabase: settlements first, then employee
+        await supabase.from('employee_salary_settlements').delete().eq('employee_id', id);
+        await supabase.from('employees').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Supabase deleteEmployee error:', err);
+      }
     }
     return true;
   }
@@ -3953,10 +3957,12 @@ class DataService {
     this.notify();
 
     if (isSupabaseConfigured) {
+      // Omit non-column array fields from Supabase payload
+      const { advance_history, payment_history, ...supabaseRecord } = record;
       if (isNew) {
-        supabase.from('employee_salary_settlements').insert([record]).then().catch(console.warn);
+        supabase.from('employee_salary_settlements').insert([supabaseRecord]).then().catch(console.warn);
       } else {
-        supabase.from('employee_salary_settlements').update(record).eq('id', settlementId).then().catch(console.warn);
+        supabase.from('employee_salary_settlements').update(supabaseRecord).eq('id', settlementId).then().catch(console.warn);
       }
     }
 
