@@ -215,7 +215,7 @@ export const SalarySettlementModal = ({
                   type="number"
                   required
                   min="0"
-                  step="100"
+                  step="any"
                   value={baseSalary}
                   onChange={(e) => setBaseSalary(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px 8px 34px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}
@@ -254,7 +254,7 @@ export const SalarySettlementModal = ({
                 <input
                   type="number"
                   min="0"
-                  step="100"
+                  step="any"
                   placeholder="0"
                   value={advanceAmount}
                   onChange={(e) => setAdvanceAmount(e.target.value)}
@@ -312,7 +312,7 @@ export const SalarySettlementModal = ({
                 <input
                   type="number"
                   min="0"
-                  step="100"
+                  step="any"
                   required
                   value={paidAmount}
                   onChange={(e) => setPaidAmount(e.target.value)}

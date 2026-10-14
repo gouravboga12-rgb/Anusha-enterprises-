@@ -176,8 +176,8 @@ export const EmployeeFormModal = ({ isOpen, onClose, onSave, employee }) => {
                   <input
                     type="number"
                     required
-                    min="1"
-                    step="100"
+                    min="0"
+                    step="any"
                     placeholder="e.g. 20000"
                     value={formData.base_salary}
                     onChange={(e) => setFormData({ ...formData, base_salary: e.target.value })}
