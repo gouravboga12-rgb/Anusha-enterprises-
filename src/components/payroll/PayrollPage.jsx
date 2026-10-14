@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Banknote, PlusCircle, Search, Filter, Calendar, ChevronLeft, ChevronRight,
   UserCheck, AlertCircle, CheckCircle2, Clock, IndianRupee, ArrowDownRight,
-  FileText, Download, Edit2, Trash2, ShieldCheck, MoreVertical, Phone, CreditCard, Database
+  FileText, Download, Edit2, Trash2, ShieldCheck, MoreVertical, Phone, CreditCard
 } from 'lucide-react';
 import { formatCurrency, formatDate, getTodayDateString } from '../../utils/formatters';
 import { EmployeeFormModal } from './EmployeeFormModal';
@@ -46,12 +46,6 @@ export const PayrollPage = ({ dataService, currentUser }) => {
     return dataService.subscribe(() => setTick((t) => t + 1));
   }, [dataService]);
 
-  // Auto-seed 5 demo employees with 8 months of records if none exist
-  useEffect(() => {
-    if (dataService?.getEmployees && dataService.getEmployees('all').length === 0) {
-      dataService.seedDemoPayrollData(false).then(() => setTick((t) => t + 1));
-    }
-  }, [dataService]);
 
   // Month navigation helpers
   const handlePrevMonth = () => {
@@ -285,30 +279,6 @@ export const PayrollPage = ({ dataService, currentUser }) => {
             This Month
           </button>
 
-          <button
-            onClick={async () => {
-              if (window.confirm('Load / Reset 5 demo staff members with 8 months of realistic salary and advance records?')) {
-                await dataService.seedDemoPayrollData(true);
-                setTick((t) => t + 1);
-              }
-            }}
-            className="btn btn-secondary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 12px',
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#0284c7',
-              borderColor: '#bfdbfe',
-              background: '#eff6ff'
-            }}
-            title="Load 5 demo employees with 8 months of salary records"
-          >
-            <Database size={15} />
-            Load Demo Data (5 Staff × 8 Months)
-          </button>
 
           <button
             onClick={handleOpenAddEmployee}
