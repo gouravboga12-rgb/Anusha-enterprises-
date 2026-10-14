@@ -82,6 +82,11 @@ export const App = () => {
     setSelectedSupplierId(null);
   };
 
+  const [, setTick] = useState(0); // For re-rendering when dataService changes
+  const [productsSubTab, setProductsSubTab] = useState('catalog'); // 'catalog' | 'godowns'
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Header Manual Refresh Handler (Fetches fresh live data across all modules from Supabase)
   const handleRefresh = async () => {
     try {
       if (dataService?.fetchAll) {
@@ -92,10 +97,6 @@ export const App = () => {
     }
     setTick((t) => t + 1);
   };
-
-  const [productsSubTab, setProductsSubTab] = useState('catalog'); // 'catalog' | 'godowns'
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [, setTick] = useState(0); // For re-rendering when dataService changes
 
   // Synchronize route URL with login state
   useEffect(() => {
