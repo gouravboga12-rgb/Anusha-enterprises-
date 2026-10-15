@@ -66,18 +66,6 @@ export const LoginPage = ({ onLoginSuccess, dataService }) => {
     }, 400);
   };
 
-  const handleQuickFillEmail = () => {
-    setIdentifier('shivat9640@gmail.com');
-    setPassword('96409 12521');
-    setError('');
-  };
-
-  const handleQuickFillPhone = () => {
-    setIdentifier('96409 12521');
-    setPassword('96409 12521');
-    setError('');
-  };
-
   return (
     <div className="login-page-container">
       <div className="login-card">
@@ -112,12 +100,13 @@ export const LoginPage = ({ onLoginSuccess, dataService }) => {
               <input
                 type="text"
                 className="login-input"
-                placeholder="shivat9640@gmail.com or 96409 12521"
+                placeholder="Enter your email or mobile number"
                 value={identifier}
                 onChange={(e) => {
                   setIdentifier(e.target.value);
                   setError('');
                 }}
+                autoComplete="username"
                 required
                 autoFocus
               />
@@ -135,12 +124,13 @@ export const LoginPage = ({ onLoginSuccess, dataService }) => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="login-input"
-                placeholder="Enter password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
                   setError('');
                 }}
+                autoComplete="current-password"
                 required
               />
               <button
@@ -178,27 +168,6 @@ export const LoginPage = ({ onLoginSuccess, dataService }) => {
             )}
           </button>
         </form>
-
-        {/* Quick Demo Fill Buttons */}
-        <div className="login-helpers">
-          <p className="login-helpers-title">Quick Access Shortcut</p>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="login-helper-pill"
-              onClick={handleQuickFillEmail}
-            >
-              <Mail size={12} /> Auto-fill with Email
-            </button>
-            <button
-              type="button"
-              className="login-helper-pill"
-              onClick={handleQuickFillPhone}
-            >
-              <Phone size={12} /> Auto-fill with Mobile
-            </button>
-          </div>
-        </div>
 
         {/* Security Footer */}
         <div className="login-footer">

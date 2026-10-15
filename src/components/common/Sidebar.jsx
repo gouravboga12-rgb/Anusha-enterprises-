@@ -18,11 +18,12 @@ import {
   Wallet,
   Activity,
   ShieldCheck,
-  Banknote
+  Banknote,
+  Globe
 } from 'lucide-react';
 import { dataService } from '../../api/dataService';
 
-export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, onLogout }) => {
+export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, onLogout, onOpenSeoModal }) => {
   const products = dataService.getProducts();
   const lowStockCount = products.filter((p) => p.current_stock <= (p.min_stock_alert || 20)).length;
 
@@ -47,10 +48,13 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
     { id: 'activity-log', label: 'Activity Log', icon: Activity }
   ];
 
-  const adminItems = isOwner ? [
-    { id: 'payroll', label: 'Employee Salaries', icon: Banknote },
-    { id: 'users', label: 'Staff & Roles', icon: ShieldCheck }
-  ] : [];
+  const adminItems = [
+    ...(isOwner ? [
+      { id: 'payroll', label: 'Employee Salaries', icon: Banknote },
+      { id: 'users', label: 'Staff & Roles', icon: ShieldCheck }
+    ] : []),
+    { id: 'seo', label: 'SEO & Google Console', icon: Globe, isAction: true }
+  ];
 
   const handleResetData = () => {
     if (window.confirm('Reset all CRM and Ledger records back to default demo state?')) {
@@ -166,7 +170,11 @@ export const Sidebar = ({ activeTab, onSelectTab, isOpen, onClose, currentUser, 
                     key={item.id}
                     className={`nav-link ${isActive ? 'active' : ''}`}
                     onClick={() => {
-                      onSelectTab(item.id);
+                      if (item.isAction) {
+                        if (onOpenSeoModal) onOpenSeoModal();
+                      } else {
+                        onSelectTab(item.id);
+                      }
                       if (window.innerWidth <= 1024) onClose();
                     }}
                   >

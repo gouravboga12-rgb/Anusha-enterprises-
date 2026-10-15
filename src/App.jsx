@@ -36,6 +36,7 @@ import { Footer } from './components/common/Footer';
 import { LoginPage } from './components/auth/LoginPage';
 import { InvoiceModal } from './components/common/InvoiceModal';
 import { ToastNotification } from './components/common/ToastNotification';
+import { GoogleSearchConsoleModal } from './components/seo/GoogleSearchConsoleModal';
 import { Boxes, Warehouse } from 'lucide-react';
 
 import { dataService } from './api/dataService';
@@ -85,6 +86,52 @@ export const App = () => {
   const [, setTick] = useState(0); // For re-rendering when dataService changes
   const [productsSubTab, setProductsSubTab] = useState('catalog'); // 'catalog' | 'godowns'
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSeoModalOpen, setIsSeoModalOpen] = useState(false);
+
+  // Synchronize Google Search Console Verification Meta Tag from Local Storage
+  useEffect(() => {
+    try {
+      const savedToken = localStorage.getItem('anusha_gsc_verification_token');
+      if (savedToken) {
+        let metaTag = document.querySelector('meta[name="google-site-verification"]');
+        if (!metaTag) {
+          metaTag = document.createElement('meta');
+          metaTag.setAttribute('name', 'google-site-verification');
+          document.head.appendChild(metaTag);
+        }
+        metaTag.setAttribute('content', savedToken);
+      }
+    } catch (e) {
+      console.warn('GSC token sync error:', e);
+    }
+  }, []);
+
+  // Dynamic SEO Document Title per Tab/View
+  useEffect(() => {
+    if (!currentUser) {
+      document.title = 'Sign In | Anusha Enterprises Digital Ledger & Control Center';
+      return;
+    }
+
+    const tabTitleMap = {
+      dashboard: 'Dashboard Overview | Anusha Enterprises CRM',
+      customers: 'Customers & Khatabook Ledgers | Anusha Enterprises CRM',
+      suppliers: 'Suppliers & Accounts Payable | Anusha Enterprises CRM',
+      products: 'Products & Multi-Godown Stock | Anusha Enterprises CRM',
+      sales: 'Sales Billing & GST Invoices | Anusha Enterprises CRM',
+      purchases: 'Purchases & Stock Inward | Anusha Enterprises CRM',
+      payments: 'Payment Receipts & Installments | Anusha Enterprises CRM',
+      'customer-ledger': 'Customer Accounts Khatabook | Anusha Enterprises CRM',
+      'supplier-ledger': 'Supplier Accounts Khatabook | Anusha Enterprises CRM',
+      daybook: 'Day Book & Daily Transactions | Anusha Enterprises CRM',
+      wallet: 'Business Cash & Bank Wallets | Anusha Enterprises CRM',
+      payroll: 'Staff Salaries & Payroll Management | Anusha Enterprises CRM',
+      'activity-log': 'System Security & Activity Audit Log | Anusha Enterprises CRM',
+      users: 'Team Access & Permissions | Anusha Enterprises CRM'
+    };
+
+    document.title = tabTitleMap[activeTab] || 'Anusha Enterprises | Digital Ledger & Business Management';
+  }, [activeTab, currentUser]);
 
   // Header Manual Refresh Handler (Fetches fresh live data across all modules from Supabase)
   const handleRefresh = async () => {
@@ -321,6 +368,7 @@ export const App = () => {
         onClose={() => setIsSidebarOpen(false)}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenSeoModal={() => setIsSeoModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -332,6 +380,7 @@ export const App = () => {
           onOpenNewSale={() => openNewSale()}
           onOpenPayment={() => openPayment()}
           onRefresh={handleRefresh}
+          onOpenSeoModal={() => setIsSeoModalOpen(true)}
           currentUser={currentUser}
           onLogout={handleLogout}
         />
@@ -809,6 +858,12 @@ export const App = () => {
       <ToastNotification
         notification={toastNotification}
         onClose={() => setToastNotification(null)}
+      />
+
+      {/* SEO Optimization & Google Search Console Integration Modal */}
+      <GoogleSearchConsoleModal
+        isOpen={isSeoModalOpen}
+        onClose={() => setIsSeoModalOpen(false)}
       />
 
       {/* Touch-Friendly Mobile Bottom Navigation Bar */}

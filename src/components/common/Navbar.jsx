@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Menu, Search, PlusCircle, Receipt, MapPin, Calendar, Database, Cloud, LogOut, RefreshCw } from 'lucide-react';
+import { Menu, Search, PlusCircle, Receipt, MapPin, Calendar, Database, Cloud, LogOut, RefreshCw, Globe } from 'lucide-react';
 import { AiVoiceWidget } from './AiVoiceWidget';
 import { formatDate, getTodayDateString } from '../../utils/formatters';
 
-export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, onRefresh, isLiveConnected, isLoading, currentUser, onLogout }) => {
+export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, onRefresh, onOpenSeoModal, isLiveConnected, isLoading, currentUser, onLogout }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const todayStr = formatDate(getTodayDateString());
 
@@ -140,6 +140,32 @@ export const Navbar = ({ onToggleSidebar, onOpenNewSale, onOpenPayment, onRefres
         </button>
 
         <AiVoiceWidget />
+
+        {/* SEO & Google Search Console Quick Launcher */}
+        <button
+          onClick={onOpenSeoModal}
+          className="btn btn-secondary btn-sm header-seo-btn"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 11px',
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            color: '#166534',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            flexShrink: 0
+          }}
+          title="SEO Optimization & Google Search Console Integration"
+        >
+          <Globe size={14} color="#16a34a" />
+          <span className="btn-text" style={{ fontSize: '12px', fontWeight: 700, color: '#166534' }}>
+            SEO & Google
+          </span>
+        </button>
 
         <div className="header-quick-btns" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button

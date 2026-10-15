@@ -1,0 +1,9 @@
+# Robots.txt for Anusha Enterprises CRM
+User-agent: *
+Allow: /
+Allow: /logo.png
+Allow: /manifest.json
+Allow: /sitemap.xml
+
+# XML Sitemap location for search crawlers (Googlebot, Bingbot, etc.)
+Sitemap: https://anusha-enterprises.vercel.app/sitemap.xml
