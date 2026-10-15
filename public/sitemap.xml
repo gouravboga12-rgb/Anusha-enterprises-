@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <!-- Primary Landing & Access -->
   <url>
-    <loc>https://anusha-enterprises.vercel.app/</loc>
+    <loc>https://www.anushaenterprises.com/</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -14,70 +11,70 @@
 
   <!-- Core Business Modules -->
   <url>
-    <loc>https://anusha-enterprises.vercel.app/dashboard</loc>
+    <loc>https://www.anushaenterprises.com/dashboard</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/customers</loc>
+    <loc>https://www.anushaenterprises.com/customers</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/suppliers</loc>
+    <loc>https://www.anushaenterprises.com/suppliers</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/products</loc>
+    <loc>https://www.anushaenterprises.com/products</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/sales</loc>
+    <loc>https://www.anushaenterprises.com/sales</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/purchases</loc>
+    <loc>https://www.anushaenterprises.com/purchases</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/payments</loc>
+    <loc>https://www.anushaenterprises.com/payments</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/customer-ledger</loc>
+    <loc>https://www.anushaenterprises.com/customer-ledger</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/supplier-ledger</loc>
+    <loc>https://www.anushaenterprises.com/supplier-ledger</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://anusha-enterprises.vercel.app/daybook</loc>
+    <loc>https://www.anushaenterprises.com/daybook</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
