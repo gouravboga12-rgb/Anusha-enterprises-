@@ -36,7 +36,6 @@ import { Footer } from './components/common/Footer';
 import { LoginPage } from './components/auth/LoginPage';
 import { InvoiceModal } from './components/common/InvoiceModal';
 import { ToastNotification } from './components/common/ToastNotification';
-import { GoogleSearchConsoleModal } from './components/seo/GoogleSearchConsoleModal';
 import { Boxes, Warehouse } from 'lucide-react';
 
 import { dataService } from './api/dataService';
@@ -86,25 +85,6 @@ export const App = () => {
   const [, setTick] = useState(0); // For re-rendering when dataService changes
   const [productsSubTab, setProductsSubTab] = useState('catalog'); // 'catalog' | 'godowns'
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSeoModalOpen, setIsSeoModalOpen] = useState(false);
-
-  // Synchronize Google Search Console Verification Meta Tag from Local Storage
-  useEffect(() => {
-    try {
-      const savedToken = localStorage.getItem('anusha_gsc_verification_token');
-      if (savedToken) {
-        let metaTag = document.querySelector('meta[name="google-site-verification"]');
-        if (!metaTag) {
-          metaTag = document.createElement('meta');
-          metaTag.setAttribute('name', 'google-site-verification');
-          document.head.appendChild(metaTag);
-        }
-        metaTag.setAttribute('content', savedToken);
-      }
-    } catch (e) {
-      console.warn('GSC token sync error:', e);
-    }
-  }, []);
 
   // Dynamic SEO Document Title per Tab/View
   useEffect(() => {
@@ -368,7 +348,6 @@ export const App = () => {
         onClose={() => setIsSidebarOpen(false)}
         currentUser={currentUser}
         onLogout={handleLogout}
-        onOpenSeoModal={() => setIsSeoModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -380,7 +359,6 @@ export const App = () => {
           onOpenNewSale={() => openNewSale()}
           onOpenPayment={() => openPayment()}
           onRefresh={handleRefresh}
-          onOpenSeoModal={() => setIsSeoModalOpen(true)}
           currentUser={currentUser}
           onLogout={handleLogout}
         />
@@ -858,12 +836,6 @@ export const App = () => {
       <ToastNotification
         notification={toastNotification}
         onClose={() => setToastNotification(null)}
-      />
-
-      {/* SEO Optimization & Google Search Console Integration Modal */}
-      <GoogleSearchConsoleModal
-        isOpen={isSeoModalOpen}
-        onClose={() => setIsSeoModalOpen(false)}
       />
 
       {/* Touch-Friendly Mobile Bottom Navigation Bar */}
